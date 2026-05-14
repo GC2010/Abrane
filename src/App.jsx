@@ -201,7 +201,7 @@ function LoginScreen({onLogin}) {
       <div style={{display:'flex',justifyContent:'center',marginBottom:20}}>
         <div style={{background:T.navy,borderRadius:6,padding:'10px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
           <span style={{color:'#fff',fontWeight:900,fontSize:18,letterSpacing:3}}>ABRANE</span>
-          <span style={{color:'rgba(255,255,255,.5)',fontSize:8,letterSpacing:2}}>LE FABRICANT DE MOBILIER</span>
+          <span style={{color:'rgba(255,255,255,.5)',fontSize:8,letterSpacing:2}}>LE FABRICANT DE MOBILIER TEST</span>
         </div>
       </div>
       <h1 style={{fontSize:20,fontWeight:600,textAlign:'center',color:T.ink,margin:'0 0 6px'}}>Bienvenue</h1>
