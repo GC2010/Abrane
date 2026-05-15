@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 
 const T = {
   bg:"#F4F1EA",surface:"#FFFFFF",panel:"#FAF8F3",panel2:"#F0EBE0",tint:"#FBF7EE",
