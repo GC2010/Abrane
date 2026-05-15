@@ -377,25 +377,25 @@ function FormatThumb({id,accent='#C8A96E'}) {
 function TemplateApplyModal({template,onClose,onConfirm}) {
   const [name,setName]=useState(template.kind==='client'?`${template.name} — `:'Nouveau projet');
   const [fmt,setFmt]=useState(template.pageFormat);
-  return <Scrim onClose={onClose}><div style={{width:560,maxWidth:'92vw',background:T.surface,borderRadius:16,overflow:'hidden',boxShadow:'0 24px 80px rgba(15,20,40,.22)'}} onClick={e=>e.stopPropagation()}>
-    <div style={{padding:'22px 28px 16px',borderBottom:`1px solid ${T.lineSoft}`,display:'flex',justifyContent:'space-between'}}>
-      <div><div style={{fontSize:17,fontWeight:600,color:T.ink}}>Nouveau — {template.name}</div><div style={{fontSize:12,color:T.ink3,marginTop:3}}>{template.kind==='client'?'Tout est pré-rempli.':'Style et format sans identité client.'}</div></div>
+  return <Scrim onClose={onClose}><div style={{width:520,maxWidth:'92vw',maxHeight:'85vh',background:T.surface,borderRadius:16,overflow:'hidden',boxShadow:'0 24px 80px rgba(15,20,40,.22)',display:'flex',flexDirection:'column'}} onClick={e=>e.stopPropagation()}>
+    <div style={{padding:'18px 24px 14px',borderBottom:`1px solid ${T.lineSoft}`,display:'flex',justifyContent:'space-between',flexShrink:0}}>
+      <div><div style={{fontSize:16,fontWeight:600,color:T.ink}}>Nouveau — {template.name}</div><div style={{fontSize:12,color:T.ink3,marginTop:3}}>{template.kind==='client'?'Tout est pré-rempli.':'Style et format sans identité client.'}</div></div>
       <button style={{...btnSt('ghost',true),padding:4,border:'none'}} onClick={onClose}><Icon name="close" size={16} color={T.ink3}/></button>
     </div>
-    <div style={{padding:'16px 28px 24px'}}>
-      <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:14}}>
+    <div style={{padding:'14px 24px 18px',overflowY:'auto',flex:1}}>
+      <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:12}}>
         <label style={{fontSize:11,color:T.ink3,fontWeight:500}}>Nom du projet</label>
-        <input style={{...inputSt,padding:'10px 12px',fontSize:13}} value={name} onChange={e=>setName(e.target.value)} autoFocus/>
+        <input style={{...inputSt,padding:'9px 12px',fontSize:13}} value={name} onChange={e=>setName(e.target.value)} autoFocus/>
       </div>
       <div style={{fontSize:10.5,letterSpacing:'.12em',fontWeight:600,textTransform:'uppercase',color:T.ink4,marginBottom:8}}>Format</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-        {PAGE_FORMATS.map(f=><button key={f.id} onClick={()=>setFmt(f.id)} style={{padding:8,textAlign:'left',background:T.surface,border:`${f.id===fmt?2:1}px solid ${f.id===fmt?T.navy:T.line}`,borderRadius:8,cursor:'pointer'}}>
-          <div style={{marginBottom:6,borderRadius:4,overflow:'hidden'}}><FormatThumb id={f.id} accent={template.palette[1]}/></div>
-          <div style={{fontSize:11.5,fontWeight:500,color:T.ink}}>{f.name.replace(/^[^—]+— /,'')}</div>
+        {PAGE_FORMATS.map(f=><button key={f.id} onClick={()=>setFmt(f.id)} style={{padding:7,textAlign:'left',background:T.surface,border:`${f.id===fmt?2:1}px solid ${f.id===fmt?T.navy:T.line}`,borderRadius:8,cursor:'pointer'}}>
+          <div style={{marginBottom:5,borderRadius:4,overflow:'hidden'}}><FormatThumb id={f.id} accent={template.palette[1]}/></div>
+          <div style={{fontSize:11,fontWeight:500,color:T.ink}}>{f.name.replace(/^[^—]+— /,'')}</div>
         </button>)}
       </div>
     </div>
-    <div style={{padding:'14px 28px',borderTop:`1px solid ${T.lineSoft}`,display:'flex',justifyContent:'flex-end',gap:8,background:T.panel}}>
+    <div style={{padding:'12px 24px',borderTop:`1px solid ${T.lineSoft}`,display:'flex',justifyContent:'flex-end',gap:8,background:T.panel,flexShrink:0}}>
       <button style={btnSt()} onClick={onClose}>Annuler</button>
       <button style={btnSt('primary')} onClick={()=>onConfirm({name,pageFormat:fmt})}><Icon name="check" size={14} color="#fff"/>Créer</button>
     </div>
