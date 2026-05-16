@@ -473,20 +473,31 @@ function CoverPage({state,isPortrait,isRing}) {
   </div>;
 }
 
-function IndexPage({state,isPortrait,isRing}) {
-  const p=state.palette,rows=[];let pgN=2;
-  if(state.enIdx)pgN=3;if(state.enMat)pgN+=state.thumbCount>18?2:1;
+function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
+  const p=state.palette,allRows=[];
+  const totalRowCount=state.contentOrder.filter(it=>
+    it.type==='cat'||(state.idxMode!=='cats'&&state.files.find(x=>x.id===it.fileId))
+  ).length;
+  const nIdxPages=Math.max(1,Math.ceil(totalRowCount/40));
+  let pgN=2+nIdxPages;
+  if(state.enMat)pgN+=state.thumbCount>18?2:1;
   state.contentOrder.forEach(it=>{
-    if(it.type==='cat'){rows.push({name:it.name,page:pgN,isCat:true});pgN+=1;}
-    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){rows.push({name:f.name.replace(/\.[^.]+$/,''),page:pgN,isCat:false});pgN+=f.pages||1;}else pgN+=1;}
+    if(it.type==='cat'){allRows.push({name:it.name,page:pgN,isCat:true});pgN+=1;}
+    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){allRows.push({name:f.name.replace(/\.[^.]+$/,''),page:pgN,isCat:false});pgN+=f.pages||1;}else pgN+=1;}
   });
+  const pageRows=allRows.slice(pageIndex*40,(pageIndex+1)*40);
+  const col1=pageRows.slice(0,20),col2=pageRows.slice(20,40);
+  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'baseline',gap:4,padding:'5px 0',borderBottom:`1px dotted ${T.line}`,fontSize:11}}>
+    <span style={{flex:1,color:r.isCat?p.c2:T.ink2,fontWeight:r.isCat?700:400}}>{r.name}</span>
+    <span style={{color:r.isCat?p.c2:T.ink3,fontWeight:r.isCat?600:400}}>{String(r.page).padStart(2,'0')}</span>
+  </div>;
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:'5% '+(isRing?'9% 4% 12%':'9% 4% 5%'),position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'7%',background:p.c1,borderLeft:`3px solid ${p.c2}`}}/>
-          <h3 style={{fontSize:22,fontWeight:800,letterSpacing:'.08em',color:p.c3,margin:'0 0 12px'}}>INDEX</h3>
-    {rows.map((r,i)=><div key={i} style={{display:'flex',alignItems:'baseline',gap:4,padding:'5px 0',borderBottom:`1px dotted ${T.line}`,fontSize:11}}>
-      <span style={{flex:1,color:r.isCat?p.c2:T.ink2,fontWeight:r.isCat?700:400}}>{r.name}</span>
-      <span style={{color:r.isCat?p.c2:T.ink3,fontWeight:r.isCat?600:400}}>{String(r.page).padStart(2,'0')}</span>
-    </div>)}
+    <h3 style={{fontSize:22,fontWeight:800,letterSpacing:'.08em',color:p.c3,margin:'0 0 12px'}}>INDEX{nIdxPages>1?` · ${pageIndex+1}/${nIdxPages}`:''}</h3>
+    <div style={{display:'grid',gridTemplateColumns:col2.length?'1fr 1fr':'1fr',gap:'0 16px'}}>
+      <div>{col1.map((r,i)=><Row key={i} r={r} i={i}/>)}</div>
+      {col2.length>0&&<div>{col2.map((r,i)=><Row key={i} r={r} i={i}/>)}</div>}
+    </div>
     <BindingMarks isRing={isRing}/>
   </div>;
 }
@@ -572,7 +583,13 @@ function BackPage({state,isPortrait,isRing}) {
 const buildPageList = s => {
   const pages=[];
   pages.push({key:'cover',type:'cover',label:'Couverture'});
-  if(s.enIdx) pages.push({key:'idx',type:'index',label:'Sommaire'});
+  if(s.enIdx) {
+    const totalRowCount=s.contentOrder.filter(it=>
+      it.type==='cat'||(s.idxMode!=='cats'&&s.files.find(x=>x.id===it.fileId))
+    ).length;
+    const nIdxPages=Math.max(1,Math.ceil(totalRowCount/40));
+    for(let i=0;i<nIdxPages;i++) pages.push({key:'idx'+i,type:'index',label:'Sommaire',pageIndex:i});
+  }
   if(s.enMat) {
     const isP=s.pageFormat.startsWith('v');
     const perPage=(isP?4:6)*(isP?4:3);
@@ -593,7 +610,7 @@ function PageRender({page,state}) {
   const isP=state.pageFormat.startsWith('v'),isR=state.pageFormat.includes('ring');
   switch(page.type){
     case 'cover':     return <CoverPage   state={state} isPortrait={isP} isRing={isR}/>;
-    case 'index':     return <IndexPage   state={state} isPortrait={isP} isRing={isR}/>;
+    case 'index':     return <IndexPage   state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'materials': return <MatPage     state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'category':  return <CatPage     state={state} catName={page.catName} isPortrait={isP} isRing={isR}/>;
     case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} isPortrait={isP} isRing={isR}/>;
