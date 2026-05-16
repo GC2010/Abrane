@@ -735,7 +735,9 @@ function ProjectPanel({state,update}) {
             <div style={{display:'flex',alignItems:'center',gap:8}}><Icon name={f.ico} size={14} color={on?T.navy:T.ink4}/><div style={{fontSize:12.5,fontWeight:500,color:on?T.ink:T.ink3}}>{f.label}</div></div>
             <Toggle checked={on} onChange={v=>update({[f.key]:v})}/>
           </div>
-          {on&&<input style={inputSt} value={state[f.valKey]||''} placeholder={f.ph} onChange={e=>update({[f.valKey]:e.target.value})}/>}
+          {on&&(f.valKey==='sendDate'
+            ?<input type="date" style={inputSt} value={state.sendDate?state.sendDate.split('/').reverse().join('-'):''} onChange={e=>{const [y,m,d]=(e.target.value||'--').split('-');update({sendDate:e.target.value?`${d}/${m}/${y}`:''});}}/>
+            :<input style={inputSt} value={state[f.valKey]||''} placeholder={f.ph} onChange={e=>update({[f.valKey]:e.target.value})}/>)}
         </div>
       );})}
     </Sect>
