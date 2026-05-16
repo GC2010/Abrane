@@ -736,7 +736,7 @@ function ProjectPanel({state,update}) {
             <Toggle checked={on} onChange={v=>update({[f.key]:v})}/>
           </div>
           {on&&(f.valKey==='sendDate'
-            ?<input type="date" style={inputSt} value={state.sendDate?state.sendDate.split('/').reverse().join('-'):''} onChange={e=>{const [y,m,d]=(e.target.value||'--').split('-');update({sendDate:e.target.value?`${d}/${m}/${y}`:''});}}/>
+            ?<input type="date" lang="fr" style={inputSt} value={state.sendDate?state.sendDate.split('/').reverse().join('-'):''} onChange={e=>{const [y,m,d]=(e.target.value||'--').split('-');update({sendDate:e.target.value?`${d}/${m}/${y}`:''});}}/>
             :<input style={inputSt} value={state[f.valKey]||''} placeholder={f.ph} onChange={e=>update({[f.valKey]:e.target.value})}/>)}
         </div>
       );})}
