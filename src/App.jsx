@@ -571,7 +571,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'30%':'4%',left:(isRing||isNotes)?'14%':'4%',overflow:'hidden',display:'grid',alignItems:isNotes?'start':'center',justifyItems:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'34%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',alignItems:'center',justifyItems:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -582,7 +582,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     </div>
     {/* Notes zone — height 17%, bottom 3% */}
     {isNotes&&(
-      <div style={{position:'absolute',left:(isRing||isNotes)?'14%':'4%',right:'11%',bottom:'3%',height:'17%',background:'#fff',border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{position:'absolute',left:isRing?'14%':'4%',right:'11%',bottom:'3%',height:'17%',background:'#fff',border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         {/* Compact toolbar — only when editing context available */}
         {notesCtx&&(
           <div style={{display:'flex',alignItems:'center',gap:1,padding:'1px 3px',borderBottom:`1px solid ${shade(p.c1,-6)}`,flexShrink:0,background:shade(p.c1,8),flexWrap:'wrap'}}>
