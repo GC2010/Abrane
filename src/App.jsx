@@ -1209,20 +1209,27 @@ function Configurator({user,project}) {
   const activeStepRef=React.useRef('project');
   const [toast,setToast]=useState(null);
   const [zoom,setZoom]=useState(1);
+  const [activePage,setActivePage]=useState(0);
+  const [thumbSize,setThumbSize]=useState('M');
   const update=useCallback(patch=>{setState(s=>({...s,...patch,_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const updateNested=useCallback((key,patch)=>{setState(s=>({...s,[key]:{...s[key],...patch},_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2400);};
   const save=()=>{setState(s=>({...s,_dirty:false}));showToast('Projet enregistré');};
   const compl=computeCompletion(state,dirtySteps);
+  const PALETTE_H={S:99,M:122,L:150};
+  const paletteH=PALETTE_H[thumbSize];
   return <div style={{display:'flex',flex:1,overflow:'hidden',minHeight:0}}>
     <Rail steps={STEPS} active={activeStep} state={state} compl={compl} onPick={id=>{activeStepRef.current=id;setActiveStep(id);}}/>
     {activeStep&&<Inspector step={activeStep} state={state} update={update} updateNested={updateNested}/>}
-    <Canvas state={state} zoom={zoom} setZoom={setZoom}/>
-    {state._dirty&&<div style={{position:'fixed',bottom:24,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:8,background:'rgba(20,20,30,.92)',backdropFilter:'blur(20px)',borderRadius:999,padding:'6px 8px 6px 14px',zIndex:30,boxShadow:'0 8px 24px rgba(0,0,0,.22)'}}>
+    <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <Canvas state={state} zoom={zoom} setZoom={setZoom} activePage={activePage}/>
+      <ThumbnailPalette state={state} activePage={activePage} onPageClick={setActivePage} thumbSize={thumbSize} setThumbSize={setThumbSize}/>
+    </div>
+    {state._dirty&&<div style={{position:'fixed',bottom:paletteH+16,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:8,background:'rgba(20,20,30,.92)',backdropFilter:'blur(20px)',borderRadius:999,padding:'6px 8px 6px 14px',zIndex:30,boxShadow:'0 8px 24px rgba(0,0,0,.22)'}}>
       <span style={{fontSize:11.5,color:'rgba(255,255,255,.6)'}}>Modifications non enregistrées</span>
       <button onClick={save} style={{background:T.surface,border:'none',color:T.ink,padding:'5px 12px',fontSize:12,borderRadius:999,display:'inline-flex',alignItems:'center',gap:5,fontWeight:600,cursor:'pointer'}}><Icon name="save" size={13} color={T.ink}/>Enregistrer</button>
     </div>}
-    {toast&&<div style={{position:'fixed',bottom:16,right:16,background:T.ink,color:'#fff',padding:'9px 14px',borderRadius:8,fontSize:12,zIndex:9999}}>{toast}</div>}
+    {toast&&<div style={{position:'fixed',bottom:paletteH+16,right:16,background:T.ink,color:'#fff',padding:'9px 14px',borderRadius:8,fontSize:12,zIndex:9999}}>{toast}</div>}
   </div>;
 }
 
