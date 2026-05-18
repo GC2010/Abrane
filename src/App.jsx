@@ -54,6 +54,9 @@ const PATHS = {
   pageBot:"M6 7l6 6 6-6 M6 13l6 6 6-6",
   pencil:"M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z",
   move:"M5 9l-2 2 2 2 M19 9l2 2-2 2 M9 5l2-2 2 2 M9 19l2 2 2-2 M12 3v18 M3 12h18",
+  alignL:"M3 6h18 M3 11h13 M3 16h9",
+  alignC:"M3 6h18 M6 11h12 M7 16h10",
+  alignR:"M3 6h18 M8 11h13 M12 16h9",
 };
 
 function Icon({name, size=18, color, stroke=1.5, style={}}) {
@@ -164,7 +167,7 @@ const initialState = project => {
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, wmEnabled:false, wmOpacity:15,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', _dirty:false,
   };
 };
 
@@ -569,8 +572,11 @@ function MatPage({state,isPortrait,isRing,pageIndex=0}) {
 function NotesPage({state,isPortrait,isRing}) {
   const p=state.palette;
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:isRing?'9% 9% 9% 14%':'9%',position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
-    <div style={{fontSize:10,letterSpacing:'.18em',textTransform:'uppercase',color:p.c3,marginBottom:'2%'}}>NOTES</div>
-    {Array.from({length:12}).map((_,i)=><div key={i} style={{borderBottom:`1px solid ${shade(p.c1,-4)}`,marginBottom:'2.6%'}}/>)}
+    <div style={{fontSize:10,letterSpacing:'.18em',textTransform:'uppercase',color:p.c3,marginBottom:'3%'}}>NOTES</div>
+    <div
+      style={{fontSize:11,color:'#222',lineHeight:1.7,wordBreak:'break-word'}}
+      dangerouslySetInnerHTML={{__html:state.noteHtml||'<span style="color:#bbb;font-style:italic">Vos notes apparaîtront ici…</span>'}}
+    />
     <BindingMarks isRing={isRing}/>
   </div>;
 }
@@ -984,7 +990,71 @@ function MaterialsPanel({state,update}) {
 }
 
 function NotesPanel({state,update}) {
-  return <Sect title="Notes"><RowItem label="Activer les pages Notes" sub="Annotables en réunion"><Toggle checked={state.enNotes} onChange={v=>update({enNotes:v})}/></RowItem></Sect>;
+  const editorRef=useRef(null);
+  useEffect(()=>{
+    if(editorRef.current) editorRef.current.innerHTML=state.noteHtml||'';
+  },[]);
+  const exec=(cmd,val=null)=>{
+    editorRef.current?.focus();
+    document.execCommand(cmd,false,val);
+    update({noteHtml:editorRef.current?.innerHTML||''});
+  };
+  const setSize=sz=>{
+    const map={S:'1',M:'3',L:'5',XL:'7'};
+    exec('fontSize',map[sz]||'3');
+  };
+  const btnStyle=(active)=>({
+    padding:'2px 6px',borderRadius:4,border:'none',cursor:'pointer',fontSize:11,
+    background:active?T.gold:'transparent',color:active?'#fff':T.ink,fontWeight:600,
+  });
+  return <>
+    <Sect title="Notes">
+      <RowItem label="Activer les pages Notes" sub="Annotables en réunion">
+        <Toggle checked={state.enNotes} onChange={v=>update({enNotes:v})}/>
+      </RowItem>
+    </Sect>
+    {state.enNotes&&<Sect title="Contenu des notes">
+      {/* Formatting toolbar */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:8,padding:'6px 8px',background:T.panel,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
+        <button style={{...btnStyle(),fontWeight:900}} onMouseDown={e=>{e.preventDefault();exec('bold');}}>B</button>
+        <button style={{...btnStyle(),fontStyle:'italic'}} onMouseDown={e=>{e.preventDefault();exec('italic');}}>I</button>
+        <button style={{...btnStyle(),textDecoration:'underline'}} onMouseDown={e=>{e.preventDefault();exec('underline');}}>U</button>
+        <button style={{...btnStyle(),textDecoration:'line-through'}} onMouseDown={e=>{e.preventDefault();exec('strikeThrough');}}>S</button>
+        <div style={{width:1,background:T.lineSoft,margin:'0 3px'}}/>
+        {['S','M','L','XL'].map(s=>(
+          <button key={s} style={btnStyle()} onMouseDown={e=>{e.preventDefault();setSize(s);}}>{s}</button>
+        ))}
+        <div style={{width:1,background:T.lineSoft,margin:'0 3px'}}/>
+        <button style={btnStyle()} title="Aligner à gauche" onMouseDown={e=>{e.preventDefault();exec('justifyLeft');}}>
+          <Icon name="alignL" size={13} color={T.ink}/>
+        </button>
+        <button style={btnStyle()} title="Centrer" onMouseDown={e=>{e.preventDefault();exec('justifyCenter');}}>
+          <Icon name="alignC" size={13} color={T.ink}/>
+        </button>
+        <button style={btnStyle()} title="Aligner à droite" onMouseDown={e=>{e.preventDefault();exec('justifyRight');}}>
+          <Icon name="alignR" size={13} color={T.ink}/>
+        </button>
+        <div style={{width:1,background:T.lineSoft,margin:'0 3px'}}/>
+        <button style={btnStyle()} title="Liste à puces" onMouseDown={e=>{e.preventDefault();exec('insertUnorderedList');}}>•</button>
+        <button style={btnStyle()} title="Liste numérotée" onMouseDown={e=>{e.preventDefault();exec('insertOrderedList');}}>1.</button>
+        <div style={{width:1,background:T.lineSoft,margin:'0 3px'}}/>
+        <button style={btnStyle()} title="Effacer la mise en forme" onMouseDown={e=>{e.preventDefault();exec('removeFormat');}}>✕</button>
+      </div>
+      {/* Editable area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={()=>update({noteHtml:editorRef.current?.innerHTML||''})}
+        style={{
+          minHeight:180,padding:'10px 12px',borderRadius:6,border:`1.5px solid ${T.lineStrong}`,
+          background:'#fff',fontSize:12.5,color:T.ink,lineHeight:1.7,outline:'none',
+          wordBreak:'break-word',fontFamily:'inherit',
+        }}
+        data-placeholder="Saisissez vos notes ici…"
+      />
+    </Sect>}
+  </>;
 }
 function ContentPanel({state,update}) {
   return <>
