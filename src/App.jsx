@@ -183,7 +183,7 @@ const initialState = project => {
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, wmEnabled:false, wmOpacity:15,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, _dirty:false,
   };
 };
 
@@ -539,12 +539,14 @@ function CatPage({state,catName,isPortrait,isRing}) {
   </div>;
 }
 
-function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,pageKey}) {
+function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,pageKey,ordId}) {
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
   const rot=rotation||0;
-  const needsScale=rot===90||rot===270;
   const hasAnn=!!(state.annotations?.[pageKey]);
   const displayUrl=state.annotSnaps?.[pageKey]||pageUrl;
+  const cZoom=state.contentZoom?.[ordId]??100;
+  const cX=state.contentPos?.[ordId]?.x??50;
+  const cY=state.contentPos?.[ordId]?.y??50;
   const notesCtx=React.useContext(NotesEditCtx);
   const editorRef=useRef(null);
   const savedHtml=notesCtx?.pageNotes?.[pageKey]||'';
@@ -569,9 +571,9 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
     </div>
     {/* Image zone */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(needsScale?'34%':'25%'):'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'26%':'4%',left:isRing?'14%':'4%',overflow:'hidden'}}>
       {displayUrl
-        ?<img src={displayUrl} alt={file.name} style={{maxWidth:'92%',maxHeight:'92%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?(isNotes?0.55:0.68):1})`:'none',transition:'transform .2s'}}/>
+        ?<img src={displayUrl} alt={file.name} style={{position:'absolute',width:`${cZoom}%`,height:`${cZoom}%`,objectFit:'cover',left:`${cX}%`,top:`${cY}%`,transform:`translate(-50%,-50%)${rot?` rotate(${rot}deg)`:''}`,maxWidth:'none',maxHeight:'none',transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
           {file.name.replace(/\.[^.]+$/,'')} {pageIdx>0?`(${pageIdx+1})`:''}
         </div>
@@ -698,7 +700,7 @@ const buildPageList = s => {
   if(s.enNotes) pages.push({key:'notes0',type:'notes',label:'Notes'});
   s.contentOrder.forEach(it=>{
     if(it.type==='cat') pages.push({key:'cat-'+it.id,type:'category',label:it.name,catName:it.name});
-    else{const f=s.files.find(x=>x.id===it.fileId);if(!f)return;const dn=it.label||f.name.replace(/\.[^.]+$/,'');for(let i=0;i<(f.pages||1);i++)pages.push({key:'f-'+it.id+'-'+i,type:'content',label:dn,file:f,pageIdx:i,rotation:it.rotation||0,pageUrl:(f.pageUrls&&f.pageUrls[i])||null});}
+    else{const f=s.files.find(x=>x.id===it.fileId);if(!f)return;const dn=it.label||f.name.replace(/\.[^.]+$/,'');for(let i=0;i<(f.pages||1);i++)pages.push({key:'f-'+it.id+'-'+i,type:'content',label:dn,file:f,pageIdx:i,ordId:it.id,rotation:(it.pageRotations?.[i]??it.rotation)??0,pageUrl:(f.pageUrls&&f.pageUrls[i])||null});}
   });
 
   pages.push({key:'back',type:'back',label:'Quatrième de couverture'});
@@ -712,7 +714,7 @@ function PageRender({page,state}) {
     case 'index':     return <IndexPage   state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'materials': return <MatPage     state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'category':  return <CatPage     state={state} catName={page.catName} isPortrait={isP} isRing={isR}/>;
-    case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} isPortrait={isP} isRing={isR} rotation={page.rotation} pageUrl={page.pageUrl} pageKey={page.key}/>;
+    case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} isPortrait={isP} isRing={isR} rotation={page.rotation} pageUrl={page.pageUrl} pageKey={page.key} ordId={page.ordId}/>;
     case 'notes':     return <NotesPage   state={state} isPortrait={isP} isRing={isR} noteIdx={page.noteIdx||0}/>;
     case 'back':      return <BackPage    state={state} isPortrait={isP} isRing={isR}/>;
     default: return null;
@@ -1217,9 +1219,15 @@ function ContentPanel({state,update}) {
     update({contentOrder:newOrder,files:newFiles});
   };
 
-  const setRotation=(ordId,deg)=>{
-    update({contentOrder:state.contentOrder.map(x=>x.id===ordId?{...x,rotation:deg}:x)});
+  const setRotation=(ordId,deg,pageIdx)=>{
+    update({contentOrder:state.contentOrder.map(x=>{
+      if(x.id!==ordId)return x;
+      if(pageIdx===undefined) return {...x,rotation:deg};
+      return {...x,pageRotations:{...(x.pageRotations||{}),[pageIdx]:deg}};
+    })});
   };
+  const setContentZoom=(ordId,val)=>update({contentZoom:{...(state.contentZoom||{}),[ordId]:val}});
+  const setContentPos=(ordId,x,y)=>update({contentPos:{...(state.contentPos||{}),[ordId]:{x,y}}});
 
   const startRename=item=>{
     const f=item.type==='file'?state.files.find(x=>x.id===item.fileId):null;
@@ -1277,6 +1285,9 @@ function ContentPanel({state,update}) {
           const isOver=overIdx===idx;
           const isRenaming=renaming?.id===item.id;
           const rot=item.rotation||0;
+          const cz=isCat?100:(state.contentZoom?.[item.id]??100);
+          const cx=isCat?50:(state.contentPos?.[item.id]?.x??50);
+          const cy=isCat?50:(state.contentPos?.[item.id]?.y??50);
           return(
             <div key={item.id}
               draggable={!isRenaming}
@@ -1314,14 +1325,50 @@ function ContentPanel({state,update}) {
                   <Icon name="trash" size={12} color={T.ink4}/>
                 </button>
               </div>
-              {/* Rotation row — only for files */}
+              {/* Controls — only for files */}
               {!isCat&&(
-                <div style={{display:'flex',alignItems:'center',gap:4,marginTop:5,paddingLeft:47}}>
-                  <Icon name="rotateCW" size={10} color={T.ink5}/>
-                  <span style={{fontSize:9,color:T.ink5,marginRight:2}}>Rotation</span>
-                  {[0,90,180,270].map(deg=>(
-                    <button key={deg} onClick={e=>{e.stopPropagation();setRotation(item.id,deg);}} style={rotBtnSt(rot===deg)}>{deg}°</button>
-                  ))}
+                <div style={{marginTop:6,paddingLeft:47}}>
+                  {/* Rotation: single row for 1-page, per-page for multi */}
+                  {f.pages===1?(
+                    <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:5}}>
+                      <Icon name="rotateCW" size={10} color={T.ink5}/>
+                      <span style={{fontSize:9,color:T.ink5,marginRight:2}}>Rotation</span>
+                      {[0,90,180,270].map(deg=>(
+                        <button key={deg} onClick={e=>{e.stopPropagation();setRotation(item.id,deg);}} style={rotBtnSt((item.pageRotations?.[0]??item.rotation??0)===deg)}>{deg}°</button>
+                      ))}
+                    </div>
+                  ):(
+                    <div style={{marginBottom:5}}>
+                      <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
+                        <Icon name="rotateCW" size={10} color={T.ink5}/>
+                        <span style={{fontSize:9,color:T.ink5}}>Rotation par page</span>
+                      </div>
+                      {Array.from({length:f.pages},(_,pi)=>{
+                        const pr=item.pageRotations?.[pi]??item.rotation??0;
+                        return(
+                          <div key={pi} style={{display:'flex',alignItems:'center',gap:3,marginBottom:2}}>
+                            <span style={{fontSize:8.5,color:T.ink5,minWidth:22,flexShrink:0}}>P{pi+1}</span>
+                            {[0,90,180,270].map(deg=>(
+                              <button key={deg} onClick={e=>{e.stopPropagation();setRotation(item.id,deg,pi);}} style={rotBtnSt(pr===deg)}>{deg}°</button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Zoom & position */}
+                  <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
+                    <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Zoom {cz}%</span>
+                    <input type="range" min="30" max="250" value={cz} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();setContentZoom(item.id,parseInt(e.target.value));}} style={{flex:1,accentColor:T.navy}}/>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
+                    <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>← → {cx}%</span>
+                    <input type="range" min="0" max="100" value={cx} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();setContentPos(item.id,parseInt(e.target.value),cy);}} style={{flex:1,accentColor:T.navy}}/>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>↑ ↓ {cy}%</span>
+                    <input type="range" min="0" max="100" value={cy} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();setContentPos(item.id,cx,parseInt(e.target.value));}} style={{flex:1,accentColor:T.navy}}/>
+                  </div>
                 </div>
               )}
             </div>
