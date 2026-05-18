@@ -181,7 +181,8 @@ const initialState = project => {
     enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,
     materials:SAMPLE_MATS, files:[], contentOrder:[],
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
-    backDecor:'BOOK', sigEnabled:false, wmEnabled:false, wmOpacity:15, sigUrl:'', wmLogoUrl:'',
+    backDecor:'BOOK', sigEnabled:false, sigPlacement:'all', wmEnabled:false, wmOpacity:10, sigUrl:'',
+    stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
     notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, _dirty:false,
   };
@@ -495,7 +496,7 @@ function CoverPage({state,isPortrait,isRing}) {
       <div style={{background:T.navy,borderRadius:3,padding:'5px 0',display:'flex',flexDirection:'column',alignItems:'center',width:'62%',flexShrink:0}}>
         {'ABRANE'.split('').map((c,i)=><span key={i} style={{color:'#fff',fontWeight:900,fontSize:8,lineHeight:1.25}}>{c}</span>)}
       </div>
-      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{maxWidth:'80%',maxHeight:'18%',objectFit:'contain',display:'block',flexShrink:0}}/>}
+      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     <BindingMarks isRing={isRing}/>
   </div>;
@@ -779,13 +780,25 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
               <PageRender page={p} state={state}/>
             </NotesEditCtx.Provider>
             {state.wmEnabled&&(
-              <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:6,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {state.wmLogoUrl
-                  ?<img src={state.wmLogoUrl} alt="" style={{width:'55%',maxHeight:'55%',objectFit:'contain',opacity:state.wmOpacity/100,transform:'rotate(-45deg)',filter:'grayscale(1) brightness(1.4)',userSelect:'none'}}/>
-                  :<span style={{fontWeight:900,letterSpacing:'.35em',color:'#1A1F2E',opacity:state.wmOpacity/100,transform:'rotate(-45deg)',whiteSpace:'nowrap',userSelect:'none',fontSize:'clamp(14px,5vw,52px)',fontFamily:'inherit'}}>ABRANE</span>
-                }
+              <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:6}}>
+                <div style={{position:'absolute',inset:'-80%',display:'grid',gridTemplateColumns:'repeat(5,1fr)',gridTemplateRows:'repeat(8,1fr)',transform:'rotate(-40deg)',transformOrigin:'center',opacity:state.wmOpacity/100}}>
+                  {Array.from({length:40}).map((_,k)=>(
+                    <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <span style={{fontWeight:900,letterSpacing:'.25em',fontSize:'clamp(5px,1.1vw,11px)',color:'#1A1F2E',whiteSpace:'nowrap',userSelect:'none',fontFamily:'inherit'}}>ABRANE</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
+            {state.sigEnabled&&state.sigUrl&&(()=>{
+              const pl=state.sigPlacement||'all';
+              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content');
+              return show?(
+                <div style={{position:'absolute',bottom:'4%',right:'9.5%',zIndex:8,pointerEvents:'none',maxWidth:'22%'}}>
+                  <img src={state.sigUrl} alt="" style={{width:'100%',objectFit:'contain',opacity:0.9}}/>
+                </div>
+              ):null;
+            })()}
             {p.type==='content'&&onAnnotate&&(
               <div style={{position:'absolute',top:8,right:10,zIndex:10}}>
                 <button onClick={e=>{e.stopPropagation();onAnnotate(p);}} style={{
@@ -880,10 +893,17 @@ function ProjectPanel({state,update}) {
           <input type="file" accept="image/*" style={{display:'none'}} onChange={handleLogoDrop}/>
         </label>
       )}
-      {state.clientLogoUrl&&<Fld label={`Taille du logo · ${state.logoScale}%`}>
-        <input type="range" min="20" max="300" value={state.logoScale} onChange={e=>update({logoScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
-        <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:T.ink4}}><span>Petit</span><span>Normal</span><span>Grand</span></div>
-      </Fld>}
+      {state.clientLogoUrl&&<>
+        <Fld label={`Taille logo couverture · ${state.logoScale}%`}>
+          <input type="range" min="20" max="300" value={state.logoScale} onChange={e=>update({logoScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Taille logo striscia · ${state.stripeLogoScale||80}%`}>
+          <input type="range" min="20" max="100" value={state.stripeLogoScale||80} onChange={e=>update({stripeLogoScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position verticale striscia · ${state.stripeLogoY||0}%`}>
+          <input type="range" min="0" max="70" value={state.stripeLogoY||0} onChange={e=>update({stripeLogoY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+      </>}
       <div style={{padding:'8px 12px',background:T.navyTint,border:`1px solid #D2DBEC`,borderRadius:8,fontSize:11,color:T.ink3}}>Le logo <strong style={{color:T.ink}}>ABRANE</strong> est intégré automatiquement en haut à droite.</div>
     </Sect>
     <Sect title="Informations complémentaires" extra={<span style={{fontSize:11,color:T.ink3}}>{OPT.filter(f=>state[f.key]).length}/{OPT.length}</span>}>
@@ -1424,6 +1444,12 @@ function SignPanel({state,update,user}) {
   const savedSig=sigKey?localStorage.getItem(sigKey)||'':'';
   const [sigImg,setSigImg]=useState(savedSig);
 
+  // Sync saved signature into state on mount so it appears on pages
+  useEffect(()=>{
+    if(savedSig&&!state.sigUrl) update({sigUrl:savedSig});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
   const px=e=>e.touches?e.touches[0].clientX:e.clientX;
   const py=e=>e.touches?e.touches[0].clientY:e.clientY;
 
@@ -1472,11 +1498,23 @@ function SignPanel({state,update,user}) {
     r.readAsDataURL(f);
   };
 
+  const PLACEMENTS=[{v:'all',l:'Toutes les pages'},{v:'first',l:'Couverture uniquement'},{v:'last',l:'Dernière page uniquement'},{v:'content',l:'Pages contenu uniquement'}];
+
   return <>
     <Sect title="Signature">
       <RowItem label="Activer la signature" sub={user?`Profil : ${user.name}`:'Aucun profil'}>
         <Toggle checked={state.sigEnabled} onChange={v=>update({sigEnabled:v})}/>
       </RowItem>
+      {state.sigEnabled&&<Fld label="Appliquer sur">
+        <div style={{display:'flex',flexDirection:'column',gap:4}}>
+          {PLACEMENTS.map(pl=>(
+            <label key={pl.v} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12,color:T.ink}}>
+              <input type="radio" name="sigPlacement" value={pl.v} checked={(state.sigPlacement||'all')===pl.v} onChange={()=>update({sigPlacement:pl.v})} style={{accentColor:T.navy}}/>
+              {pl.l}
+            </label>
+          ))}
+        </div>
+      </Fld>}
       {sigImg
         ?<div style={{border:`1px solid ${T.line}`,borderRadius:8,overflow:'hidden',background:'#fafaf8'}}>
             <img src={sigImg} alt="Signature" style={{width:'100%',display:'block',maxHeight:90,objectFit:'contain',padding:8,boxSizing:'border-box'}}/>
@@ -1511,31 +1549,12 @@ function SignPanel({state,update,user}) {
       }
     </Sect>
     <Sect title="Filigrane">
-      <RowItem label="Filigrane ABRANE" sub="Logo en diagonale sur toutes les pages">
+      <RowItem label="Filigrane ABRANE" sub="Répété en diagonale sur toutes les pages">
         <Toggle checked={state.wmEnabled} onChange={v=>update({wmEnabled:v})}/>
       </RowItem>
-      {state.wmEnabled&&<>
-        <Fld label={`Opacité ${state.wmOpacity}%`}>
-          <input type="range" min="3" max="50" value={state.wmOpacity} onChange={e=>update({wmOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
-        </Fld>
-        <div style={{fontSize:11,color:T.ink3,lineHeight:1.5}}>
-          Logo utilisé : texte <strong>ABRANE</strong> stylisé. Pour utiliser votre fichier SVG/PNG, importez-le ci-dessous.
-        </div>
-        {state.wmLogoUrl
-          ?<div style={{display:'flex',gap:6,alignItems:'center',padding:'6px 8px',background:T.panel,border:`1px solid ${T.line}`,borderRadius:6}}>
-              <img src={state.wmLogoUrl} alt="Logo" style={{height:24,objectFit:'contain'}}/>
-              <span style={{flex:1,fontSize:11,color:T.ink3}}>Logo personnalisé</span>
-              <button onClick={()=>update({wmLogoUrl:''})} style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA'}}>✕</button>
-            </div>
-          :<label style={{...btnSt(undefined,true),cursor:'pointer',justifyContent:'center',width:'100%',boxSizing:'border-box'}}>
-              <Icon name="upload" size={11} color={T.ink}/>Importer logo ABRANE
-              <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={e=>{
-                const f=e.target.files?.[0];if(!f)return;
-                const r=new FileReader();r.onload=ev=>update({wmLogoUrl:ev.target.result});r.readAsDataURL(f);
-              }}/>
-            </label>
-        }
-      </>}
+      {state.wmEnabled&&<Fld label={`Opacité ${state.wmOpacity}%`}>
+        <input type="range" min="3" max="40" value={state.wmOpacity} onChange={e=>update({wmOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+      </Fld>}
     </Sect>
   </>;
 }
