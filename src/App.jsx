@@ -181,7 +181,7 @@ const initialState = project => {
     enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,
     materials:SAMPLE_MATS, files:[], contentOrder:[],
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
-    backDecor:'BOOK', sigEnabled:false, wmEnabled:false, wmOpacity:15,
+    backDecor:'BOOK', sigEnabled:false, wmEnabled:false, wmOpacity:15, sigUrl:'', wmLogoUrl:'',
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
     notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, _dirty:false,
   };
@@ -771,6 +771,14 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
             <NotesEditCtx.Provider value={notesCtxVal}>
               <PageRender page={p} state={state}/>
             </NotesEditCtx.Provider>
+            {state.wmEnabled&&(
+              <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:6,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {state.wmLogoUrl
+                  ?<img src={state.wmLogoUrl} alt="" style={{width:'55%',maxHeight:'55%',objectFit:'contain',opacity:state.wmOpacity/100,transform:'rotate(-45deg)',filter:'grayscale(1) brightness(1.4)',userSelect:'none'}}/>
+                  :<span style={{fontWeight:900,letterSpacing:'.35em',color:'#1A1F2E',opacity:state.wmOpacity/100,transform:'rotate(-45deg)',whiteSpace:'nowrap',userSelect:'none',fontSize:'clamp(14px,5vw,52px)',fontFamily:'inherit'}}>ABRANE</span>
+                }
+              </div>
+            )}
             {p.type==='content'&&onAnnotate&&(
               <div style={{position:'absolute',top:8,right:10,zIndex:10}}>
                 <button onClick={e=>{e.stopPropagation();onAnnotate(p);}} style={{
@@ -1400,17 +1408,127 @@ function BackPanel({state,update}) {
     {state.backLines.map((l,i)=><Fld key={i} label={`Ligne ${i+1}`}><input style={inputSt} value={l} onChange={e=>{const lines=[...state.backLines];lines[i]=e.target.value;update({backLines:lines});}}/></Fld>)}
   </Sect>;
 }
-function SignPanel({state,update}) {
+function SignPanel({state,update,user}) {
+  const canvasRef=useRef(null);
+  const drawing=useRef(false);
+  const [mode,setMode]=useState('draw');
+
+  const sigKey=user?'abrane_sig_'+user.id:null;
+  const savedSig=sigKey?localStorage.getItem(sigKey)||'':'';
+  const [sigImg,setSigImg]=useState(savedSig);
+
+  const px=e=>e.touches?e.touches[0].clientX:e.clientX;
+  const py=e=>e.touches?e.touches[0].clientY:e.clientY;
+
+  const startDraw=e=>{
+    e.preventDefault();
+    drawing.current=true;
+    const c=canvasRef.current,r=c.getBoundingClientRect();
+    const ctx=c.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo((px(e)-r.left)*(c.width/r.width),(py(e)-r.top)*(c.height/r.height));
+  };
+  const draw=e=>{
+    e.preventDefault();
+    if(!drawing.current)return;
+    const c=canvasRef.current,r=c.getBoundingClientRect();
+    const ctx=c.getContext('2d');
+    ctx.lineTo((px(e)-r.left)*(c.width/r.width),(py(e)-r.top)*(c.height/r.height));
+    ctx.strokeStyle='#1A1F2E';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();
+  };
+  const stopDraw=()=>{drawing.current=false;};
+
+  const clear=()=>{
+    const c=canvasRef.current;
+    c.getContext('2d').clearRect(0,0,c.width,c.height);
+  };
+  const saveSig=()=>{
+    const url=canvasRef.current.toDataURL('image/png');
+    if(sigKey) localStorage.setItem(sigKey,url);
+    setSigImg(url);
+    update({sigUrl:url,sigEnabled:true});
+  };
+  const deleteSig=()=>{
+    if(sigKey) localStorage.removeItem(sigKey);
+    setSigImg('');
+    update({sigUrl:'',sigEnabled:false});
+  };
+  const uploadSig=e=>{
+    const f=e.target.files?.[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      const url=ev.target.result;
+      if(sigKey) localStorage.setItem(sigKey,url);
+      setSigImg(url);
+      update({sigUrl:url,sigEnabled:true});
+    };
+    r.readAsDataURL(f);
+  };
+
   return <>
     <Sect title="Signature">
-      <div style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:'pointer'}}>
-        <Icon name="signature" size={22} color={T.gold}/><strong style={{fontSize:12.5,color:T.ink}}>Chargez votre signature</strong>
-      </div>
-      <RowItem label="Activer la signature" sub="Apposée sur l'export"><Toggle checked={state.sigEnabled} onChange={v=>update({sigEnabled:v})}/></RowItem>
+      <RowItem label="Activer la signature" sub={user?`Profil : ${user.name}`:'Aucun profil'}>
+        <Toggle checked={state.sigEnabled} onChange={v=>update({sigEnabled:v})}/>
+      </RowItem>
+      {sigImg
+        ?<div style={{border:`1px solid ${T.line}`,borderRadius:8,overflow:'hidden',background:'#fafaf8'}}>
+            <img src={sigImg} alt="Signature" style={{width:'100%',display:'block',maxHeight:90,objectFit:'contain',padding:8,boxSizing:'border-box'}}/>
+            <div style={{display:'flex',gap:6,padding:'6px 8px',borderTop:`1px solid ${T.lineSoft}`}}>
+              <button onClick={deleteSig} style={{...btnSt(undefined,true),flex:1,justifyContent:'center',color:'#C53030',borderColor:'#FECACA'}}>Supprimer</button>
+            </div>
+          </div>
+        :<>
+          <div style={{display:'flex',gap:4,marginBottom:6}}>
+            {['draw','upload'].map(m=><button key={m} onClick={()=>setMode(m)} style={{...btnSt(mode===m?'primary':'default',true),flex:1,justifyContent:'center'}}>
+              {m==='draw'?'Dessiner':'Importer'}
+            </button>)}
+          </div>
+          {mode==='draw'
+            ?<>
+              <canvas ref={canvasRef} width={560} height={180}
+                style={{border:`1.5px solid ${T.lineStrong}`,borderRadius:8,background:'#fff',cursor:'crosshair',touchAction:'none',width:'100%',display:'block'}}
+                onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+              />
+              <div style={{display:'flex',gap:6,marginTop:6}}>
+                <button onClick={clear} style={{...btnSt(undefined,true),flex:1,justifyContent:'center'}}>Effacer</button>
+                <button onClick={saveSig} style={{...btnSt('primary',true),flex:1,justifyContent:'center'}}><Icon name="check" size={12} color="#fff"/>Enregistrer</button>
+              </div>
+            </>
+            :<label style={{...btnSt(undefined,false),cursor:'pointer',justifyContent:'center',width:'100%',boxSizing:'border-box'}}>
+              <Icon name="upload" size={13} color={T.ink}/>Choisir une image
+              <input type="file" accept="image/*" style={{display:'none'}} onChange={uploadSig}/>
+            </label>
+          }
+        </>
+      }
     </Sect>
     <Sect title="Filigrane">
-      <RowItem label="Filigrane" sub="Texte diagonal en transparence"><Toggle checked={state.wmEnabled} onChange={v=>update({wmEnabled:v})}/></RowItem>
-      {state.wmEnabled&&<Fld label={`Opacité ${state.wmOpacity}%`}><input type="range" min="5" max="60" value={state.wmOpacity} onChange={e=>update({wmOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/></Fld>}
+      <RowItem label="Filigrane ABRANE" sub="Logo en diagonale sur toutes les pages">
+        <Toggle checked={state.wmEnabled} onChange={v=>update({wmEnabled:v})}/>
+      </RowItem>
+      {state.wmEnabled&&<>
+        <Fld label={`Opacité ${state.wmOpacity}%`}>
+          <input type="range" min="3" max="50" value={state.wmOpacity} onChange={e=>update({wmOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <div style={{fontSize:11,color:T.ink3,lineHeight:1.5}}>
+          Logo utilisé : texte <strong>ABRANE</strong> stylisé. Pour utiliser votre fichier SVG/PNG, importez-le ci-dessous.
+        </div>
+        {state.wmLogoUrl
+          ?<div style={{display:'flex',gap:6,alignItems:'center',padding:'6px 8px',background:T.panel,border:`1px solid ${T.line}`,borderRadius:6}}>
+              <img src={state.wmLogoUrl} alt="Logo" style={{height:24,objectFit:'contain'}}/>
+              <span style={{flex:1,fontSize:11,color:T.ink3}}>Logo personnalisé</span>
+              <button onClick={()=>update({wmLogoUrl:''})} style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA'}}>✕</button>
+            </div>
+          :<label style={{...btnSt(undefined,true),cursor:'pointer',justifyContent:'center',width:'100%',boxSizing:'border-box'}}>
+              <Icon name="upload" size={11} color={T.ink}/>Importer logo ABRANE
+              <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={e=>{
+                const f=e.target.files?.[0];if(!f)return;
+                const r=new FileReader();r.onload=ev=>update({wmLogoUrl:ev.target.result});r.readAsDataURL(f);
+              }}/>
+            </label>
+        }
+      </>}
     </Sect>
   </>;
 }
@@ -1423,7 +1541,7 @@ function SymbolsPanel() {
   </Sect>;
 }
 
-function StepPanel({step,state,update,updateNested}) {
+function StepPanel({step,state,update,updateNested,user}) {
   switch(step){
     case 'project': return <ProjectPanel  state={state} update={update}/>;
     case 'palette': return <PalettePanel  state={state} update={update} updateNested={updateNested}/>;
@@ -1434,7 +1552,7 @@ function StepPanel({step,state,update,updateNested}) {
     case 'notes':   return <NotesPanel    state={state} update={update}/>;
     case 'content': return <ContentPanel  state={state} update={update}/>;
     case 'back':    return <BackPanel     state={state} update={update}/>;
-    case 'sign':    return <SignPanel     state={state} update={update}/>;
+    case 'sign':    return <SignPanel     state={state} update={update} user={user}/>;
     case 'sym':     return <SymbolsPanel/>;
     default: return null;
   }
@@ -1483,7 +1601,7 @@ const STEP_DESC={
   back:"La 4ᵉ de couverture : coordonnées entreprise.",sign:"Signature et filigrane optionnel.",sym:"Bibliothèque de pictogrammes.",
 };
 
-function Inspector({step,state,update,updateNested}) {
+function Inspector({step,state,update,updateNested,user}) {
   const meta=STEPS.find(s=>s.id===step)||STEPS[0];
   const stepIndex=STEPS.findIndex(s=>s.id===step)+1;
   return <section style={{width:340,flexShrink:0,background:T.surface,borderRight:`1px solid ${T.line}`,overflowY:'auto',display:'flex',flexDirection:'column'}}>
@@ -1496,7 +1614,7 @@ function Inspector({step,state,update,updateNested}) {
       <p style={{fontSize:12,color:T.ink3,lineHeight:1.5,margin:'6px 0 0'}}>{STEP_DESC[step]}</p>
     </div>
     <div style={{padding:'16px 22px 60px',display:'flex',flexDirection:'column',gap:18}}>
-      <StepPanel step={step} state={state} update={update} updateNested={updateNested}/>
+      <StepPanel step={step} state={state} update={update} updateNested={updateNested} user={user}/>
     </div>
   </section>;
 }
@@ -2119,7 +2237,7 @@ function Configurator({user,project}) {
   const paletteH=paletteCollapsed?32:PALETTE_H[thumbSize];
   return <div style={{display:'flex',flex:1,overflow:'hidden',minHeight:0}}>
     <Rail steps={STEPS} active={activeStep} state={state} compl={compl} onPick={id=>{activeStepRef.current=id;setActiveStep(id);}}/>
-    {activeStep&&<Inspector step={activeStep} state={state} update={update} updateNested={updateNested}/>}
+    {activeStep&&<Inspector step={activeStep} state={state} update={update} updateNested={updateNested} user={user}/>}
     <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <Canvas state={state} zoom={zoom} setZoom={setZoom} activePage={activePage}
         paletteH={paletteH}
