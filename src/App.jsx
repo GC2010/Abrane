@@ -83,10 +83,6 @@ const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',setBrand:()=>{}}
 
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
-  {id:'u1',name:'Sandro Caron',initials:'SC',role:'admin',hasSig:true,team:'ABRANE FR'},
-  {id:'u2',name:'Élise Mercier',initials:'ÉM',role:'editor',hasSig:true,team:'ABRANE FR'},
-  {id:'u3',name:'Marco Bianchi',initials:'MB',role:'editor',hasSig:false,team:'ABRANE IT'},
-  {id:'u4',name:'Camille Rouvière',initials:'CR',role:'viewer',hasSig:true,team:'ABRANE FR'},
 ];
 const TEAM_TEMPLATES = [
   {id:'t-std',name:'ABRANE — Standard',kind:'generic',desc:'Modèle de base ABRANE. Couleurs crème + or.',palette:['#E8DCC8','#C8A96E','#2B2B2B'],pageFormat:'h-full',badges:['Officiel'],author:'Sandro Caron',updated:'Il y a 3 j',uses:28,lastAdminNote:null},
@@ -188,6 +184,7 @@ const initialState = project => {
     materials:SAMPLE_MATS, files:[], contentOrder:[],
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, sigPlacement:'all', wmEnabled:false, wmOpacity:10, sigUrl:'',
+    sigScale:30, sigX:78, sigY:88,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
     notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, _dirty:false,
@@ -907,7 +904,7 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
               const pl=state.sigPlacement||'all';
               const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content');
               return show?(
-                <div style={{position:'absolute',bottom:'4%',right:'9.5%',zIndex:8,pointerEvents:'none',maxWidth:'22%'}}>
+                <div style={{position:'absolute',left:`${state.sigX??78}%`,top:`${state.sigY??88}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.sigScale??30}%`,maxWidth:'40%'}}>
                   <img src={state.sigUrl} alt="" style={{width:'100%',objectFit:'contain',opacity:0.9}}/>
                 </div>
               ):null;
@@ -1618,16 +1615,27 @@ function SignPanel({state,update,user}) {
       <RowItem label="Activer la signature" sub={user?`Profil : ${user.name}`:'Aucun profil'}>
         <Toggle checked={state.sigEnabled} onChange={v=>update({sigEnabled:v})}/>
       </RowItem>
-      {state.sigEnabled&&<Fld label="Appliquer sur">
-        <div style={{display:'flex',flexDirection:'column',gap:4}}>
-          {PLACEMENTS.map(pl=>(
-            <label key={pl.v} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12,color:T.ink}}>
-              <input type="radio" name="sigPlacement" value={pl.v} checked={(state.sigPlacement||'all')===pl.v} onChange={()=>update({sigPlacement:pl.v})} style={{accentColor:T.navy}}/>
-              {pl.l}
-            </label>
-          ))}
-        </div>
-      </Fld>}
+      {state.sigEnabled&&<>
+        <Fld label="Appliquer sur">
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {PLACEMENTS.map(pl=>(
+              <label key={pl.v} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12,color:T.ink}}>
+                <input type="radio" name="sigPlacement" value={pl.v} checked={(state.sigPlacement||'all')===pl.v} onChange={()=>update({sigPlacement:pl.v})} style={{accentColor:T.navy}}/>
+                {pl.l}
+              </label>
+            ))}
+          </div>
+        </Fld>
+        <Fld label={`Taille · ${state.sigScale??30}%`}>
+          <input type="range" min="5" max="60" value={state.sigScale??30} onChange={e=>update({sigScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position horizontale · ${state.sigX??78}%`}>
+          <input type="range" min="0" max="100" value={state.sigX??78} onChange={e=>update({sigX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position verticale · ${state.sigY??88}%`}>
+          <input type="range" min="0" max="100" value={state.sigY??88} onChange={e=>update({sigY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+      </>}
       {sigImg
         ?<div style={{border:`1px solid ${T.line}`,borderRadius:8,overflow:'hidden',background:'#fafaf8'}}>
             <img src={sigImg} alt="Signature" style={{width:'100%',display:'block',maxHeight:90,objectFit:'contain',padding:8,boxSizing:'border-box'}}/>
