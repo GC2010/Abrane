@@ -50,6 +50,10 @@ const PATHS = {
   pdf:"M7 3h7l4 4v14H7V3z M14 3v4h4 M9 14h6 M9 17h4",
   folderTeam:"M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z M8 12h8 M8 15h5",
   minus:"M5 12h14",
+  pageTop:"M6 17l6-6 6 6 M6 11l6-6 6 6",
+  pageBot:"M6 7l6 6 6-6 M6 13l6 6 6-6",
+  pencil:"M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z",
+  move:"M5 9l-2 2 2 2 M19 9l2 2-2 2 M9 5l2-2 2 2 M9 19l2 2 2-2 M12 3v18 M3 12h18",
 };
 
 function Icon({name, size=18, color, stroke=1.5, style={}}) {
@@ -1115,7 +1119,154 @@ function Inspector({step,state,update,updateNested}) {
   </section>;
 }
 
-function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize}) {
+function VueEnsembleModal({state,update,onClose}) {
+  const [vueSize,setVueSize]=useState('M');
+  const [localOrder,setLocalOrder]=useState(state.contentOrder);
+  const [renamingId,setRenamingId]=useState(null);
+  const [renameVal,setRenameVal]=useState('');
+  const [dragCoIdx,setDragCoIdx]=useState(null);
+  const [overCoIdx,setOverCoIdx]=useState(null);
+
+  const stateL=useMemo(()=>({...state,contentOrder:localOrder}),[state,localOrder]);
+
+  const enriched=useMemo(()=>{
+    const s=stateL,pages=[];
+    pages.push({key:'cover',type:'cover',label:'Couverture',coIdx:-1});
+    if(s.enIdx){
+      const n=s.contentOrder.filter(it=>it.type==='cat'||(s.idxMode!=='cats'&&s.files.find(x=>x.id===it.fileId))).length;
+      for(let i=0;i<Math.max(1,Math.ceil(n/40));i++) pages.push({key:'idx'+i,type:'index',label:'Sommaire',pageIndex:i,coIdx:-1});
+    }
+    if(s.enMat){
+      const isP=s.pageFormat.startsWith('v'),pp=(isP?4:6)*(isP?4:3);
+      for(let i=0;i<(s.thumbCount>pp?2:1);i++) pages.push({key:'mat'+i,type:'materials',label:'Matériaux',pageIndex:i,coIdx:-1});
+    }
+    if(s.enNotes) pages.push({key:'notes0',type:'notes',label:'Notes',coIdx:-1});
+    s.contentOrder.forEach((it,coIdx)=>{
+      if(it.type==='cat'){pages.push({key:'cat-'+it.id,type:'category',label:it.name,catName:it.name,coIdx});}
+      else{const f=s.files.find(x=>x.id===it.fileId);if(!f)return;for(let i=0;i<(f.pages||1);i++) pages.push({key:'f-'+it.id+'-'+i,type:'content',label:f.name.replace(/\.[^.]+$/,''),file:f,pageIdx:i,coIdx});}
+    });
+    pages.push({key:'back',type:'back',label:'Quatrième de couverture',coIdx:-1});
+    return pages;
+  },[stateL]);
+
+  const VH={SX:46,S:66,M:90,L:124,XL:168};
+  const thumbH=VH[vueSize];
+  const isP=state.pageFormat.startsWith('v');
+  const ratio=isP?210/297:297/210;
+  const thumbW=Math.round(thumbH*ratio);
+  const REF_W=isP?700:1000;
+  const scale=thumbW/REF_W;
+
+  const startRename=it=>{setRenamingId(it.id);setRenameVal(it.name);};
+  const commitRename=()=>{
+    if(renamingId&&renameVal.trim()) setLocalOrder(o=>o.map(it=>it.id===renamingId?{...it,name:renameVal.trim()}:it));
+    setRenamingId(null);
+  };
+  const reorder=(from,to)=>{
+    if(from===to||from===null||to===null)return;
+    const a=[...localOrder];
+    const [item]=a.splice(from,1);
+    a.splice(from<to?Math.min(to-1,a.length):to,0,item);
+    setLocalOrder(a);
+  };
+  const apply=()=>{update({contentOrder:localOrder});onClose();};
+
+  return <Scrim onClose={onClose}><div style={{
+    width:'92vw',maxWidth:1300,maxHeight:'90vh',background:T.surface,
+    borderRadius:16,display:'flex',flexDirection:'column',
+    boxShadow:'0 32px 80px rgba(0,0,0,.3)',border:`1px solid ${T.line}`,overflow:'hidden'
+  }} onClick={e=>e.stopPropagation()}>
+
+    {/* ── Header */}
+    <div style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px',borderBottom:`1px solid ${T.lineSoft}`,flexShrink:0}}>
+      <Icon name="grid" size={16} color={T.navy}/>
+      <span style={{fontSize:15,fontWeight:600,color:T.ink}}>Vue ensemble</span>
+      <span style={{...pillSt(),fontSize:10}}>{enriched.length} pages</span>
+      <div style={{flex:1}}/>
+      <div style={{display:'inline-flex',gap:2,background:T.panel2,borderRadius:6,padding:2}}>
+        {['SX','S','M','L','XL'].map(s=>(
+          <button key={s} onClick={()=>setVueSize(s)} style={{
+            background:vueSize===s?T.navy:'transparent',border:'none',
+            color:vueSize===s?'#fff':T.ink3,borderRadius:4,padding:'3px 10px',
+            fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'.12s'
+          }}>{s}</button>
+        ))}
+      </div>
+      <button onClick={onClose} style={{background:'transparent',border:`1px solid ${T.line}`,borderRadius:6,padding:'5px 8px',cursor:'pointer',display:'flex',alignItems:'center',marginLeft:4}}>
+        <Icon name="close" size={15} color={T.ink3}/>
+      </button>
+    </div>
+
+    {/* ── Pages grid */}
+    <div style={{flex:1,overflowY:'auto',padding:18,display:'flex',flexWrap:'wrap',gap:10,alignContent:'flex-start'}}
+      onDragOver={e=>e.preventDefault()}
+      onDrop={e=>{e.preventDefault();setDragCoIdx(null);setOverCoIdx(null);}}>
+      {enriched.map((page,i)=>{
+        const isFixed=page.coIdx<0;
+        const isDraggable=!isFixed;
+        const isCat=page.type==='category';
+        const isDragging=isDraggable&&dragCoIdx===page.coIdx;
+        const isOver=isDraggable&&overCoIdx===page.coIdx&&dragCoIdx!==null&&dragCoIdx!==page.coIdx;
+        const coItem=isDraggable?localOrder[page.coIdx]:null;
+        const isRenaming=isCat&&coItem&&renamingId===coItem.id;
+        const numSz=Math.min(10,Math.max(6,Math.round(thumbH*0.09)));
+        return (
+          <div key={page.key}
+            draggable={isDraggable}
+            onDragStart={e=>{if(isDraggable){setDragCoIdx(page.coIdx);e.dataTransfer.effectAllowed='move';}}}
+            onDragOver={e=>{e.preventDefault();e.stopPropagation();if(isDraggable)setOverCoIdx(page.coIdx);}}
+            onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setOverCoIdx(null);}}
+            onDrop={e=>{e.preventDefault();e.stopPropagation();if(isDraggable){reorder(dragCoIdx,page.coIdx);setDragCoIdx(null);setOverCoIdx(null);}}}
+            onDragEnd={()=>{setDragCoIdx(null);setOverCoIdx(null);}}
+            style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5,opacity:isDragging?.28:1,cursor:isDraggable?'grab':'default',position:'relative',transition:'opacity .15s'}}
+          >
+            {isOver&&<div style={{position:'absolute',left:-7,top:0,bottom:14,width:3,background:T.navy,borderRadius:2,zIndex:10}}/>}
+            <div style={{
+              width:thumbW,height:thumbH,overflow:'hidden',borderRadius:3,position:'relative',
+              border:`1.5px solid ${isOver?T.navy:isCat?T.goldSoft:isFixed?T.lineSoft:T.line}`,
+              boxShadow:isOver?`0 0 0 2px ${T.navyTint}`:isCat?`0 0 0 1px rgba(184,149,86,.2)`:'none',
+              background:'#fff',transition:'border-color .12s,box-shadow .12s'
+            }}>
+              <div style={{position:'absolute',top:2,left:2,zIndex:3,background:'rgba(0,0,0,.4)',color:'#fff',fontSize:numSz,fontWeight:700,padding:'0.5px 3px',borderRadius:1.5,letterSpacing:'.04em',pointerEvents:'none'}}>{i+1}</div>
+              {isFixed&&<div style={{position:'absolute',top:2,right:2,zIndex:3,background:'rgba(0,0,0,.3)',borderRadius:2,padding:2,pointerEvents:'none'}}><Icon name="lock" size={Math.max(6,Math.round(thumbH*.08))} color="rgba(255,255,255,.85)"/></div>}
+              {isDraggable&&<div style={{position:'absolute',bottom:2,right:2,zIndex:3,background:'rgba(255,255,255,.72)',borderRadius:2,padding:2,pointerEvents:'none'}}><Icon name="move" size={Math.max(6,Math.round(thumbH*.08))} color={T.ink3}/></div>}
+              <div style={{width:REF_W,transformOrigin:'top left',transform:`scale(${scale})`,pointerEvents:'none'}}>
+                <PageRender page={page} state={stateL}/>
+              </div>
+            </div>
+            {isRenaming
+              ?<input autoFocus value={renameVal} onChange={e=>setRenameVal(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={e=>{if(e.key==='Enter')commitRename();if(e.key==='Escape')setRenamingId(null);}}
+                  style={{width:Math.max(thumbW,60),fontSize:9,textAlign:'center',border:`1px solid ${T.navy}`,borderRadius:3,padding:'2px 4px',fontFamily:'inherit',outline:'none',color:T.ink,background:'#fff'}}
+                  onClick={e=>e.stopPropagation()}/>
+              :<div title={isCat?'Double-cliquer pour renommer':undefined}
+                  onDoubleClick={isCat&&coItem?()=>startRename(coItem):undefined}
+                  style={{fontSize:9,color:isCat?T.navy:isFixed?T.ink4:T.ink3,maxWidth:Math.max(thumbW,50),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center',fontWeight:isCat?600:400,cursor:isCat?'text':'default',userSelect:'none',display:'flex',alignItems:'center',gap:3}}>
+                <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{page.label}</span>
+                {isCat&&<Icon name="pencil" size={8} color={T.ink4}/>}
+              </div>
+            }
+          </div>
+        );
+      })}
+    </div>
+
+    {/* ── Footer */}
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 18px',borderTop:`1px solid ${T.lineSoft}`,flexShrink:0,background:T.panel}}>
+      <div style={{fontSize:11,color:T.ink3,display:'flex',alignItems:'center',gap:6}}>
+        <Icon name="info" size={13} color={T.ink4}/>
+        Glissez pour réorganiser · Double-cliquez sur une catégorie pour renommer
+      </div>
+      <div style={{display:'flex',gap:8}}>
+        <button style={btnSt()} onClick={onClose}>Annuler</button>
+        <button style={btnSt('primary')} onClick={apply}><Icon name="check" size={13} color="#fff"/>Appliquer</button>
+      </div>
+    </div>
+  </div></Scrim>;
+}
+
+function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble}) {
   const stripRef=useRef(null);
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isPortrait=state.pageFormat.startsWith('v');
@@ -1133,13 +1284,39 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize})
     if(el) el.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
   },[activePage]);
 
+  const navBtnSt={background:'transparent',border:'none',cursor:'pointer',padding:'2px 5px',display:'flex',alignItems:'center',borderRadius:3,transition:'.12s'};
+
   return (
     <div style={{flexShrink:0,background:'#18202E',borderTop:'1px solid rgba(255,255,255,.1)',display:'flex',flexDirection:'column'}}>
-      {/* Header */}
-      <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 14px',borderBottom:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
+      {/* ── Toolbar */}
+      <div style={{display:'flex',alignItems:'center',gap:6,padding:'5px 10px',borderBottom:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
         <Icon name="layers" size={12} color="rgba(255,255,255,.4)"/>
         <span style={{fontSize:9.5,color:'rgba(255,255,255,.4)',letterSpacing:'.12em',textTransform:'uppercase',fontWeight:600}}>{pages.length} pages</span>
         <div style={{flex:1}}/>
+
+        {/* First / last page */}
+        <button style={navBtnSt} title="Première page" onClick={()=>onPageClick(0)}>
+          <Icon name="pageTop" size={14} color="rgba(255,255,255,.55)"/>
+        </button>
+        <button style={navBtnSt} title="Dernière page" onClick={()=>onPageClick(pages.length-1)}>
+          <Icon name="pageBot" size={14} color="rgba(255,255,255,.55)"/>
+        </button>
+
+        <div style={{width:1,height:12,background:'rgba(255,255,255,.14)',margin:'0 3px'}}/>
+
+        {/* Vue ensemble */}
+        <button onClick={onOpenVueEnsemble} style={{
+          background:'rgba(255,255,255,.09)',border:'1px solid rgba(255,255,255,.16)',
+          color:'rgba(255,255,255,.82)',borderRadius:4,padding:'2px 9px',
+          fontSize:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',
+          display:'flex',alignItems:'center',gap:4,letterSpacing:'.03em',transition:'.12s'
+        }}>
+          <Icon name="grid" size={11} color="rgba(255,255,255,.82)"/>Vue ensemble
+        </button>
+
+        <div style={{width:1,height:12,background:'rgba(255,255,255,.14)',margin:'0 3px'}}/>
+
+        {/* Size selector */}
         <div style={{display:'inline-flex',gap:2,background:'rgba(255,255,255,.07)',borderRadius:5,padding:2}}>
           {['S','M','L'].map(s=>(
             <button key={s} onClick={()=>setThumbSize(s)} style={{
@@ -1151,7 +1328,8 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize})
           ))}
         </div>
       </div>
-      {/* Thumbnail strip */}
+
+      {/* ── Thumbnail strip */}
       <div ref={stripRef} style={{
         display:'flex',alignItems:'flex-end',gap:8,
         padding:'9px 14px 10px',overflowX:'auto',overflowY:'hidden',
@@ -1211,6 +1389,7 @@ function Configurator({user,project}) {
   const [zoom,setZoom]=useState(1);
   const [activePage,setActivePage]=useState(0);
   const [thumbSize,setThumbSize]=useState('M');
+  const [showVueEnsemble,setShowVueEnsemble]=useState(false);
   const update=useCallback(patch=>{setState(s=>({...s,...patch,_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const updateNested=useCallback((key,patch)=>{setState(s=>({...s,[key]:{...s[key],...patch},_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2400);};
@@ -1223,13 +1402,14 @@ function Configurator({user,project}) {
     {activeStep&&<Inspector step={activeStep} state={state} update={update} updateNested={updateNested}/>}
     <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <Canvas state={state} zoom={zoom} setZoom={setZoom} activePage={activePage}/>
-      <ThumbnailPalette state={state} activePage={activePage} onPageClick={setActivePage} thumbSize={thumbSize} setThumbSize={setThumbSize}/>
+      <ThumbnailPalette state={state} activePage={activePage} onPageClick={setActivePage} thumbSize={thumbSize} setThumbSize={setThumbSize} onOpenVueEnsemble={()=>setShowVueEnsemble(true)}/>
     </div>
     {state._dirty&&<div style={{position:'fixed',bottom:paletteH+16,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:8,background:'rgba(20,20,30,.92)',backdropFilter:'blur(20px)',borderRadius:999,padding:'6px 8px 6px 14px',zIndex:30,boxShadow:'0 8px 24px rgba(0,0,0,.22)'}}>
       <span style={{fontSize:11.5,color:'rgba(255,255,255,.6)'}}>Modifications non enregistrées</span>
       <button onClick={save} style={{background:T.surface,border:'none',color:T.ink,padding:'5px 12px',fontSize:12,borderRadius:999,display:'inline-flex',alignItems:'center',gap:5,fontWeight:600,cursor:'pointer'}}><Icon name="save" size={13} color={T.ink}/>Enregistrer</button>
     </div>}
     {toast&&<div style={{position:'fixed',bottom:paletteH+16,right:16,background:T.ink,color:'#fff',padding:'9px 14px',borderRadius:8,fontSize:12,zIndex:9999}}>{toast}</div>}
+    {showVueEnsemble&&<VueEnsembleModal state={state} update={update} onClose={()=>setShowVueEnsemble(false)}/>}
   </div>;
 }
 
