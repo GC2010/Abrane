@@ -503,7 +503,7 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   ).length;
   const nIdxPages=Math.max(1,Math.ceil(totalRowCount/40));
   let pgN=2+nIdxPages;
-  if(state.enMat)pgN+=state.thumbCount>18?2:1;
+  if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){allRows.push({name:it.name,page:pgN,isCat:true});pgN+=1;}
     else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){const dn=it.label||f.name.replace(/\.[^.]+$/,'');allRows.push({name:dn,page:pgN,isCat:false});pgN+=f.pages||1;}else pgN+=1;}
@@ -627,14 +627,15 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
 
 // ── MAT PAGE — con immagini ───────────────────────────────
 function MatPage({state,isPortrait,isRing,pageIndex=0}) {
-  const p=state.palette,cols=isPortrait?4:6,perPage=cols*(isPortrait?4:3);
+  const p=state.palette,cols=isPortrait?4:6,perPage=12;
+  const totalPages=Math.max(1,Math.ceil(state.thumbCount/perPage));
   const start=pageIndex*perPage;
   const end=Math.min(start+perPage,state.thumbCount);
   const cells=state.materials.slice(start,end).filter(Boolean);
   const actualRows=Math.max(1,Math.ceil(cells.length/cols));
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:isRing?'3% 2% 3% 9%':'3% 2%',position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
     <div style={{fontSize:10,letterSpacing:'.18em',textTransform:'uppercase',marginBottom:'1.6%',color:p.c3}}>
-      MATÉRIAUX{state.thumbCount>perPage?` · ${pageIndex+1}/2`:''}
+      MATÉRIAUX{totalPages>1?` · ${pageIndex+1}/${totalPages}`:''}
     </div>
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${actualRows},1fr)`,gap:5,height:'90%'}}>
       {cells.map((m,i)=>(
@@ -692,9 +693,7 @@ const buildPageList = s => {
     for(let i=0;i<nIdxPages;i++) pages.push({key:'idx'+i,type:'index',label:'Sommaire',pageIndex:i});
   }
   if(s.enMat) {
-    const isP=s.pageFormat.startsWith('v');
-    const perPage=(isP?4:6)*(isP?4:3);
-    const nPgs=s.thumbCount>perPage?2:1;
+    const nPgs=Math.max(1,Math.ceil(s.thumbCount/12));
     for(let i=0;i<nPgs;i++) pages.push({key:'mat'+i,type:'materials',label:'Matériaux',pageIndex:i});
   }
   if(s.enNotes) pages.push({key:'notes0',type:'notes',label:'Notes'});
@@ -983,8 +982,9 @@ function IndexPanel({state,update}) {
 // ── MATERIALS PANEL — con upload per vignetta + import multiplo ──
 function MaterialsPanel({state,update}) {
   const isP=state.pageFormat.startsWith('v');
-  const perPage=(isP?4:6)*(isP?4:3);
-  const twoPages=state.thumbCount>perPage;
+  const perPage=12;
+  const numPages=Math.max(1,Math.ceil(state.thumbCount/perPage));
+  const twoPages=numPages>1;
 
   const parseFileName = name => {
     const base = name.replace(/\.[^.]+$/, '');
@@ -1032,7 +1032,7 @@ function MaterialsPanel({state,update}) {
 
   return <>
     <Sect title="Matériaux">
-      <RowItem label="Activer la page Matériaux" sub="Jusqu'à 36 vignettes (2 pages si > 18)">
+      <RowItem label="Activer la page Matériaux" sub="Jusqu'à 36 vignettes (nouvelle page tous les 12)">
         <Toggle checked={state.enMat} onChange={v=>update({enMat:v})}/>
       </RowItem>
     </Sect>
@@ -1048,7 +1048,7 @@ function MaterialsPanel({state,update}) {
         </div>
         {twoPages&&<div style={{padding:'6px 10px',background:T.navyTint,border:`1px solid #D2DBEC`,borderRadius:6,fontSize:11,color:T.navy}}>
           <Icon name="info" size={11} color={T.navy} style={{verticalAlign:'-2px',marginRight:5}}/>
-          {state.thumbCount} vignettes · 2 pages générées automatiquement
+          {state.thumbCount} vignettes · {numPages} pages générées automatiquement
         </div>}
       </Sect>
       <Sect title="Vignettes"
