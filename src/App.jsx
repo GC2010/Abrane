@@ -576,7 +576,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     {/* Image zone — bottom reduced to 22% when notes active */}
     <div style={{position:'absolute',top:'4%',right:'11%',bottom:isNotes?'22%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
       {pageUrl
-        ?<img src={pageUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?0.72:1})`:'none',transition:'transform .2s'}}/>
+        ?<img src={pageUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?(isNotes?0.65:0.72):1})`:'none',transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
           {file.name.replace(/\.[^.]+$/,'')} {pageIdx>0?`(${pageIdx+1})`:''}
         </div>
@@ -605,6 +605,11 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
             {nb('1.','insertOrderedList')}
             <span style={{width:1,height:9,background:shade(p.c1,-10),margin:'0 1px'}}/>
             {nb('✕','removeFormat')}
+            <span style={{width:1,height:9,background:shade(p.c1,-10),margin:'0 1px'}}/>
+            {['#1A1F2E','#555','#C53030','#2B6CB0','#276749','#D69E2E'].map(c=>(
+              <button key={c} onMouseDown={e=>{e.preventDefault();exec('foreColor',c);}}
+                style={{width:8,height:8,borderRadius:'50%',background:c,border:'1px solid rgba(0,0,0,.15)',cursor:'pointer',padding:0,flexShrink:0}}/>
+            ))}
           </div>
         )}
         {/* Editable / read-only content */}
@@ -1806,6 +1811,12 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       } else if(t==='rect'||t==='rectText'){
         shapeRef.current=new window.fabric.Rect({left:p.x,top:p.y,width:1,height:1,fill:'white',stroke:col,strokeWidth:strokeWRef.current,rx:2,ry:2,selectable:false,evented:false});
         canvas.add(shapeRef.current);
+      } else if(t==='circle'){
+        shapeRef.current=new window.fabric.Ellipse({left:p.x,top:p.y,rx:1,ry:1,fill:'transparent',stroke:col,strokeWidth:strokeWRef.current,selectable:false,evented:false});
+        canvas.add(shapeRef.current);
+      } else if(t==='triangle'){
+        shapeRef.current=new window.fabric.Triangle({left:p.x,top:p.y,width:1,height:1,fill:'transparent',stroke:col,strokeWidth:strokeWRef.current,selectable:false,evented:false});
+        canvas.add(shapeRef.current);
       }
       canvas.requestRenderAll();
     });
@@ -1815,7 +1826,12 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       const p=canvas.getPointer(opt.e),o=originRef.current,t=toolRef.current;
       if(t==='line') shapeRef.current.set({x2:p.x,y2:p.y});
       else if(t==='underline') shapeRef.current.set({x2:p.x,y2:o.y});
-      else{
+      else if(t==='circle'){
+        const rx=Math.max(1,Math.abs(p.x-o.x)/2),ry=Math.max(1,Math.abs(p.y-o.y)/2);
+        shapeRef.current.set({left:Math.min(p.x,o.x),top:Math.min(p.y,o.y),rx,ry});
+      } else if(t==='triangle'){
+        shapeRef.current.set({left:p.x<o.x?p.x:o.x,top:p.y<o.y?p.y:o.y,width:Math.max(1,Math.abs(p.x-o.x)),height:Math.max(1,Math.abs(p.y-o.y))});
+      } else{
         shapeRef.current.set({
           left:p.x<o.x?p.x:o.x,top:p.y<o.y?p.y:o.y,
           width:Math.max(1,Math.abs(p.x-o.x)),height:Math.max(1,Math.abs(p.y-o.y)),
@@ -1863,8 +1879,30 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     canvas.freeDrawingBrush.width=strokeW*2;
   },[color,strokeW,tool]);
 
+  useEffect(()=>{
+    const handler=e=>{
+      if(e.key!=='Delete'&&e.key!=='Backspace')return;
+      const canvas=fc.current;if(!canvas)return;
+      const active=canvas.getActiveObject();
+      if(active&&active.type==='i-text'&&active.isEditing)return;
+      const objs=canvas.getActiveObjects();if(!objs.length)return;
+      canvas.discardActiveObject();
+      objs.forEach(o=>canvas.remove(o));
+      canvas.requestRenderAll();
+    };
+    window.addEventListener('keydown',handler);
+    return ()=>window.removeEventListener('keydown',handler);
+  },[]);
+
   const undo=()=>restoreHist(fc.current,histIdxRef.current-1);
   const redo=()=>restoreHist(fc.current,histIdxRef.current+1);
+
+  const rotateBy90=()=>{
+    const canvas=fc.current;const o=canvas?.getActiveObject();
+    if(!o)return;
+    o.rotate((o.angle+90)%360);
+    canvas.requestRenderAll();
+  };
 
   const deleteSelected=()=>{
     const canvas=fc.current;
@@ -1882,11 +1920,15 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
   const commitRectText=()=>{
     if(!textPrompt||!textVal.trim()){setTextPrompt(null);return;}
     const rect=textPrompt;
+    const rw=Math.max(rect.width||1,40),rh=Math.max(rect.height||1,24);
+    fc.current.remove(rect);
+    const newRect=new window.fabric.Rect({width:rw,height:rh,fill:'white',stroke:colorRef.current,strokeWidth:rect.strokeWidth||1,rx:2,ry:2});
     const txt=new window.fabric.IText(textVal.trim(),{
-      left:rect.left+8,top:rect.top+Math.max(0,rect.height/2-9),
-      fontSize:14,fill:'#1A1F2E',fontFamily:'Arial',
+      fontSize:Math.max(10,Math.min(18,rh*0.45)),fill:'#1A1F2E',fontFamily:'Arial',
+      textAlign:'center',originX:'center',originY:'center',left:rw/2,top:rh/2,width:rw-4,
     });
-    fc.current.add(txt);fc.current.requestRenderAll();
+    const grp=new window.fabric.Group([newRect,txt],{left:rect.left,top:rect.top,selectable:true,evented:true});
+    fc.current.add(grp);fc.current.setActiveObject(grp);fc.current.requestRenderAll();
     setTextPrompt(null);setTextVal('');
   };
 
@@ -1908,6 +1950,8 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     {id:'line',     label:'Ligne',       sym:'╱'},
     {id:'rect',     label:'Cache blanc', sym:'□'},
     {id:'rectText', label:'Zone + texte',sym:'▣'},
+    {id:'circle',   label:'Cercle',      sym:'○'},
+    {id:'triangle', label:'Triangle',    sym:'△'},
     {id:'pencil',   label:'Crayon libre',sym:'✏'},
   ];
   const tbSt=act=>({display:'flex',alignItems:'center',gap:7,padding:'6px 10px',borderRadius:5,border:'none',cursor:'pointer',width:'100%',textAlign:'left',fontFamily:'inherit',fontSize:11.5,background:act?T.navy:'transparent',color:act?'#fff':'rgba(255,255,255,.7)',fontWeight:act?600:400});
@@ -1950,6 +1994,10 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
             </div>
             <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginTop:10,marginBottom:4}}>Épaisseur · {strokeW}</div>
             <input type="range" min="1" max="8" value={strokeW} onChange={e=>setStrokeW(parseInt(e.target.value))} style={{width:'100%',accentColor:T.gold}}/>
+          </div>
+          <div style={{borderTop:'1px solid rgba(255,255,255,.08)',margin:'4px 0',paddingTop:8}}>
+            <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginBottom:6}}>Rotation</div>
+            <button onClick={rotateBy90} style={tbSt(false)}>↻ +90°</button>
           </div>
           <div style={{borderTop:'1px solid rgba(255,255,255,.08)',margin:'4px 0',paddingTop:8}}>
             <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginBottom:6}}>Calque</div>
