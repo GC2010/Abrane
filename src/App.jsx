@@ -547,11 +547,15 @@ function MatPage({state,isPortrait,isRing,pageIndex=0}) {
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${rows},1fr)`,gap:5,height:'90%'}}>
       {cells.map((m,i)=>m?(
         <div key={i} style={{border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          {m.imgUrl
-            ?<img src={m.imgUrl} alt={m.mat} style={{flex:'0 0 62%',width:'100%',objectFit:'cover'}}/>
-            :<div style={{flex:'0 0 62%',background:`linear-gradient(135deg,${shade(p.c1,4)} 0 50%,${p.c1} 50% 100%)`}}/>
-          }
-          <div style={{flex:'0 0 38%',padding:'3px 5px',background:'#fff',borderTop:`1px solid ${p.c1}`}}>
+          {/* Image wrapper — div carries the flex-basis so all photo areas are identical */}
+          <div style={{flex:'1 1 0',minHeight:0,position:'relative',overflow:'hidden'}}>
+            {m.imgUrl
+              ?<img src={m.imgUrl} alt={m.mat} style={{display:'block',position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',objectPosition:'center'}}/>
+              :<div style={{position:'absolute',inset:0,background:`linear-gradient(135deg,${shade(p.c1,4)} 0 50%,${p.c1} 50% 100%)`}}/>
+            }
+          </div>
+          {/* Text area — fixed natural height, always at the same vertical position */}
+          <div style={{flexShrink:0,padding:'3px 5px',background:'#fff',borderTop:`1px solid ${p.c1}`,overflow:'hidden'}}>
             <div style={{fontSize:9,fontWeight:700,color:p.c3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{m.mat}</div>
             <div style={{fontSize:8,color:shade(p.c3,40),overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{m.fin}</div>
           </div>
@@ -936,13 +940,13 @@ function MaterialsPanel({state,update}) {
           {Array.from({length:state.thumbCount}).map((_,i)=>{
             const m=state.materials[i]||{mat:'',fin:'',imgUrl:''};
             return(
-              <label key={i} style={{aspectRatio:'auto',background:T.panel,border:`1px solid ${T.lineSoft}`,borderRadius:6,cursor:'pointer',display:'flex',flexDirection:'column',overflow:'hidden',padding:0,position:'relative'}}>
+              <label key={i} style={{background:T.panel,border:`1px solid ${T.lineSoft}`,borderRadius:6,cursor:'pointer',display:'flex',flexDirection:'column',overflow:'hidden',padding:0,position:'relative'}}>
                 <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>handleSingleUpload(i,e)}/>
-                {/* Image area */}
-                <div style={{aspectRatio:'1/1',position:'relative',overflow:'hidden'}}>
+                {/* Image area — aspect-ratio forces uniform square; img fills it with cover */}
+                <div style={{aspectRatio:'1/1',position:'relative',overflow:'hidden',width:'100%'}}>
                   {m.imgUrl
-                    ?<img src={m.imgUrl} alt={m.mat} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                    :<div style={{width:'100%',height:'100%',background:`linear-gradient(135deg,${T.panel} 0 50%,${T.panel2} 50% 100%)`,display:'grid',placeItems:'center'}}>
+                    ?<img src={m.imgUrl} alt={m.mat} style={{display:'block',position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',objectPosition:'center'}}/>
+                    :<div style={{position:'absolute',inset:0,background:`linear-gradient(135deg,${T.panel} 0 50%,${T.panel2} 50% 100%)`,display:'grid',placeItems:'center'}}>
                       <Icon name="upload" size={14} color={T.ink5}/>
                     </div>
                   }
