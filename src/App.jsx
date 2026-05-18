@@ -188,7 +188,7 @@ const initialState = project => {
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, wmEnabled:false, wmOpacity:15,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, _dirty:false,
   };
 };
 
@@ -662,7 +662,7 @@ function PageRender({page,state}) {
   }
 }
 
-function Canvas({state,zoom,setZoom,activePage}) {
+function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH}) {
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isP=state.pageFormat.startsWith('v');
   const canvasRef=useRef(null);
@@ -673,7 +673,9 @@ function Canvas({state,zoom,setZoom,activePage}) {
     if(el&&canvasRef.current) el.scrollIntoView({behavior:'smooth',block:'nearest'});
   },[activePage]);
 
-  return <main ref={canvasRef} style={{flex:1,minWidth:0,overflowY:'auto',background:T.bg,display:'flex',flexDirection:'column',alignItems:'center',padding:'36px 32px 80px',position:'relative'}}>
+  const botPad=(paletteH||120)+24;
+
+  return <main ref={canvasRef} style={{flex:1,minWidth:0,overflowY:'auto',background:T.bg,display:'flex',flexDirection:'column',alignItems:'center',padding:`36px 32px ${botPad}px`,position:'relative'}}>
     <div style={{width:'100%',maxWidth:isP?700:1000,display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18,flexShrink:0}}>
       <div style={{fontSize:11,color:T.ink3,display:'flex',alignItems:'center',gap:10}}>
         <Icon name="layers" size={14} color={T.ink3}/>
@@ -689,12 +691,37 @@ function Canvas({state,zoom,setZoom,activePage}) {
       </div>
     </div>
     <div style={{display:'flex',flexDirection:'column',gap:24,alignItems:'center',width:'100%',transform:`scale(${zoom})`,transformOrigin:'top center',transition:'transform .15s'}}>
-      {pages.map((p,i)=><div key={p.key} ref={el=>pageRefs.current[i]=el} style={{width:'100%',maxWidth:isP?700:1000}}>
-        <div style={{fontSize:10,color:T.ink4,letterSpacing:'.08em',textTransform:'uppercase',display:'flex',justifyContent:'space-between',marginBottom:6,padding:'0 2px'}}>
-          <span>{p.label}</span><span>Page {i+1} / {pages.length}</span>
+      {pages.map((p,i)=>(
+        <div key={p.key} ref={el=>pageRefs.current[i]=el} style={{width:'100%',maxWidth:isP?700:1000}}>
+          <div style={{fontSize:10,color:T.ink4,letterSpacing:'.08em',textTransform:'uppercase',display:'flex',justifyContent:'space-between',marginBottom:6,padding:'0 2px'}}>
+            <span style={{display:'flex',alignItems:'center',gap:6}}>
+              {p.label}
+              {p.type==='content'&&state.annotations?.[p.key]&&(
+                <span style={{background:T.gold,color:'#fff',fontSize:8,fontWeight:700,padding:'1px 5px',borderRadius:3,letterSpacing:'.06em'}}>ANNOTÉ</span>
+              )}
+            </span>
+            <span>Page {i+1} / {pages.length}</span>
+          </div>
+          <div style={{background:'#fff',boxShadow:'0 6px 22px rgba(20,20,30,.12)',borderRadius:2,position:'relative'}}>
+            <PageRender page={p} state={state}/>
+            {p.type==='content'&&onAnnotate&&(
+              <div style={{position:'absolute',top:8,right:10,zIndex:10}}>
+                <button onClick={e=>{e.stopPropagation();onAnnotate(p);}} style={{
+                  background:'rgba(15,27,45,.82)',backdropFilter:'blur(6px)',
+                  border:`1px solid ${state.annotations?.[p.key]?T.gold:'rgba(255,255,255,.25)'}`,
+                  color:'#fff',padding:'4px 10px',borderRadius:5,fontSize:9.5,
+                  fontWeight:700,cursor:'pointer',letterSpacing:'.08em',
+                  fontFamily:'inherit',display:'flex',alignItems:'center',gap:5,
+                  transition:'border-color .15s',
+                }}>
+                  <Icon name="pencil" size={10} color={state.annotations?.[p.key]?T.gold:'rgba(255,255,255,.7)'}/>
+                  {state.annotations?.[p.key]?'MODIFIER':'ANNOTER'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-        <div style={{background:'#fff',boxShadow:'0 6px 22px rgba(20,20,30,.12)',borderRadius:2}}><PageRender page={p} state={state}/></div>
-      </div>)}
+      ))}
     </div>
   </main>;
 }
@@ -1192,13 +1219,13 @@ function ContentPanel({state,update}) {
           const rot=item.rotation||0;
           return(
             <div key={item.id}
-              draggable
-              onDragStart={()=>setDragIdx(idx)}
+              draggable={!isRenaming}
+              onDragStart={e=>{if(isRenaming){e.preventDefault();return;}setDragIdx(idx);}}
               onDragEnd={()=>{setDragIdx(null);setOverIdx(null);}}
-              onDragOver={e=>{e.preventDefault();setOverIdx(idx);}}
-              onDrop={e=>{e.preventDefault();reorder(dragIdx,idx);setDragIdx(null);setOverIdx(null);}}
+              onDragOver={e=>{if(isRenaming)return;e.preventDefault();setOverIdx(idx);}}
+              onDrop={e=>{if(isRenaming)return;e.preventDefault();reorder(dragIdx,idx);setDragIdx(null);setOverIdx(null);}}
               onDoubleClick={()=>startRename(item)}
-              style={{padding:'6px 8px',background:isCat?T.goldTint:T.surface,border:`1px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderLeft:`3px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderRadius:6,cursor:'grab',userSelect:'none'}}
+              style={{padding:'6px 8px',background:isCat?T.goldTint:T.surface,border:`1px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderLeft:`3px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderRadius:6,cursor:isRenaming?'default':'grab',userSelect:isRenaming?'text':'none'}}
             >
               {/* Main row */}
               <div style={{display:'grid',gridTemplateColumns:'14px 26px 1fr auto',alignItems:'center',gap:7}}>
@@ -1498,7 +1525,7 @@ function VueEnsembleModal({state,update,onClose}) {
   </div></Scrim>;
 }
 
-function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble}) {
+function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed}) {
   const stripRef=useRef(null);
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isPortrait=state.pageFormat.startsWith('v');
@@ -1559,10 +1586,15 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
             }}>{s}</button>
           ))}
         </div>
+
+        <div style={{width:1,height:12,background:'rgba(255,255,255,.14)',margin:'0 3px'}}/>
+        <button onClick={()=>setCollapsed(c=>!c)} style={navBtnSt} title={collapsed?'Afficher les miniatures':'Réduire'}>
+          <Icon name="chevD" size={13} color="rgba(255,255,255,.55)" style={{transform:collapsed?'rotate(180deg)':'none',transition:'transform .2s'}}/>
+        </button>
       </div>
 
       {/* ── Thumbnail strip */}
-      <div ref={stripRef} style={{
+      {!collapsed&&<div ref={stripRef} style={{
         display:'flex',alignItems:'flex-end',gap:8,
         padding:'9px 14px 10px',overflowX:'auto',overflowY:'hidden',
         scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,.15) transparent'
@@ -1607,6 +1639,286 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
             </div>
           );
         })}
+      </div>}
+    </div>
+  );
+}
+
+// ── ANNOTATOR MODAL ───────────────────────────────────────────
+function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
+  const canvasElRef=useRef(null);
+  const fc=useRef(null);
+  const toolRef=useRef('select');
+  const colorRef=useRef('#E53E3E');
+  const strokeWRef=useRef(2);
+  const isLoadingRef=useRef(false);
+  const shapeRef=useRef(null);
+  const isDrawingRef=useRef(false);
+  const originRef=useRef({x:0,y:0});
+  const histRef=useRef([]);
+  const histIdxRef=useRef(-1);
+
+  const [tool,setToolState]=useState('select');
+  const [color,setColorState]=useState('#E53E3E');
+  const [strokeW,setStrokeWState]=useState(2);
+  const [textPrompt,setTextPrompt]=useState(null);
+  const [textVal,setTextVal]=useState('');
+  const [canUndo,setCanUndo]=useState(false);
+  const [canRedo,setCanRedo]=useState(false);
+
+  const setTool=t=>{toolRef.current=t;setToolState(t);};
+  const setColor=c=>{colorRef.current=c;setColorState(c);};
+  const setStrokeW=w=>{strokeWRef.current=w;setStrokeWState(w);};
+
+  const ratio=isPortrait?(210/297):(297/210);
+  const CW=isPortrait?560:840;
+  const CH=Math.round(CW/ratio);
+
+  const updHist=()=>{setCanUndo(histIdxRef.current>0);setCanRedo(histIdxRef.current<histRef.current.length-1);};
+
+  const pushHist=canvas=>{
+    if(isLoadingRef.current)return;
+    const objs=canvas.getObjects().map(o=>o.toObject(['selectable','evented']));
+    const h=histRef.current.slice(0,histIdxRef.current+1);
+    h.push(JSON.stringify(objs));
+    if(h.length>30)h.shift();else histIdxRef.current++;
+    histRef.current=h;
+    updHist();
+  };
+
+  const restoreHist=(canvas,idx)=>{
+    if(idx<0||idx>=histRef.current.length)return;
+    isLoadingRef.current=true;
+    const objs=JSON.parse(histRef.current[idx]);
+    canvas.getObjects().slice().forEach(o=>canvas.remove(o));
+    if(objs.length===0){canvas.requestRenderAll();isLoadingRef.current=false;}
+    else{window.fabric.util.enlivenObjects(objs,en=>{en.forEach(o=>canvas.add(o));canvas.requestRenderAll();isLoadingRef.current=false;});}
+    histIdxRef.current=idx;
+    updHist();
+  };
+
+  useEffect(()=>{
+    if(!window.fabric||!canvasElRef.current)return;
+    const canvas=new window.fabric.Canvas(canvasElRef.current,{width:CW,height:CH,preserveObjectStacking:true,selection:true});
+    fc.current=canvas;
+
+    // Background
+    if(pageUrl){
+      window.fabric.Image.fromURL(pageUrl,img=>{
+        const sc=Math.max(CW/img.width,CH/img.height);
+        img.set({scaleX:sc,scaleY:sc,originX:'left',originY:'top',left:0,top:0});
+        canvas.setBackgroundImage(img,()=>canvas.requestRenderAll());
+      },{crossOrigin:'anonymous'});
+    } else {
+      canvas.setBackgroundColor('#F0EBE0',()=>canvas.requestRenderAll());
+    }
+
+    // Saved annotations
+    const saved=state.annotations?.[pageKey];
+    if(saved){
+      try{
+        isLoadingRef.current=true;
+        window.fabric.util.enlivenObjects(JSON.parse(saved),en=>{
+          en.forEach(o=>canvas.add(o));
+          canvas.requestRenderAll();
+          isLoadingRef.current=false;
+          pushHist(canvas);
+        });
+      }catch(e){isLoadingRef.current=false;}
+    } else {
+      pushHist(canvas);
+    }
+
+    canvas.on('object:added',()=>pushHist(canvas));
+    canvas.on('object:modified',()=>pushHist(canvas));
+    canvas.on('object:removed',()=>pushHist(canvas));
+
+    // Mouse handlers (read tool/color/stroke via refs to avoid stale closures)
+    canvas.on('mouse:down',opt=>{
+      const t=toolRef.current;
+      if(t==='select'||t==='pencil'||t==='text')return;
+      isDrawingRef.current=true;
+      const p=canvas.getPointer(opt.e);
+      originRef.current={x:p.x,y:p.y};
+      const col=colorRef.current,sw=strokeWRef.current*2;
+      if(t==='line'||t==='underline'){
+        shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:sw,strokeLineCap:'round',selectable:false,evented:false});
+        canvas.add(shapeRef.current);
+      } else if(t==='rect'||t==='rectText'){
+        shapeRef.current=new window.fabric.Rect({left:p.x,top:p.y,width:1,height:1,fill:'white',stroke:col,strokeWidth:strokeWRef.current,rx:2,ry:2,selectable:false,evented:false});
+        canvas.add(shapeRef.current);
+      }
+      canvas.requestRenderAll();
+    });
+
+    canvas.on('mouse:move',opt=>{
+      if(!isDrawingRef.current||!shapeRef.current)return;
+      const p=canvas.getPointer(opt.e),o=originRef.current,t=toolRef.current;
+      if(t==='line') shapeRef.current.set({x2:p.x,y2:p.y});
+      else if(t==='underline') shapeRef.current.set({x2:p.x,y2:o.y});
+      else{
+        shapeRef.current.set({
+          left:p.x<o.x?p.x:o.x,top:p.y<o.y?p.y:o.y,
+          width:Math.max(1,Math.abs(p.x-o.x)),height:Math.max(1,Math.abs(p.y-o.y)),
+        });
+      }
+      canvas.requestRenderAll();
+    });
+
+    canvas.on('mouse:up',opt=>{
+      const t=toolRef.current;
+      if(t==='text'){
+        const p=canvas.getPointer(opt.e);
+        const txt=new window.fabric.IText('Texte',{left:p.x,top:p.y,fontSize:18,fill:colorRef.current,fontFamily:'Arial'});
+        canvas.add(txt);canvas.setActiveObject(txt);txt.enterEditing();txt.selectAll();
+        return;
+      }
+      if(!isDrawingRef.current||!shapeRef.current)return;
+      isDrawingRef.current=false;
+      const shape=shapeRef.current;shapeRef.current=null;
+      shape.set({selectable:true,evented:true});
+      canvas.setActiveObject(shape);
+      if(t==='rectText'){setTextPrompt(shape);setTextVal('');}
+      canvas.requestRenderAll();
+    });
+
+    return ()=>canvas.dispose();
+  },[]);
+
+  useEffect(()=>{
+    const canvas=fc.current;if(!canvas)return;
+    canvas.isDrawingMode=tool==='pencil';
+    if(tool==='pencil'){canvas.freeDrawingBrush.color=color;canvas.freeDrawingBrush.width=strokeW*2;}
+    const isSel=tool==='select';
+    canvas.selection=isSel;
+    canvas.defaultCursor=isSel?'default':'crosshair';
+    canvas.hoverCursor=isSel?'move':'crosshair';
+    canvas.getObjects().forEach(o=>{o.selectable=isSel;o.evented=isSel;});
+    canvas.requestRenderAll();
+  },[tool]);
+
+  useEffect(()=>{
+    const canvas=fc.current;
+    if(!canvas||tool!=='pencil')return;
+    canvas.freeDrawingBrush.color=color;
+    canvas.freeDrawingBrush.width=strokeW*2;
+  },[color,strokeW,tool]);
+
+  const undo=()=>restoreHist(fc.current,histIdxRef.current-1);
+  const redo=()=>restoreHist(fc.current,histIdxRef.current+1);
+
+  const deleteSelected=()=>{
+    const canvas=fc.current;
+    const active=canvas.getActiveObjects();
+    canvas.discardActiveObject();
+    active.forEach(o=>canvas.remove(o));
+    canvas.requestRenderAll();
+  };
+
+  const deleteAll=()=>{fc.current?.getObjects().slice().forEach(o=>fc.current.remove(o));fc.current?.requestRenderAll();};
+
+  const bringFwd=()=>{const o=fc.current?.getActiveObject();if(o){fc.current.bringForward(o);fc.current.requestRenderAll();}};
+  const sendBwd=()=>{const o=fc.current?.getActiveObject();if(o){fc.current.sendBackwards(o);fc.current.requestRenderAll();}};
+
+  const commitRectText=()=>{
+    if(!textPrompt||!textVal.trim()){setTextPrompt(null);return;}
+    const rect=textPrompt;
+    const txt=new window.fabric.IText(textVal.trim(),{
+      left:rect.left+8,top:rect.top+Math.max(0,rect.height/2-9),
+      fontSize:14,fill:'#1A1F2E',fontFamily:'Arial',
+    });
+    fc.current.add(txt);fc.current.requestRenderAll();
+    setTextPrompt(null);setTextVal('');
+  };
+
+  const save=()=>{
+    const canvas=fc.current;
+    const objs=canvas.getObjects();
+    const newAnn={...(state.annotations||{})};
+    if(objs.length===0) delete newAnn[pageKey];
+    else newAnn[pageKey]=JSON.stringify(objs.map(o=>o.toObject(['selectable','evented'])));
+    update({annotations:newAnn});
+    onClose();
+  };
+
+  const COLORS=['#E53E3E','#F6AD55','#48BB78','#4299E1','#9F7AEA','#1A1F2E','#FFFFFF'];
+  const TOOLS=[
+    {id:'select',   label:'Sélectionner',sym:'↖'},
+    {id:'text',     label:'Texte',       sym:'T'},
+    {id:'underline',label:'Souligner',   sym:'U̲'},
+    {id:'line',     label:'Ligne',       sym:'╱'},
+    {id:'rect',     label:'Cache blanc', sym:'□'},
+    {id:'rectText', label:'Zone + texte',sym:'▣'},
+    {id:'pencil',   label:'Crayon libre',sym:'✏'},
+  ];
+  const tbSt=act=>({display:'flex',alignItems:'center',gap:7,padding:'6px 10px',borderRadius:5,border:'none',cursor:'pointer',width:'100%',textAlign:'left',fontFamily:'inherit',fontSize:11.5,background:act?T.navy:'transparent',color:act?'#fff':'rgba(255,255,255,.7)',fontWeight:act?600:400});
+  const aBtnSt=(danger,disabled)=>({...btnSt('ghost',true),color:danger?'#F87171':disabled?'rgba(255,255,255,.25)':'rgba(255,255,255,.82)',border:`1px solid ${danger?'rgba(248,113,113,.3)':disabled?'rgba(255,255,255,.08)':'rgba(255,255,255,.18)'}`,opacity:disabled?0.45:1,cursor:disabled?'not-allowed':'pointer'});
+
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:500,background:'rgba(8,12,24,0.96)',display:'flex',flexDirection:'column',fontFamily:'inherit'}}>
+      {/* ── Top bar */}
+      <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 16px',background:'#0A1220',borderBottom:'1px solid rgba(255,255,255,.1)',flexShrink:0}}>
+        <button onClick={save} style={{...btnSt('primary',true),minWidth:120}}><Icon name="save" size={13} color="#fff"/> Enregistrer</button>
+        <button onClick={onClose} style={aBtnSt()}>Annuler</button>
+        <div style={{flex:1,textAlign:'center',fontSize:10,color:'rgba(255,255,255,.3)',letterSpacing:'.14em',textTransform:'uppercase'}}>Mode Annotation</div>
+        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          <button onClick={undo} disabled={!canUndo} style={aBtnSt(false,!canUndo)}>↩ Annuler</button>
+          <button onClick={redo} disabled={!canRedo} style={aBtnSt(false,!canRedo)}>↪ Rétablir</button>
+          <div style={{width:1,height:18,background:'rgba(255,255,255,.12)',margin:'0 4px'}}/>
+          <button onClick={deleteSelected} style={aBtnSt(true,false)}><Icon name="trash" size={12} color="#F87171"/> Supprimer</button>
+          <button onClick={deleteAll} style={aBtnSt(true,false)}>Tout effacer</button>
+        </div>
+      </div>
+
+      {/* ── Body */}
+      <div style={{flex:1,display:'flex',overflow:'hidden',minHeight:0}}>
+        {/* Left sidebar */}
+        <div style={{width:150,background:'#0F1825',borderRight:'1px solid rgba(255,255,255,.07)',padding:'12px 8px',display:'flex',flexDirection:'column',gap:3,overflowY:'auto',flexShrink:0}}>
+          <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginBottom:4}}>Outil</div>
+          {TOOLS.map(t=>(
+            <button key={t.id} onClick={()=>setTool(t.id)} style={tbSt(tool===t.id)}>
+              <span style={{width:18,textAlign:'center',fontSize:13,flexShrink:0}}>{t.sym}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+          <div style={{borderTop:'1px solid rgba(255,255,255,.08)',margin:'8px 0',paddingTop:8}}>
+            <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginBottom:8}}>Couleur</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:5,padding:'0 4px'}}>
+              {COLORS.map(c=>(
+                <button key={c} onClick={()=>setColor(c)} style={{width:20,height:20,borderRadius:'50%',background:c,padding:0,border:`2px solid ${color===c?'#fff':c==='#FFFFFF'?'rgba(255,255,255,.25)':'transparent'}`,cursor:'pointer',outline:color===c?`2px solid ${T.gold}`:undefined,outlineOffset:1}}/>
+              ))}
+              <input type="color" value={color} onChange={e=>setColor(e.target.value)} title="Couleur libre" style={{width:20,height:20,border:'1px solid rgba(255,255,255,.2)',padding:0,cursor:'pointer',borderRadius:'50%',overflow:'hidden',background:'transparent'}}/>
+            </div>
+            <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginTop:10,marginBottom:4}}>Épaisseur · {strokeW}</div>
+            <input type="range" min="1" max="8" value={strokeW} onChange={e=>setStrokeW(parseInt(e.target.value))} style={{width:'100%',accentColor:T.gold}}/>
+          </div>
+          <div style={{borderTop:'1px solid rgba(255,255,255,.08)',margin:'4px 0',paddingTop:8}}>
+            <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginBottom:6}}>Calque</div>
+            <button onClick={bringFwd} style={tbSt(false)}>↑ Premier plan</button>
+            <button onClick={sendBwd} style={tbSt(false)}>↓ Arrière-plan</button>
+          </div>
+        </div>
+
+        {/* Canvas area */}
+        <div style={{flex:1,display:'grid',placeItems:'center',overflow:'auto',background:'#141E30',padding:20,position:'relative'}}>
+          <div style={{position:'relative',lineHeight:0,boxShadow:'0 24px 80px rgba(0,0,0,.7)'}}>
+            <canvas ref={canvasElRef}/>
+            {textPrompt&&(
+              <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.5)',display:'grid',placeItems:'center',zIndex:20}}>
+                <div style={{background:'#fff',borderRadius:10,padding:20,minWidth:280,boxShadow:'0 12px 40px rgba(0,0,0,.5)'}}>
+                  <div style={{fontSize:13,fontWeight:600,color:T.ink,marginBottom:10}}>Texte du rectangle</div>
+                  <input autoFocus value={textVal} onChange={e=>setTextVal(e.target.value)}
+                    onKeyDown={e=>{if(e.key==='Enter')commitRectText();if(e.key==='Escape')setTextPrompt(null);}}
+                    style={{...inputSt,marginBottom:12}} placeholder="Saisissez le texte…"/>
+                  <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                    <button onClick={()=>setTextPrompt(null)} style={btnSt('ghost',true)}>Annuler</button>
+                    <button onClick={commitRectText} style={btnSt('primary',true)}>Ajouter</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1622,19 +1934,26 @@ function Configurator({user,project}) {
   const [activePage,setActivePage]=useState(0);
   const [thumbSize,setThumbSize]=useState('M');
   const [showVueEnsemble,setShowVueEnsemble]=useState(false);
+  const [paletteCollapsed,setPaletteCollapsed]=useState(false);
+  const [annotating,setAnnotating]=useState(null);
   const update=useCallback(patch=>{setState(s=>({...s,...patch,_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const updateNested=useCallback((key,patch)=>{setState(s=>({...s,[key]:{...s[key],...patch},_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2400);};
   const save=()=>{setState(s=>({...s,_dirty:false}));showToast('Projet enregistré');};
   const compl=computeCompletion(state,dirtySteps);
   const PALETTE_H={S:99,M:122,L:150};
-  const paletteH=PALETTE_H[thumbSize];
+  const paletteH=paletteCollapsed?32:PALETTE_H[thumbSize];
   return <div style={{display:'flex',flex:1,overflow:'hidden',minHeight:0}}>
     <Rail steps={STEPS} active={activeStep} state={state} compl={compl} onPick={id=>{activeStepRef.current=id;setActiveStep(id);}}/>
     {activeStep&&<Inspector step={activeStep} state={state} update={update} updateNested={updateNested}/>}
     <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <Canvas state={state} zoom={zoom} setZoom={setZoom} activePage={activePage}/>
-      <ThumbnailPalette state={state} activePage={activePage} onPageClick={setActivePage} thumbSize={thumbSize} setThumbSize={setThumbSize} onOpenVueEnsemble={()=>setShowVueEnsemble(true)}/>
+      <Canvas state={state} zoom={zoom} setZoom={setZoom} activePage={activePage}
+        paletteH={paletteH}
+        onAnnotate={p=>setAnnotating({pageKey:p.key,pageUrl:p.pageUrl,isPortrait:state.pageFormat.startsWith('v')})}/>
+      <ThumbnailPalette state={state} activePage={activePage} onPageClick={setActivePage}
+        thumbSize={thumbSize} setThumbSize={setThumbSize}
+        onOpenVueEnsemble={()=>setShowVueEnsemble(true)}
+        collapsed={paletteCollapsed} setCollapsed={setPaletteCollapsed}/>
     </div>
     {state._dirty&&<div style={{position:'fixed',bottom:paletteH+16,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:8,background:'rgba(20,20,30,.92)',backdropFilter:'blur(20px)',borderRadius:999,padding:'6px 8px 6px 14px',zIndex:30,boxShadow:'0 8px 24px rgba(0,0,0,.22)'}}>
       <span style={{fontSize:11.5,color:'rgba(255,255,255,.6)'}}>Modifications non enregistrées</span>
@@ -1642,6 +1961,9 @@ function Configurator({user,project}) {
     </div>}
     {toast&&<div style={{position:'fixed',bottom:paletteH+16,right:16,background:T.ink,color:'#fff',padding:'9px 14px',borderRadius:8,fontSize:12,zIndex:9999}}>{toast}</div>}
     {showVueEnsemble&&<VueEnsembleModal state={state} update={update} onClose={()=>setShowVueEnsemble(false)}/>}
+    {annotating&&<AnnotatorModal state={state} update={update}
+      pageKey={annotating.pageKey} pageUrl={annotating.pageUrl}
+      isPortrait={annotating.isPortrait} onClose={()=>setAnnotating(null)}/>}
   </div>;
 }
 
