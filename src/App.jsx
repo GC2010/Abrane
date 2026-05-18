@@ -627,30 +627,30 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
 
 // ── MAT PAGE — con immagini ───────────────────────────────
 function MatPage({state,isPortrait,isRing,pageIndex=0}) {
-  const p=state.palette,cols=isPortrait?4:6,rows=isPortrait?4:3,perPage=cols*rows;
+  const p=state.palette,cols=isPortrait?4:6,perPage=cols*(isPortrait?4:3);
   const start=pageIndex*perPage;
-  const cells=Array.from({length:perPage}).map((_,i)=>state.materials[start+i]);
+  const end=Math.min(start+perPage,state.thumbCount);
+  const cells=state.materials.slice(start,end).filter(Boolean);
+  const actualRows=Math.max(1,Math.ceil(cells.length/cols));
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:isRing?'3% 2% 3% 9%':'3% 2%',position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
     <div style={{fontSize:10,letterSpacing:'.18em',textTransform:'uppercase',marginBottom:'1.6%',color:p.c3}}>
       MATÉRIAUX{state.thumbCount>perPage?` · ${pageIndex+1}/2`:''}
     </div>
-    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${rows},1fr)`,gap:5,height:'90%'}}>
-      {cells.map((m,i)=>m?(
+    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${actualRows},1fr)`,gap:5,height:'90%'}}>
+      {cells.map((m,i)=>(
         <div key={i} style={{border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          {/* Image wrapper — div carries the flex-basis so all photo areas are identical */}
           <div style={{flex:'1 1 0',minHeight:0,position:'relative',overflow:'hidden'}}>
             {m.imgUrl
               ?<img src={m.imgUrl} alt={m.mat} style={{display:'block',position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',objectPosition:'center'}}/>
               :<div style={{position:'absolute',inset:0,background:`linear-gradient(135deg,${shade(p.c1,4)} 0 50%,${p.c1} 50% 100%)`}}/>
             }
           </div>
-          {/* Text area — fixed natural height, always at the same vertical position */}
           <div style={{flexShrink:0,padding:'3px 5px',background:'#fff',borderTop:`1px solid ${p.c1}`,overflow:'hidden'}}>
             <div style={{fontSize:9,fontWeight:700,color:p.c3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{m.mat}</div>
             <div style={{fontSize:8,color:shade(p.c3,40),overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{m.fin}</div>
           </div>
         </div>
-      ):<div key={i} style={{border:`1px dashed ${T.lineSoft}`,borderRadius:2}}/>)}
+      ))}
     </div>
     <BindingMarks isRing={isRing}/>
   </div>;
