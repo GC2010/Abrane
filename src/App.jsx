@@ -145,7 +145,24 @@ const paletteHash = n => { let h=0; for(let i=0;i<(n||'').length;i++) h=(h*31+n.
 const shade = (hex,amt) => { try { const n=parseInt(hex.replace('#',''),16); let r=(n>>16)+amt,g=(n>>8&255)+amt,b=(n&255)+amt; return '#'+(Math.max(0,Math.min(255,r))<<16|Math.max(0,Math.min(255,g))<<8|Math.max(0,Math.min(255,b))).toString(16).padStart(6,'0'); } catch { return hex; } };
 
 const readFileAsDataUrl = file => new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
-const countPdfPages = file => new Promise(res=>{const r=new FileReader();r.onload=e=>{const t=e.target.result;const m=t.match(/\/Type\s*\/Page[^s]/g);res(Math.max(1,m?m.length:1));};r.onerror=()=>res(1);r.readAsText(file,'latin1');});
+
+const renderPdfToDataUrls = async file => {
+  const pdfjsLib = window.pdfjsLib;
+  if(!pdfjsLib) return {pageCount:1,pageUrls:[]};
+  const ab = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:ab}).promise;
+  const pageCount = pdf.numPages;
+  const pageUrls = [];
+  for(let i=1;i<=pageCount;i++){
+    const page = await pdf.getPage(i);
+    const vp = page.getViewport({scale:1.5});
+    const canvas = document.createElement('canvas');
+    canvas.width = vp.width; canvas.height = vp.height;
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    pageUrls.push(canvas.toDataURL('image/jpeg',0.85));
+  }
+  return {pageCount,pageUrls};
+};
 
 const initialState = project => {
   const t=new Date(), dd=String(t.getDate()).padStart(2,'0'), mm=String(t.getMonth()+1).padStart(2,'0');
@@ -1072,23 +1089,27 @@ function ContentPanel({state,update}) {
   const [dragIdx,setDragIdx]=useState(null);
   const [overIdx,setOverIdx]=useState(null);
   const [renaming,setRenaming]=useState(null);
+  const [importing,setImporting]=useState(false);
 
   const handleImport=async e=>{
     const list=Array.from(e.target.files);
     if(!list.length)return;
+    setImporting(true);
     const newFiles=[],newOrders=[];
     for(const file of list){
       const ext=file.name.split('.').pop().toLowerCase();
       const isPdf=ext==='pdf';
       let pageCount=1,pageUrls=[];
-      if(isPdf){
-        pageCount=await countPdfPages(file);
-        const objUrl=URL.createObjectURL(file);
-        pageUrls=Array.from({length:pageCount},(_,i)=>objUrl+(pageCount>1?'#page='+(i+1):''));
-      } else {
-        const dataUrl=await readFileAsDataUrl(file);
-        pageUrls=[dataUrl];
-      }
+      try{
+        if(isPdf){
+          const result=await renderPdfToDataUrls(file);
+          pageCount=result.pageCount;
+          pageUrls=result.pageUrls;
+        } else {
+          const dataUrl=await readFileAsDataUrl(file);
+          pageUrls=[dataUrl];
+        }
+      }catch(err){ console.warn('Import error:',err); }
       const sz=file.size>1024*1024?(file.size/1024/1024).toFixed(1)+' Mo':Math.round(file.size/1024)+' Ko';
       const id='f'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
       newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls});
@@ -1097,6 +1118,7 @@ function ContentPanel({state,update}) {
     }
     update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
     e.target.value='';
+    setImporting(false);
   };
 
   const handleDelete=ordId=>{
@@ -1108,8 +1130,8 @@ function ContentPanel({state,update}) {
     update({contentOrder:newOrder,files:newFiles});
   };
 
-  const handleRotate=ordId=>{
-    update({contentOrder:state.contentOrder.map(x=>x.id===ordId?{...x,rotation:((x.rotation||0)+90)%360}:x)});
+  const setRotation=(ordId,deg)=>{
+    update({contentOrder:state.contentOrder.map(x=>x.id===ordId?{...x,rotation:deg}:x)});
   };
 
   const startRename=item=>{
@@ -1140,13 +1162,19 @@ function ContentPanel({state,update}) {
     update({contentOrder:[...state.contentOrder,{type:'cat',id,name:'Nouvelle catégorie'}]});
   };
 
+  const rotBtnSt=(active)=>({
+    padding:'2px 5px',fontSize:9,fontWeight:600,lineHeight:1,
+    border:`1px solid ${active?T.gold:T.lineSoft}`,borderRadius:3,cursor:'pointer',
+    background:active?T.gold:'transparent',color:active?'#fff':T.ink4,
+  });
+
   return <>
     <Sect title="Importer">
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf" style={{display:'none'}} onChange={handleImport}/>
-      <div onClick={()=>fileInputRef.current?.click()} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:'pointer'}}>
-        <Icon name="upload" size={22} color={T.gold}/>
-        <strong style={{fontSize:12.5,color:T.ink}}>Cliquez ou glissez vos fichiers</strong>
-        <span style={{fontSize:12,color:T.ink3}}>JPG, PNG — PDF multi-pages (1 page par feuille)</span>
+      <div onClick={()=>!importing&&fileInputRef.current?.click()} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
+        <Icon name="upload" size={22} color={importing?T.navy:T.gold}/>
+        <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
+        <span style={{fontSize:12,color:T.ink3}}>{importing?'Chaque page PDF sera convertie en image…':'JPG, PNG — PDF multi-pages (1 page par feuille)'}</span>
       </div>
     </Sect>
     <Sect title={`Ordre · ${state.contentOrder.length} entrées`}>
@@ -1161,6 +1189,7 @@ function ContentPanel({state,update}) {
           const displayName=isCat?item.name:(item.label||f.name.replace(/\.[^.]+$/,''));
           const isOver=overIdx===idx;
           const isRenaming=renaming?.id===item.id;
+          const rot=item.rotation||0;
           return(
             <div key={item.id}
               draggable
@@ -1169,41 +1198,45 @@ function ContentPanel({state,update}) {
               onDragOver={e=>{e.preventDefault();setOverIdx(idx);}}
               onDrop={e=>{e.preventDefault();reorder(dragIdx,idx);setDragIdx(null);setOverIdx(null);}}
               onDoubleClick={()=>startRename(item)}
-              style={{display:'grid',gridTemplateColumns:'14px 26px 1fr auto',alignItems:'center',gap:7,padding:'6px 8px',background:isCat?T.goldTint:T.surface,border:`1px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderLeft:`3px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderRadius:6,cursor:'grab',userSelect:'none'}}
+              style={{padding:'6px 8px',background:isCat?T.goldTint:T.surface,border:`1px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderLeft:`3px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderRadius:6,cursor:'grab',userSelect:'none'}}
             >
-              <Icon name="move" size={10} color={T.ink5}/>
-              <div style={{width:26,height:26,borderRadius:3,background:isCat?'#fff':T.panel2,display:'grid',placeItems:'center',flexShrink:0}}>
-                <Icon name={isCat?'bookmark':f.type==='pdf'?'pdf':'image'} size={13} color={isCat?T.gold:T.ink3}/>
-              </div>
-              <div style={{minWidth:0}}>
-                {isRenaming?(
-                  <input autoFocus value={renaming.val}
-                    onChange={e=>setRenaming(r=>({...r,val:e.target.value}))}
-                    onBlur={commitRename}
-                    onKeyDown={e=>{if(e.key==='Enter')commitRename();if(e.key==='Escape')setRenaming(null);}}
-                    onClick={e=>e.stopPropagation()}
-                    style={{width:'100%',border:`1px solid ${T.gold}`,borderRadius:3,padding:'1px 5px',fontSize:11.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
-                  />
-                ):(
-                  <div style={{fontSize:11.5,fontWeight:isCat?600:400,color:T.ink,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}} title="Double-clic pour renommer">{displayName}</div>
-                )}
-                <div style={{fontSize:10,color:T.ink4}}>
-                  {isCat?'Catégorie':`${f.pages}p · ${f.size}${item.rotation?` · ${item.rotation}°`:''}`}
+              {/* Main row */}
+              <div style={{display:'grid',gridTemplateColumns:'14px 26px 1fr auto',alignItems:'center',gap:7}}>
+                <Icon name="move" size={10} color={T.ink5}/>
+                <div style={{width:26,height:26,borderRadius:3,background:isCat?'#fff':T.panel2,display:'grid',placeItems:'center',flexShrink:0}}>
+                  <Icon name={isCat?'bookmark':f.type==='pdf'?'pdf':'image'} size={13} color={isCat?T.gold:T.ink3}/>
                 </div>
-              </div>
-              <div style={{display:'flex',gap:2,alignItems:'center',flexShrink:0}}>
-                {!isCat&&(
-                  <button onClick={e=>{e.stopPropagation();handleRotate(item.id);}}
-                    title={`Rotation → ${((item.rotation||0)+90)%360}°`}
-                    style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
-                    <Icon name="rotateCW" size={12} color={T.ink4}/>
-                  </button>
-                )}
+                <div style={{minWidth:0}}>
+                  {isRenaming?(
+                    <input autoFocus value={renaming.val}
+                      onChange={e=>setRenaming(r=>({...r,val:e.target.value}))}
+                      onBlur={commitRename}
+                      onKeyDown={e=>{if(e.key==='Enter')commitRename();if(e.key==='Escape')setRenaming(null);}}
+                      onClick={e=>e.stopPropagation()}
+                      style={{width:'100%',border:`1px solid ${T.gold}`,borderRadius:3,padding:'1px 5px',fontSize:11.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
+                    />
+                  ):(
+                    <div style={{fontSize:11.5,fontWeight:isCat?600:400,color:T.ink,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}} title="Double-clic pour renommer">{displayName}</div>
+                  )}
+                  <div style={{fontSize:10,color:T.ink4}}>
+                    {isCat?'Catégorie':`${f.pages}p · ${f.size}`}
+                  </div>
+                </div>
                 <button onClick={e=>{e.stopPropagation();handleDelete(item.id);}}
                   style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
                   <Icon name="trash" size={12} color={T.ink4}/>
                 </button>
               </div>
+              {/* Rotation row — only for files */}
+              {!isCat&&(
+                <div style={{display:'flex',alignItems:'center',gap:4,marginTop:5,paddingLeft:47}}>
+                  <Icon name="rotateCW" size={10} color={T.ink5}/>
+                  <span style={{fontSize:9,color:T.ink5,marginRight:2}}>Rotation</span>
+                  {[0,90,180,270].map(deg=>(
+                    <button key={deg} onClick={e=>{e.stopPropagation();setRotation(item.id,deg);}} style={rotBtnSt(rot===deg)}>{deg}°</button>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
