@@ -620,31 +620,39 @@ function PageRender({page,state}) {
   }
 }
 
-function Canvas({state,zoom,setZoom}) {
+function Canvas({state,zoom,setZoom,activePage}) {
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isP=state.pageFormat.startsWith('v');
-  return <main style={{flex:1,minWidth:0,overflowY:'auto',background:T.bg,display:'flex',flexDirection:'column',alignItems:'center',padding:'36px 32px 120px',position:'relative'}}>
+  const canvasRef=useRef(null);
+  const pageRefs=useRef([]);
+
+  useEffect(()=>{
+    const el=pageRefs.current[activePage];
+    if(el&&canvasRef.current) el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },[activePage]);
+
+  return <main ref={canvasRef} style={{flex:1,minWidth:0,overflowY:'auto',background:T.bg,display:'flex',flexDirection:'column',alignItems:'center',padding:'36px 32px 80px',position:'relative'}}>
     <div style={{width:'100%',maxWidth:isP?700:1000,display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18,flexShrink:0}}>
       <div style={{fontSize:11,color:T.ink3,display:'flex',alignItems:'center',gap:10}}>
         <Icon name="layers" size={14} color={T.ink3}/>
         <span>{pages.length} pages · {isP?'A4 Portrait':'A4 Paysage'}</span>
         <span>·</span><span style={{color:T.navy,fontWeight:500}}>{state.client||'Sans client'}</span>
       </div>
+      <div style={{display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.95)',border:`1px solid ${T.line}`,borderRadius:999,padding:'4px 8px',fontSize:11.5,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
+        <button onClick={()=>setZoom(z=>Math.max(0.4,+(z-.1).toFixed(2)))} style={{background:'transparent',border:'none',padding:'2px 6px',fontSize:15,color:T.ink2,cursor:'pointer',lineHeight:1}}>−</button>
+        <span style={{minWidth:36,textAlign:'center'}}>{Math.round(zoom*100)}%</span>
+        <button onClick={()=>setZoom(z=>Math.min(2,+(z+.1).toFixed(2)))} style={{background:'transparent',border:'none',padding:'2px 6px',fontSize:15,color:T.ink2,cursor:'pointer',lineHeight:1}}>+</button>
+        <span style={{width:1,height:14,background:T.line,margin:'0 2px'}}/>
+        <button onClick={()=>setZoom(1)} style={{background:'transparent',border:'none',padding:'2px 6px',fontSize:11,color:T.ink2,cursor:'pointer'}}>100%</button>
+      </div>
     </div>
     <div style={{display:'flex',flexDirection:'column',gap:24,alignItems:'center',width:'100%',transform:`scale(${zoom})`,transformOrigin:'top center',transition:'transform .15s'}}>
-      {pages.map((p,i)=><div key={p.key} style={{width:'100%',maxWidth:isP?700:1000}}>
+      {pages.map((p,i)=><div key={p.key} ref={el=>pageRefs.current[i]=el} style={{width:'100%',maxWidth:isP?700:1000}}>
         <div style={{fontSize:10,color:T.ink4,letterSpacing:'.08em',textTransform:'uppercase',display:'flex',justifyContent:'space-between',marginBottom:6,padding:'0 2px'}}>
           <span>{p.label}</span><span>Page {i+1} / {pages.length}</span>
         </div>
         <div style={{background:'#fff',boxShadow:'0 6px 22px rgba(20,20,30,.12)',borderRadius:2}}><PageRender page={p} state={state}/></div>
       </div>)}
-    </div>
-    <div style={{position:'fixed',bottom:80,right:22,display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,.95)',border:`1px solid ${T.line}`,borderRadius:999,padding:'4px 8px',fontSize:11.5,zIndex:30,boxShadow:'0 2px 8px rgba(0,0,0,.08)'}}>
-      <button onClick={()=>setZoom(z=>Math.max(0.4,+(z-.1).toFixed(2)))} style={{background:'transparent',border:'none',padding:'2px 6px',fontSize:15,color:T.ink2,cursor:'pointer',lineHeight:1}}>−</button>
-      <span style={{minWidth:36,textAlign:'center'}}>{Math.round(zoom*100)}%</span>
-      <button onClick={()=>setZoom(z=>Math.min(2,+(z+.1).toFixed(2)))} style={{background:'transparent',border:'none',padding:'2px 6px',fontSize:15,color:T.ink2,cursor:'pointer',lineHeight:1}}>+</button>
-      <span style={{width:1,height:14,background:T.line,margin:'0 2px'}}/>
-      <button onClick={()=>setZoom(1)} style={{background:'transparent',border:'none',padding:'2px 6px',fontSize:11,color:T.ink2,cursor:'pointer'}}>100%</button>
     </div>
   </main>;
 }
@@ -1105,6 +1113,93 @@ function Inspector({step,state,update,updateNested}) {
       <StepPanel step={step} state={state} update={update} updateNested={updateNested}/>
     </div>
   </section>;
+}
+
+function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize}) {
+  const stripRef=useRef(null);
+  const pages=useMemo(()=>buildPageList(state),[state]);
+  const isPortrait=state.pageFormat.startsWith('v');
+
+  const THUMB_H={S:55,M:78,L:106};
+  const thumbH=THUMB_H[thumbSize];
+  const ratio=isPortrait?(210/297):(297/210);
+  const thumbW=Math.round(thumbH*ratio);
+  const REF_W=isPortrait?700:1000;
+  const scale=thumbW/REF_W;
+
+  useEffect(()=>{
+    if(!stripRef.current)return;
+    const el=stripRef.current.children[activePage];
+    if(el) el.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  },[activePage]);
+
+  return (
+    <div style={{flexShrink:0,background:'#18202E',borderTop:'1px solid rgba(255,255,255,.1)',display:'flex',flexDirection:'column'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 14px',borderBottom:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
+        <Icon name="layers" size={12} color="rgba(255,255,255,.4)"/>
+        <span style={{fontSize:9.5,color:'rgba(255,255,255,.4)',letterSpacing:'.12em',textTransform:'uppercase',fontWeight:600}}>{pages.length} pages</span>
+        <div style={{flex:1}}/>
+        <div style={{display:'inline-flex',gap:2,background:'rgba(255,255,255,.07)',borderRadius:5,padding:2}}>
+          {['S','M','L'].map(s=>(
+            <button key={s} onClick={()=>setThumbSize(s)} style={{
+              background:thumbSize===s?'rgba(255,255,255,.18)':'transparent',
+              border:'none',color:thumbSize===s?'#fff':'rgba(255,255,255,.35)',
+              borderRadius:3,padding:'2px 9px',fontSize:10.5,fontWeight:600,
+              cursor:'pointer',fontFamily:'inherit',transition:'.12s',letterSpacing:'.04em'
+            }}>{s}</button>
+          ))}
+        </div>
+      </div>
+      {/* Thumbnail strip */}
+      <div ref={stripRef} style={{
+        display:'flex',alignItems:'flex-end',gap:8,
+        padding:'9px 14px 10px',overflowX:'auto',overflowY:'hidden',
+        scrollbarWidth:'thin',scrollbarColor:'rgba(255,255,255,.15) transparent'
+      }}>
+        {pages.map((page,i)=>{
+          const isActive=activePage===i;
+          return (
+            <div key={page.key} onClick={()=>onPageClick(i)} style={{
+              flexShrink:0,display:'flex',flexDirection:'column',
+              alignItems:'center',gap:4,cursor:'pointer'
+            }}>
+              <div style={{
+                width:thumbW,height:thumbH,overflow:'hidden',
+                borderRadius:2,position:'relative',
+                border:`1.5px solid ${isActive?T.gold:'rgba(255,255,255,.18)'}`,
+                boxShadow:isActive?`0 0 0 2px rgba(184,149,86,.35)`:'none',
+                transform:isActive?'translateY(-2px)':'none',
+                transition:'transform .15s, border-color .15s, box-shadow .15s',
+                background:'#fff'
+              }}>
+                <div style={{
+                  fontSize:6.5,fontWeight:700,position:'absolute',top:2,right:2,zIndex:2,
+                  background:'rgba(0,0,0,.4)',color:'#fff',
+                  padding:'0.5px 3px',borderRadius:1.5,letterSpacing:'.04em',
+                  pointerEvents:'none'
+                }}>{i+1}</div>
+                <div style={{
+                  width:REF_W,transformOrigin:'top left',
+                  transform:`scale(${scale})`,pointerEvents:'none'
+                }}>
+                  <PageRender page={page} state={state}/>
+                </div>
+              </div>
+              <div style={{
+                fontSize:8.5,
+                color:isActive?T.gold:'rgba(255,255,255,.35)',
+                maxWidth:Math.max(thumbW,50),
+                overflow:'hidden',textOverflow:'ellipsis',
+                whiteSpace:'nowrap',textAlign:'center',
+                letterSpacing:'.03em',transition:'color .15s'
+              }}>{page.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function Configurator({user,project}) {
