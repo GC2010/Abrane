@@ -567,8 +567,9 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
   );
 
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',position:'relative',overflow:'hidden'}}>
-    <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:p.c1,borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'4%'}}>
-      <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
+    <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:p.c1,borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'4%',gap:6,overflow:'hidden'}}>
+      <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800,flexShrink:0}}>A</div>
+      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{maxWidth:'80%',maxHeight:'18%',objectFit:'contain',display:'block',flexShrink:0}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
     <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -677,7 +678,12 @@ function BackPage({state,isPortrait,isRing}) {
       <div style={{padding:'4px 10px',background:T.navy,borderRadius:3,marginLeft:'auto',marginBottom:8,display:'inline-block'}}><span style={{color:'#fff',fontWeight:900,fontSize:9,letterSpacing:1}}>ABRANE</span></div>
       {state.backLines.map((l,i)=><div key={i}>{l}</div>)}
     </div>
-    <div style={{position:'absolute',right:0,bottom:0,width:'48%',height:'50%',background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,opacity:.35}}/>
+    <div style={{position:'absolute',right:0,bottom:0,width:'48%',height:'50%',overflow:'hidden'}}>
+      {state.bgImageUrl
+        ?<img src={state.bgImageUrl} alt="" style={{position:'absolute',width:`${state.bgScale}%`,height:`${state.bgScale}%`,objectFit:'cover',opacity:.45,left:`${state.bgX}%`,top:`${state.bgY}%`,transform:'translate(-50%,-50%)',maxWidth:'none'}}/>
+        :<div style={{width:'100%',height:'100%',background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,opacity:.35}}/>
+      }
+    </div>
     <BindingMarks isRing={isRing}/>
   </div>;
 }
