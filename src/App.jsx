@@ -1363,7 +1363,8 @@ function ContentPanel({state,update}) {
                           <div style={{marginTop:5,display:'flex',flexDirection:'column',gap:3}}>
                             <div style={{display:'flex',alignItems:'center',gap:4}}>
                               <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Zoom {pcz}%</span>
-                              <input type="range" min="100" max="300" value={pcz} onChange={e=>setContentZoom(pKey,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
+                              <input type="range" min="30" max="300" value={pcz} onChange={e=>setContentZoom(pKey,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
+                              <button onClick={e=>{e.stopPropagation();setContentZoom(pKey,100);}} style={{fontSize:8,padding:'1px 4px',border:`1px solid ${T.lineSoft}`,borderRadius:3,cursor:'pointer',background:'transparent',color:T.ink4,flexShrink:0}}>↺</button>
                             </div>
                             <div style={{display:'flex',alignItems:'center',gap:4}}>
                               <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Cadrage H {pcx}%</span>
