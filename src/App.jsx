@@ -570,14 +570,11 @@ function CoverPage({state,isPortrait,isRing}) {
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',display:'grid',gridTemplateColumns:'1fr 8%',position:'relative',overflow:'hidden'}}>
     <div style={{padding:'6% 5% 5% '+(isRing?'12%':'5%'),display:'flex',flexDirection:'column',justifyContent:'space-between',position:'relative'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',position:'relative',zIndex:3,height:'20%',flexShrink:0,overflow:'hidden'}}>
+        <AbraneLogoBox size="lg"/>
         {state.clientLogoUrl
-          ?<img src={state.clientLogoUrl} alt={state.client} style={{height:`${state.logoScale}%`,maxHeight:'100%',maxWidth:'55%',objectFit:'contain',display:'block'}}/>
+          ?<img src={state.clientLogoUrl} alt={state.client} style={{height:`${state.logoScale}%`,maxHeight:'100%',maxWidth:'40%',objectFit:'contain',display:'block'}}/>
           :<div style={{width:16}}/>
         }
-        <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2,flexShrink:0}}>
-          <div style={{background:T.navy,borderRadius:3,padding:'3px 8px'}}><span style={{color:'#fff',fontWeight:900,fontSize:9,letterSpacing:2}}>ABRANE</span></div>
-          <span style={{fontSize:7,color:T.ink4,letterSpacing:'.08em'}}>LE FABRICANT DE MOBILIER</span>
-        </div>
       </div>
       <div style={{position:'absolute',top:'26%',left:isRing?'12%':'0',right:'0',height:'44%',zIndex:1,overflow:'hidden'}}>
         {state.bgImageUrl
