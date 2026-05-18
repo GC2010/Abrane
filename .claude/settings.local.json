@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npx vite *)",
       "Bash(npm install *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Read(//c/Users/chefprojetsbe03/Documents/GitHub/150ppi/**)",
+      "Bash(dir \"C:\\\\Users\\\\chefprojetsbe03\\\\Documents\\\\GitHub\\\\150ppi\")"
     ]
   }
 }
