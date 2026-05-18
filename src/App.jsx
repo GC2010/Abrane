@@ -1179,6 +1179,8 @@ function ContentPanel({state,update}) {
   const [overIdx,setOverIdx]=useState(null);
   const [renaming,setRenaming]=useState(null);
   const [importing,setImporting]=useState(false);
+  const [expandedZoom,setExpandedZoom]=useState({});
+  const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
   const handleImport=async e=>{
     const list=Array.from(e.target.files);
@@ -1336,27 +1338,43 @@ function ContentPanel({state,update}) {
                     const pcz=state.contentZoom?.[pKey]??100;
                     const pcx=state.contentPos?.[pKey]?.x??50;
                     const pcy=state.contentPos?.[pKey]?.y??50;
+                    const zoomKey=item.id+'-'+pi;
+                    const zOpen=!!expandedZoom[zoomKey];
+                    const hasCustomZoom=pcz!==100||pcx!==50||pcy!==50;
                     return(
                       <div key={pi} style={{marginBottom:pi<f.pages-1?8:0,paddingBottom:pi<f.pages-1?8:0,borderBottom:pi<f.pages-1?`1px dashed ${T.lineSoft}`:'none'}}>
                         {f.pages>1&&<span style={{fontSize:8.5,fontWeight:600,color:T.ink4,display:'block',marginBottom:3}}>Page {pi+1}</span>}
-                        <div style={{display:'flex',alignItems:'center',gap:3,marginBottom:4}}>
+                        {/* Rotation + zoom toggle on same row */}
+                        <div style={{display:'flex',alignItems:'center',gap:3}}>
                           <Icon name="rotateCW" size={9} color={T.ink5}/>
                           {[0,90,180,270].map(deg=>(
                             <button key={deg} onClick={e=>{e.stopPropagation();setRotation(item.id,deg,f.pages===1?undefined:pi);}} style={rotBtnSt(pr===deg)}>{deg}°</button>
                           ))}
+                          <button
+                            onClick={e=>{e.stopPropagation();toggleZoom(zoomKey);}}
+                            title="Zoom & position"
+                            style={{marginLeft:'auto',padding:'2px 5px',fontSize:9,fontWeight:600,lineHeight:1,border:`1px solid ${zOpen||hasCustomZoom?T.navy:T.lineSoft}`,borderRadius:3,cursor:'pointer',background:zOpen?T.navy:hasCustomZoom?T.navyTint:'transparent',color:zOpen?'#fff':hasCustomZoom?T.navy:T.ink4,display:'flex',alignItems:'center',gap:2}}
+                          >
+                            ⤢ {hasCustomZoom&&!zOpen?`${pcz}%`:'Zoom'}
+                          </button>
                         </div>
-                        <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
-                          <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Zoom {pcz}%</span>
-                          <input type="range" min="30" max="250" value={pcz} onChange={e=>setContentZoom(pKey,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
-                        </div>
-                        <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
-                          <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>← → {pcx}%</span>
-                          <input type="range" min="0" max="100" value={pcx} onChange={e=>setContentPos(pKey,parseInt(e.target.value),pcy)} style={{flex:1,accentColor:T.navy}}/>
-                        </div>
-                        <div style={{display:'flex',alignItems:'center',gap:4}}>
-                          <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>↑ ↓ {pcy}%</span>
-                          <input type="range" min="0" max="100" value={pcy} onChange={e=>setContentPos(pKey,pcx,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
-                        </div>
+                        {/* Collapsible zoom/position sliders */}
+                        {zOpen&&(
+                          <div style={{marginTop:5,display:'flex',flexDirection:'column',gap:3}}>
+                            <div style={{display:'flex',alignItems:'center',gap:4}}>
+                              <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Zoom {pcz}%</span>
+                              <input type="range" min="30" max="250" value={pcz} onChange={e=>setContentZoom(pKey,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
+                            </div>
+                            <div style={{display:'flex',alignItems:'center',gap:4}}>
+                              <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>← → {pcx}%</span>
+                              <input type="range" min="0" max="100" value={pcx} onChange={e=>setContentPos(pKey,parseInt(e.target.value),pcy)} style={{flex:1,accentColor:T.navy}}/>
+                            </div>
+                            <div style={{display:'flex',alignItems:'center',gap:4}}>
+                              <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>↑ ↓ {pcy}%</span>
+                              <input type="range" min="0" max="100" value={pcy} onChange={e=>setContentPos(pKey,pcx,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
