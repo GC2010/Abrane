@@ -57,6 +57,7 @@ const PATHS = {
   alignL:"M3 6h18 M3 11h13 M3 16h9",
   alignC:"M3 6h18 M6 11h12 M7 16h10",
   alignR:"M3 6h18 M8 11h13 M12 16h9",
+  rotateCW:"M21 12a9 9 0 01-15.8 6M3 12a9 9 0 0115.8-6 M18 3l3 3-3 3",
 };
 
 function Icon({name, size=18, color, stroke=1.5, style={}}) {
@@ -142,6 +143,9 @@ const STEP_GROUPS = ['Configurateur','Mise en page','Contenu','Finition'];
 const initialsFrom = n => !n?'?':n.trim().split(/\s+/).map(w=>w[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
 const paletteHash = n => { let h=0; for(let i=0;i<(n||'').length;i++) h=(h*31+n.charCodeAt(i))|0; return `hsl(${Math.abs(h)%360},35%,30%)`; };
 const shade = (hex,amt) => { try { const n=parseInt(hex.replace('#',''),16); let r=(n>>16)+amt,g=(n>>8&255)+amt,b=(n&255)+amt; return '#'+(Math.max(0,Math.min(255,r))<<16|Math.max(0,Math.min(255,g))<<8|Math.max(0,Math.min(255,b))).toString(16).padStart(6,'0'); } catch { return hex; } };
+
+const readFileAsDataUrl = file => new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
+const countPdfPages = file => new Promise(res=>{const r=new FileReader();r.onload=e=>{const t=e.target.result;const m=t.match(/\/Type\s*\/Page[^s]/g);res(Math.max(1,m?m.length:1));};r.onerror=()=>res(1);r.readAsText(file,'latin1');});
 
 const initialState = project => {
   const t=new Date(), dd=String(t.getDate()).padStart(2,'0'), mm=String(t.getMonth()+1).padStart(2,'0');
@@ -490,7 +494,7 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   if(state.enMat)pgN+=state.thumbCount>18?2:1;
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){allRows.push({name:it.name,page:pgN,isCat:true});pgN+=1;}
-    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){allRows.push({name:f.name.replace(/\.[^.]+$/,''),page:pgN,isCat:false});pgN+=f.pages||1;}else pgN+=1;}
+    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){const dn=it.label||f.name.replace(/\.[^.]+$/,'');allRows.push({name:dn,page:pgN,isCat:false});pgN+=f.pages||1;}else pgN+=1;}
   });
   const pageRows=allRows.slice(pageIndex*40,(pageIndex+1)*40);
   const col1=pageRows.slice(0,20),col2=pageRows.slice(20,40);
@@ -523,14 +527,21 @@ function CatPage({state,catName,isPortrait,isRing}) {
   </div>;
 }
 
-function ContentPage({state,file,pageIdx,isPortrait,isRing}) {
+function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl}) {
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
+  const rot=rotation||0;
+  const needsScale=rot===90||rot===270;
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',position:'relative',overflow:'hidden'}}>
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:p.c1,borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'4%'}}>
       <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
     </div>
-    <div style={{position:'absolute',top:'5%',right:'11%',bottom:isNotes?'32%':'5%',left:isRing?'14%':'5%',background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
-      {file.name.replace(/\.[^.]+$/,'')} {pageIdx>0?`(${pageIdx+1})`:''}
+    <div style={{position:'absolute',top:'5%',right:'11%',bottom:isNotes?'32%':'5%',left:isRing?'14%':'5%',overflow:'hidden',display:'grid',placeItems:'center'}}>
+      {pageUrl
+        ?<img src={pageUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?0.72:1})`:'none',transition:'transform .2s'}}/>
+        :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
+          {file.name.replace(/\.[^.]+$/,'')} {pageIdx>0?`(${pageIdx+1})`:''}
+        </div>
+      }
     </div>
     {isNotes&&<div style={{position:'absolute',left:isRing?'14%':'5%',right:'11%',bottom:'4%',height:'25%',background:'#fff',border:`1px solid ${p.c1}`,padding:'2%',fontSize:10,color:shade(p.c3,40)}}>Notes · _______________</div>}
     <div style={{position:'absolute',bottom:'2.5%',left:isRing?'14%':'4%',fontSize:10,color:shade(p.c3,50)}}>{String(pageIdx+5).padStart(2,'0')}</div>
@@ -613,7 +624,7 @@ const buildPageList = s => {
   if(s.enNotes) pages.push({key:'notes0',type:'notes',label:'Notes'});
   s.contentOrder.forEach(it=>{
     if(it.type==='cat') pages.push({key:'cat-'+it.id,type:'category',label:it.name,catName:it.name});
-    else{const f=s.files.find(x=>x.id===it.fileId);if(!f)return;for(let i=0;i<(f.pages||1);i++)pages.push({key:'f-'+it.id+'-'+i,type:'content',label:f.name,file:f,pageIdx:i});}
+    else{const f=s.files.find(x=>x.id===it.fileId);if(!f)return;const dn=it.label||f.name.replace(/\.[^.]+$/,'');for(let i=0;i<(f.pages||1);i++)pages.push({key:'f-'+it.id+'-'+i,type:'content',label:dn,file:f,pageIdx:i,rotation:it.rotation||0,pageUrl:(f.pageUrls&&f.pageUrls[i])||null});}
   });
 
   pages.push({key:'back',type:'back',label:'Quatrième de couverture'});
@@ -627,7 +638,7 @@ function PageRender({page,state}) {
     case 'index':     return <IndexPage   state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'materials': return <MatPage     state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'category':  return <CatPage     state={state} catName={page.catName} isPortrait={isP} isRing={isR}/>;
-    case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} isPortrait={isP} isRing={isR}/>;
+    case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} isPortrait={isP} isRing={isR} rotation={page.rotation} pageUrl={page.pageUrl}/>;
     case 'notes':     return <NotesPage   state={state} isPortrait={isP} isRing={isR} noteIdx={page.noteIdx||0}/>;
     case 'back':      return <BackPage    state={state} isPortrait={isP} isRing={isR}/>;
     default: return null;
@@ -1057,28 +1068,142 @@ function NotesPanel({state,update}) {
   </>;
 }
 function ContentPanel({state,update}) {
+  const fileInputRef=useRef(null);
+  const [dragIdx,setDragIdx]=useState(null);
+  const [overIdx,setOverIdx]=useState(null);
+  const [renaming,setRenaming]=useState(null);
+
+  const handleImport=async e=>{
+    const list=Array.from(e.target.files);
+    if(!list.length)return;
+    const newFiles=[],newOrders=[];
+    for(const file of list){
+      const ext=file.name.split('.').pop().toLowerCase();
+      const isPdf=ext==='pdf';
+      let pageCount=1,pageUrls=[];
+      if(isPdf){
+        pageCount=await countPdfPages(file);
+        const objUrl=URL.createObjectURL(file);
+        pageUrls=Array.from({length:pageCount},(_,i)=>objUrl+(pageCount>1?'#page='+(i+1):''));
+      } else {
+        const dataUrl=await readFileAsDataUrl(file);
+        pageUrls=[dataUrl];
+      }
+      const sz=file.size>1024*1024?(file.size/1024/1024).toFixed(1)+' Mo':Math.round(file.size/1024)+' Ko';
+      const id='f'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+      newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls});
+      const ordId='fi'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+      newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:''});
+    }
+    update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
+    e.target.value='';
+  };
+
+  const handleDelete=ordId=>{
+    const item=state.contentOrder.find(x=>x.id===ordId);
+    const newOrder=state.contentOrder.filter(x=>x.id!==ordId);
+    let newFiles=state.files;
+    if(item&&item.type==='file'&&!newOrder.some(x=>x.type==='file'&&x.fileId===item.fileId))
+      newFiles=state.files.filter(x=>x.id!==item.fileId);
+    update({contentOrder:newOrder,files:newFiles});
+  };
+
+  const handleRotate=ordId=>{
+    update({contentOrder:state.contentOrder.map(x=>x.id===ordId?{...x,rotation:((x.rotation||0)+90)%360}:x)});
+  };
+
+  const startRename=item=>{
+    const f=item.type==='file'?state.files.find(x=>x.id===item.fileId):null;
+    const val=item.type==='cat'?item.name:(item.label||f?.name?.replace(/\.[^.]+$/,'')||'');
+    setRenaming({id:item.id,val});
+  };
+  const commitRename=()=>{
+    if(!renaming)return;
+    const v=renaming.val.trim();
+    if(v) update({contentOrder:state.contentOrder.map(x=>{
+      if(x.id!==renaming.id)return x;
+      return x.type==='cat'?{...x,name:v}:{...x,label:v};
+    })});
+    setRenaming(null);
+  };
+
+  const reorder=(from,to)=>{
+    if(from===to||from===null||to===null)return;
+    const a=[...state.contentOrder];
+    const [item]=a.splice(from,1);
+    a.splice(from<to?Math.min(to-1,a.length):to,0,item);
+    update({contentOrder:a});
+  };
+
+  const addCategory=()=>{
+    const id='c'+Date.now();
+    update({contentOrder:[...state.contentOrder,{type:'cat',id,name:'Nouvelle catégorie'}]});
+  };
+
   return <>
-    <Sect title="Fichiers">
-      <div style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:'pointer'}}>
-        <Icon name="upload" size={22} color={T.gold}/><strong style={{fontSize:12.5,color:T.ink}}>Glissez vos fichiers ici</strong><span style={{fontSize:12,color:T.ink3}}>JPG, PNG, PDF multi-pages</span>
+    <Sect title="Importer">
+      <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf" style={{display:'none'}} onChange={handleImport}/>
+      <div onClick={()=>fileInputRef.current?.click()} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:'pointer'}}>
+        <Icon name="upload" size={22} color={T.gold}/>
+        <strong style={{fontSize:12.5,color:T.ink}}>Cliquez ou glissez vos fichiers</strong>
+        <span style={{fontSize:12,color:T.ink3}}>JPG, PNG — PDF multi-pages (1 page par feuille)</span>
       </div>
     </Sect>
     <Sect title={`Ordre · ${state.contentOrder.length} entrées`}>
-      <div style={{display:'flex',flexDirection:'column',gap:6}}>
-        {state.contentOrder.map(item=>{
-          if(item.type==='cat')return(
-            <div key={item.id} style={{display:'grid',gridTemplateColumns:'32px 1fr auto',alignItems:'center',gap:10,padding:'8px 10px',background:T.goldTint,border:`1px solid ${T.goldSoft}`,borderRadius:6}}>
-              <div style={{width:32,height:32,borderRadius:4,background:'#fff',display:'grid',placeItems:'center'}}><Icon name="bookmark" size={14} color={T.gold}/></div>
-              <div><div style={{fontSize:12,fontWeight:600,color:T.ink}}>{item.name}</div><div style={{fontSize:10.5,color:T.ink3}}>Catégorie</div></div>
-              <Icon name="trash" size={13} color={T.ink4}/>
-            </div>
-          );
-          const f=state.files.find(x=>x.id===item.fileId);if(!f)return null;
+      <button onClick={addCategory} style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',marginBottom:6}}>
+        <Icon name="plus" size={13} color={T.gold}/> Ajouter une catégorie
+      </button>
+      <div style={{display:'flex',flexDirection:'column',gap:4}}>
+        {state.contentOrder.map((item,idx)=>{
+          const isCat=item.type==='cat';
+          const f=isCat?null:state.files.find(x=>x.id===item.fileId);
+          if(!isCat&&!f)return null;
+          const displayName=isCat?item.name:(item.label||f.name.replace(/\.[^.]+$/,''));
+          const isOver=overIdx===idx;
+          const isRenaming=renaming?.id===item.id;
           return(
-            <div key={item.id} style={{display:'grid',gridTemplateColumns:'32px 1fr auto',alignItems:'center',gap:10,padding:'8px 10px',background:T.surface,border:`1px solid ${T.lineSoft}`,borderRadius:6}}>
-              <div style={{width:32,height:32,borderRadius:4,background:T.panel2,display:'grid',placeItems:'center'}}><Icon name={f.type==='pdf'?'pdf':'image'} size={16} color={T.ink3}/></div>
-              <div><div style={{fontSize:12,fontWeight:500,color:T.ink}}>{f.name}</div><div style={{fontSize:10.5,color:T.ink3}}>{f.pages} p · {f.size}</div></div>
-              <Icon name="trash" size={13} color={T.ink4}/>
+            <div key={item.id}
+              draggable
+              onDragStart={()=>setDragIdx(idx)}
+              onDragEnd={()=>{setDragIdx(null);setOverIdx(null);}}
+              onDragOver={e=>{e.preventDefault();setOverIdx(idx);}}
+              onDrop={e=>{e.preventDefault();reorder(dragIdx,idx);setDragIdx(null);setOverIdx(null);}}
+              onDoubleClick={()=>startRename(item)}
+              style={{display:'grid',gridTemplateColumns:'14px 26px 1fr auto',alignItems:'center',gap:7,padding:'6px 8px',background:isCat?T.goldTint:T.surface,border:`1px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderLeft:`3px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderRadius:6,cursor:'grab',userSelect:'none'}}
+            >
+              <Icon name="move" size={10} color={T.ink5}/>
+              <div style={{width:26,height:26,borderRadius:3,background:isCat?'#fff':T.panel2,display:'grid',placeItems:'center',flexShrink:0}}>
+                <Icon name={isCat?'bookmark':f.type==='pdf'?'pdf':'image'} size={13} color={isCat?T.gold:T.ink3}/>
+              </div>
+              <div style={{minWidth:0}}>
+                {isRenaming?(
+                  <input autoFocus value={renaming.val}
+                    onChange={e=>setRenaming(r=>({...r,val:e.target.value}))}
+                    onBlur={commitRename}
+                    onKeyDown={e=>{if(e.key==='Enter')commitRename();if(e.key==='Escape')setRenaming(null);}}
+                    onClick={e=>e.stopPropagation()}
+                    style={{width:'100%',border:`1px solid ${T.gold}`,borderRadius:3,padding:'1px 5px',fontSize:11.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
+                  />
+                ):(
+                  <div style={{fontSize:11.5,fontWeight:isCat?600:400,color:T.ink,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}} title="Double-clic pour renommer">{displayName}</div>
+                )}
+                <div style={{fontSize:10,color:T.ink4}}>
+                  {isCat?'Catégorie':`${f.pages}p · ${f.size}${item.rotation?` · ${item.rotation}°`:''}`}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:2,alignItems:'center',flexShrink:0}}>
+                {!isCat&&(
+                  <button onClick={e=>{e.stopPropagation();handleRotate(item.id);}}
+                    title={`Rotation → ${((item.rotation||0)+90)%360}°`}
+                    style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
+                    <Icon name="rotateCW" size={12} color={T.ink4}/>
+                  </button>
+                )}
+                <button onClick={e=>{e.stopPropagation();handleDelete(item.id);}}
+                  style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
+                  <Icon name="trash" size={12} color={T.ink4}/>
+                </button>
+              </div>
             </div>
           );
         })}
