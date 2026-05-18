@@ -632,12 +632,12 @@ function MatPage({state,isPortrait,isRing,pageIndex=0}) {
   const start=pageIndex*perPage;
   const end=Math.min(start+perPage,state.thumbCount);
   const cells=state.materials.slice(start,end).filter(Boolean);
-  const actualRows=Math.max(1,Math.ceil(cells.length/cols));
+  const fixedRows=Math.ceil(perPage/cols);
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:isRing?'3% 2% 3% 9%':'3% 2%',position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
     <div style={{fontSize:10,letterSpacing:'.18em',textTransform:'uppercase',marginBottom:'1.6%',color:p.c3}}>
       MATÉRIAUX{totalPages>1?` · ${pageIndex+1}/${totalPages}`:''}
     </div>
-    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${actualRows},1fr)`,gap:5,height:'90%'}}>
+    <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${fixedRows},1fr)`,gap:5,height:'90%'}}>
       {cells.map((m,i)=>(
         <div key={i} style={{border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
           <div style={{flex:'1 1 0',minHeight:0,position:'relative',overflow:'hidden'}}>
