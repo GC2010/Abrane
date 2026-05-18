@@ -570,10 +570,10 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:p.c1,borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'4%'}}>
       <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
     </div>
-    {/* Image zone */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'26%':'4%',left:isRing?'14%':'4%',overflow:'hidden'}}>
+    {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'26%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
       {displayUrl
-        ?<img src={displayUrl} alt={file.name} style={{position:'absolute',width:`${cZoom}%`,height:`${cZoom}%`,objectFit:'cover',left:`${cX}%`,top:`${cY}%`,transform:`translate(-50%,-50%)${rot?` rotate(${rot}deg)`:''}`,maxWidth:'none',maxHeight:'none',transition:'transform .2s'}}/>
+        ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
           {file.name.replace(/\.[^.]+$/,'')} {pageIdx>0?`(${pageIdx+1})`:''}
         </div>
@@ -1363,14 +1363,14 @@ function ContentPanel({state,update}) {
                           <div style={{marginTop:5,display:'flex',flexDirection:'column',gap:3}}>
                             <div style={{display:'flex',alignItems:'center',gap:4}}>
                               <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Zoom {pcz}%</span>
-                              <input type="range" min="30" max="250" value={pcz} onChange={e=>setContentZoom(pKey,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
+                              <input type="range" min="100" max="300" value={pcz} onChange={e=>setContentZoom(pKey,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
                             </div>
                             <div style={{display:'flex',alignItems:'center',gap:4}}>
-                              <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>← → {pcx}%</span>
+                              <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Cadrage H {pcx}%</span>
                               <input type="range" min="0" max="100" value={pcx} onChange={e=>setContentPos(pKey,parseInt(e.target.value),pcy)} style={{flex:1,accentColor:T.navy}}/>
                             </div>
                             <div style={{display:'flex',alignItems:'center',gap:4}}>
-                              <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>↑ ↓ {pcy}%</span>
+                              <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Cadrage V {pcy}%</span>
                               <input type="range" min="0" max="100" value={pcy} onChange={e=>setContentPos(pKey,pcx,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
                             </div>
                           </div>
