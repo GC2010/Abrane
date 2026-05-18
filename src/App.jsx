@@ -568,10 +568,10 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:p.c1,borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'4%'}}>
       <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
     </div>
-    {/* Image zone — extra bottom margin when rotated + notes to avoid overlap */}
-    <div style={{position:'absolute',top:'4%',right:'11%',bottom:isNotes?(needsScale?'28%':'22%'):'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
+    {/* Image zone */}
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(needsScale?'34%':'25%'):'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
       {displayUrl
-        ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?(isNotes?0.68:0.72):1})`:'none',transition:'transform .2s'}}/>
+        ?<img src={displayUrl} alt={file.name} style={{maxWidth:'92%',maxHeight:'92%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?(isNotes?0.55:0.68):1})`:'none',transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
           {file.name.replace(/\.[^.]+$/,'')} {pageIdx>0?`(${pageIdx+1})`:''}
         </div>
@@ -1661,6 +1661,8 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
       }}>
         {pages.map((page,i)=>{
           const isActive=activePage===i;
+          const hasNotes=page.type==='content'&&!!(state.pageNotes?.[page.key]);
+          const borderCol=isActive?T.gold:hasNotes?'#E53E3E':'rgba(255,255,255,.18)';
           return (
             <div key={page.key} onClick={()=>onPageClick(i)} style={{
               flexShrink:0,display:'flex',flexDirection:'column',
@@ -1669,8 +1671,8 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
               <div style={{
                 width:thumbW,height:thumbH,overflow:'hidden',
                 borderRadius:2,position:'relative',
-                border:`1.5px solid ${isActive?T.gold:'rgba(255,255,255,.18)'}`,
-                boxShadow:isActive?`0 0 0 2px rgba(184,149,86,.35)`:'none',
+                border:`1.5px solid ${borderCol}`,
+                boxShadow:isActive?`0 0 0 2px rgba(184,149,86,.35)`:hasNotes?'0 0 0 2px rgba(229,62,62,.25)':'none',
                 transform:isActive?'translateY(-2px)':'none',
                 transition:'transform .15s, border-color .15s, box-shadow .15s',
                 background:'#fff'
