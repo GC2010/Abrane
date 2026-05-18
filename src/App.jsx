@@ -544,9 +544,9 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
   const rot=rotation||0;
   const hasAnn=!!(state.annotations?.[pageKey]);
   const displayUrl=state.annotSnaps?.[pageKey]||pageUrl;
-  const cZoom=state.contentZoom?.[ordId]??100;
-  const cX=state.contentPos?.[ordId]?.x??50;
-  const cY=state.contentPos?.[ordId]?.y??50;
+  const cZoom=state.contentZoom?.[pageKey]??100;
+  const cX=state.contentPos?.[pageKey]?.x??50;
+  const cY=state.contentPos?.[pageKey]?.y??50;
   const notesCtx=React.useContext(NotesEditCtx);
   const editorRef=useRef(null);
   const savedHtml=notesCtx?.pageNotes?.[pageKey]||'';
@@ -1285,9 +1285,6 @@ function ContentPanel({state,update}) {
           const isOver=overIdx===idx;
           const isRenaming=renaming?.id===item.id;
           const rot=item.rotation||0;
-          const cz=isCat?100:(state.contentZoom?.[item.id]??100);
-          const cx=isCat?50:(state.contentPos?.[item.id]?.x??50);
-          const cy=isCat?50:(state.contentPos?.[item.id]?.y??50);
           return(
             <div key={item.id}
               draggable={!isRenaming}
@@ -1327,48 +1324,42 @@ function ContentPanel({state,update}) {
               </div>
               {/* Controls — only for files */}
               {!isCat&&(
-                <div style={{marginTop:6,paddingLeft:47}}>
-                  {/* Rotation: single row for 1-page, per-page for multi */}
-                  {f.pages===1?(
-                    <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:5}}>
-                      <Icon name="rotateCW" size={10} color={T.ink5}/>
-                      <span style={{fontSize:9,color:T.ink5,marginRight:2}}>Rotation</span>
-                      {[0,90,180,270].map(deg=>(
-                        <button key={deg} onClick={e=>{e.stopPropagation();setRotation(item.id,deg);}} style={rotBtnSt((item.pageRotations?.[0]??item.rotation??0)===deg)}>{deg}°</button>
-                      ))}
-                    </div>
-                  ):(
-                    <div style={{marginBottom:5}}>
-                      <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                        <Icon name="rotateCW" size={10} color={T.ink5}/>
-                        <span style={{fontSize:9,color:T.ink5}}>Rotation par page</span>
+                <div
+                  style={{marginTop:6,paddingLeft:47}}
+                  onMouseDown={e=>e.stopPropagation()}
+                  onDragStart={e=>{e.stopPropagation();e.preventDefault();}}
+                  draggable={false}
+                >
+                  {Array.from({length:f.pages},(_,pi)=>{
+                    const pKey='f-'+item.id+'-'+pi;
+                    const pr=item.pageRotations?.[pi]??item.rotation??0;
+                    const pcz=state.contentZoom?.[pKey]??100;
+                    const pcx=state.contentPos?.[pKey]?.x??50;
+                    const pcy=state.contentPos?.[pKey]?.y??50;
+                    return(
+                      <div key={pi} style={{marginBottom:pi<f.pages-1?8:0,paddingBottom:pi<f.pages-1?8:0,borderBottom:pi<f.pages-1?`1px dashed ${T.lineSoft}`:'none'}}>
+                        {f.pages>1&&<span style={{fontSize:8.5,fontWeight:600,color:T.ink4,display:'block',marginBottom:3}}>Page {pi+1}</span>}
+                        <div style={{display:'flex',alignItems:'center',gap:3,marginBottom:4}}>
+                          <Icon name="rotateCW" size={9} color={T.ink5}/>
+                          {[0,90,180,270].map(deg=>(
+                            <button key={deg} onClick={e=>{e.stopPropagation();setRotation(item.id,deg,f.pages===1?undefined:pi);}} style={rotBtnSt(pr===deg)}>{deg}°</button>
+                          ))}
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
+                          <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Zoom {pcz}%</span>
+                          <input type="range" min="30" max="250" value={pcz} onChange={e=>setContentZoom(pKey,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
+                          <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>← → {pcx}%</span>
+                          <input type="range" min="0" max="100" value={pcx} onChange={e=>setContentPos(pKey,parseInt(e.target.value),pcy)} style={{flex:1,accentColor:T.navy}}/>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:4}}>
+                          <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>↑ ↓ {pcy}%</span>
+                          <input type="range" min="0" max="100" value={pcy} onChange={e=>setContentPos(pKey,pcx,parseInt(e.target.value))} style={{flex:1,accentColor:T.navy}}/>
+                        </div>
                       </div>
-                      {Array.from({length:f.pages},(_,pi)=>{
-                        const pr=item.pageRotations?.[pi]??item.rotation??0;
-                        return(
-                          <div key={pi} style={{display:'flex',alignItems:'center',gap:3,marginBottom:2}}>
-                            <span style={{fontSize:8.5,color:T.ink5,minWidth:22,flexShrink:0}}>P{pi+1}</span>
-                            {[0,90,180,270].map(deg=>(
-                              <button key={deg} onClick={e=>{e.stopPropagation();setRotation(item.id,deg,pi);}} style={rotBtnSt(pr===deg)}>{deg}°</button>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {/* Zoom & position */}
-                  <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
-                    <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>Zoom {cz}%</span>
-                    <input type="range" min="30" max="250" value={cz} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();setContentZoom(item.id,parseInt(e.target.value));}} style={{flex:1,accentColor:T.navy}}/>
-                  </div>
-                  <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:2}}>
-                    <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>← → {cx}%</span>
-                    <input type="range" min="0" max="100" value={cx} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();setContentPos(item.id,parseInt(e.target.value),cy);}} style={{flex:1,accentColor:T.navy}}/>
-                  </div>
-                  <div style={{display:'flex',alignItems:'center',gap:4}}>
-                    <span style={{fontSize:9,color:T.ink5,minWidth:52,flexShrink:0}}>↑ ↓ {cy}%</span>
-                    <input type="range" min="0" max="100" value={cy} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();setContentPos(item.id,cx,parseInt(e.target.value));}} style={{flex:1,accentColor:T.navy}}/>
-                  </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
