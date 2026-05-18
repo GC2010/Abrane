@@ -571,7 +571,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'26%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'30%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',alignItems:isNotes?'start':'center',justifyItems:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
