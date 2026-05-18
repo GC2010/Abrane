@@ -179,18 +179,11 @@ const initialState = project => {
     showContact:false,contact:'',showSendDate:false,sendDate:'',showProjectType:false,projectType:'',
     tags:[],
     enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,
-    materials:SAMPLE_MATS, files:SAMPLE_FILES,
-    contentOrder:[
-      {type:'cat',id:'c0',name:'Présentation'},{type:'file',id:'fi1',fileId:'f1'},
-      {type:'file',id:'fi2',fileId:'f2'},{type:'cat',id:'c1',name:'Plans & Coupes'},
-      {type:'file',id:'fi3',fileId:'f3'},{type:'file',id:'fi4',fileId:'f4'},
-      {type:'cat',id:'c2',name:'Galerie'},{type:'file',id:'fi5',fileId:'f5'},
-      {type:'file',id:'fi6',fileId:'f6'},
-    ],
+    materials:SAMPLE_MATS, files:[], contentOrder:[],
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, wmEnabled:false, wmOpacity:15,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, pageNotes:{}, _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, _dirty:false,
   };
 };
 
@@ -550,6 +543,8 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
   const rot=rotation||0;
   const needsScale=rot===90||rot===270;
+  const hasAnn=!!(state.annotations?.[pageKey]);
+  const displayUrl=state.annotSnaps?.[pageKey]||pageUrl;
   const notesCtx=React.useContext(NotesEditCtx);
   const editorRef=useRef(null);
   const savedHtml=notesCtx?.pageNotes?.[pageKey]||'';
@@ -573,14 +568,15 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:p.c1,borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'4%'}}>
       <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
     </div>
-    {/* Image zone — bottom reduced to 22% when notes active */}
-    <div style={{position:'absolute',top:'4%',right:'11%',bottom:isNotes?'22%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
-      {pageUrl
-        ?<img src={pageUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?(isNotes?0.65:0.72):1})`:'none',transition:'transform .2s'}}/>
+    {/* Image zone — extra bottom margin when rotated + notes to avoid overlap */}
+    <div style={{position:'absolute',top:'4%',right:'11%',bottom:isNotes?(needsScale?'28%':'22%'):'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
+      {displayUrl
+        ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?(isNotes?0.68:0.72):1})`:'none',transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
           {file.name.replace(/\.[^.]+$/,'')} {pageIdx>0?`(${pageIdx+1})`:''}
         </div>
       }
+      {hasAnn&&<div style={{position:'absolute',top:4,left:4,background:T.gold,color:'#fff',fontSize:7,fontWeight:700,padding:'2px 6px',borderRadius:3,letterSpacing:'.1em',boxShadow:'0 1px 4px rgba(0,0,0,.18)'}}>ANNOTÉ</div>}
     </div>
     {/* Notes zone — height 17%, bottom 3% */}
     {isNotes&&(
@@ -1936,9 +1932,14 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     const canvas=fc.current;
     const objs=canvas.getObjects();
     const newAnn={...(state.annotations||{})};
-    if(objs.length===0) delete newAnn[pageKey];
-    else newAnn[pageKey]=JSON.stringify(objs.map(o=>o.toObject(['selectable','evented'])));
-    update({annotations:newAnn});
+    const newSnap={...(state.annotSnaps||{})};
+    if(objs.length===0){
+      delete newAnn[pageKey];delete newSnap[pageKey];
+    } else {
+      newAnn[pageKey]=JSON.stringify(objs.map(o=>o.toObject(['selectable','evented'])));
+      newSnap[pageKey]=canvas.toDataURL({format:'jpeg',quality:0.88});
+    }
+    update({annotations:newAnn,annotSnaps:newSnap});
     onClose();
   };
 
