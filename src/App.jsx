@@ -281,8 +281,14 @@ function AdminPanel({onClose}) {
           }
         </div>
 
-        <div style={{padding:'10px 12px',background:T.navyTint,border:`1px solid #D2DBEC`,borderRadius:8,fontSize:11,color:T.ink3}}>
-          <strong style={{color:T.navy}}>Note :</strong> Les logos sont sauvegardés dans le navigateur (localStorage). Ils persistent entre les sessions sur cet appareil. Pour changer le mot de passe admin, modifiez la constante <code style={{background:'#E8EFF8',padding:'0 4px',borderRadius:3}}>ADMIN_PASS</code> dans le fichier <code style={{background:'#E8EFF8',padding:'0 4px',borderRadius:3}}>src/App.jsx</code>.
+        <div style={{padding:'10px 12px',background:'#FFF8E6',border:`1px solid #F6D860`,borderRadius:8,fontSize:11,color:'#7A5C00',lineHeight:1.5}}>
+          <strong>⚠ Logo en stockage local</strong> — visible uniquement sur cet appareil. Pour l'intégrer définitivement dans le code (visible par tous) : copiez la chaîne base64 ci-dessous et envoyez-la au développeur (ou dans le chat IA) pour l'incorporer comme constante dans <code style={{background:'rgba(0,0,0,.06)',padding:'0 3px',borderRadius:2}}>App.jsx</code>.
+          {officialLogo&&<div style={{marginTop:8,display:'flex',gap:6}}>
+            <button onClick={()=>navigator.clipboard.writeText(officialLogo).then(()=>alert('Base64 copié !'))} style={{...btnSt(undefined,true),fontSize:10}}>📋 Copier base64 logo</button>
+          </div>}
+          {wmLogo&&<div style={{marginTop:6,display:'flex',gap:6}}>
+            <button onClick={()=>navigator.clipboard.writeText(wmLogo).then(()=>alert('Base64 copié !'))} style={{...btnSt(undefined,true),fontSize:10}}>📋 Copier base64 filigrane</button>
+          </div>}
         </div>
       </div>
     </div>
@@ -885,12 +891,12 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
             </NotesEditCtx.Provider>
             {state.wmEnabled&&(
               <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:6}}>
-                <div style={{position:'absolute',inset:'-80%',display:'grid',gridTemplateColumns:'repeat(5,1fr)',gridTemplateRows:'repeat(8,1fr)',transform:'rotate(-40deg)',transformOrigin:'center',opacity:state.wmOpacity/100}}>
-                  {Array.from({length:40}).map((_,k)=>(
-                    <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'4%'}}>
+                <div style={{position:'absolute',inset:'-80%',display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'repeat(12,1fr)',transform:'rotate(-40deg)',transformOrigin:'center',opacity:state.wmOpacity/100}}>
+                  {Array.from({length:84}).map((_,k)=>(
+                    <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3%'}}>
                       {wmLogo
                         ?<img src={wmLogo} alt="" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',userSelect:'none'}}/>
-                        :<span style={{fontWeight:900,letterSpacing:'.25em',fontSize:'clamp(5px,1.1vw,11px)',color:'#1A1F2E',whiteSpace:'nowrap',userSelect:'none',fontFamily:'inherit'}}>ABRANE</span>
+                        :<span style={{fontWeight:900,letterSpacing:'.18em',fontSize:'clamp(3px,0.75vw,7px)',color:'#1A1F2E',whiteSpace:'nowrap',userSelect:'none',fontFamily:'inherit'}}>ABRANE</span>
                       }
                     </div>
                   ))}
@@ -1671,7 +1677,7 @@ function SignPanel({state,update,user}) {
         <Toggle checked={state.wmEnabled} onChange={v=>update({wmEnabled:v})}/>
       </RowItem>
       {state.wmEnabled&&<Fld label={`Opacité ${state.wmOpacity}%`}>
-        <input type="range" min="3" max="40" value={state.wmOpacity} onChange={e=>update({wmOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        <input type="range" min="3" max="80" value={state.wmOpacity} onChange={e=>update({wmOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
       </Fld>}
     </Sect>
   </>;
