@@ -9,6 +9,8 @@ const T = {
   success:"#2D7A4F",successT:"#E8F2EB",
 };
 
+const NotesEditCtx = React.createContext(null);
+
 const PATHS = {
   back:"M15 6l-6 6 6 6",check:"M5 12l4.5 4.5L19 7",plus:"M12 5v14 M5 12h14",
   folder:"M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z",
@@ -188,7 +190,7 @@ const initialState = project => {
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, wmEnabled:false, wmOpacity:15,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, pageNotes:{}, _dirty:false,
   };
 };
 
@@ -544,15 +546,35 @@ function CatPage({state,catName,isPortrait,isRing}) {
   </div>;
 }
 
-function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl}) {
+function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,pageKey}) {
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
   const rot=rotation||0;
   const needsScale=rot===90||rot===270;
+  const notesCtx=React.useContext(NotesEditCtx);
+  const editorRef=useRef(null);
+  const savedHtml=notesCtx?.pageNotes?.[pageKey]||'';
+
+  useEffect(()=>{
+    if(editorRef.current) editorRef.current.innerHTML=savedHtml;
+  },[pageKey]);
+
+  const exec=(cmd,val=null)=>{
+    editorRef.current?.focus();
+    document.execCommand(cmd,false,val);
+    if(notesCtx?.onUpdateNotes) notesCtx.onUpdateNotes(pageKey, editorRef.current?.innerHTML||'');
+  };
+
+  const nb=(label,cmd,val,style={})=>(
+    <button onMouseDown={e=>{e.preventDefault();exec(cmd,val);}}
+      style={{background:'transparent',border:'none',cursor:'pointer',padding:'1px 3px',borderRadius:2,fontSize:8.5,fontWeight:600,color:shade(p.c3,30),lineHeight:1,...style}}>{label}</button>
+  );
+
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',position:'relative',overflow:'hidden'}}>
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:p.c1,borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'4%'}}>
       <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800}}>A</div>
     </div>
-    <div style={{position:'absolute',top:'5%',right:'11%',bottom:isNotes?'32%':'5%',left:isRing?'14%':'5%',overflow:'hidden',display:'grid',placeItems:'center'}}>
+    {/* Image zone — bottom reduced to 22% when notes active */}
+    <div style={{position:'absolute',top:'4%',right:'11%',bottom:isNotes?'22%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'grid',placeItems:'center'}}>
       {pageUrl
         ?<img src={pageUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:rot?`rotate(${rot}deg) scale(${needsScale?0.72:1})`:'none',transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -560,8 +582,42 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl}) {
         </div>
       }
     </div>
-    {isNotes&&<div style={{position:'absolute',left:isRing?'14%':'5%',right:'11%',bottom:'4%',height:'25%',background:'#fff',border:`1px solid ${p.c1}`,padding:'2%',fontSize:10,color:shade(p.c3,40)}}>Notes · _______________</div>}
-    <div style={{position:'absolute',bottom:'2.5%',left:isRing?'14%':'4%',fontSize:10,color:shade(p.c3,50)}}>{String(pageIdx+5).padStart(2,'0')}</div>
+    {/* Notes zone — height 17%, bottom 3% */}
+    {isNotes&&(
+      <div style={{position:'absolute',left:isRing?'14%':'4%',right:'11%',bottom:'3%',height:'17%',background:'#fff',border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        {/* Compact toolbar — only when editing context available */}
+        {notesCtx&&(
+          <div style={{display:'flex',alignItems:'center',gap:1,padding:'1px 3px',borderBottom:`1px solid ${shade(p.c1,-6)}`,flexShrink:0,background:shade(p.c1,8),flexWrap:'wrap'}}>
+            {nb('B','bold',null,{fontStyle:'normal',fontWeight:900})}
+            {nb('I','italic',null,{fontStyle:'italic'})}
+            {nb('U','underline',null,{textDecoration:'underline'})}
+            {nb('S̶','strikeThrough')}
+            <span style={{width:1,height:9,background:shade(p.c1,-10),margin:'0 1px'}}/>
+            {nb('S','fontSize','1')}
+            {nb('M','fontSize','3')}
+            {nb('L','fontSize','5')}
+            <span style={{width:1,height:9,background:shade(p.c1,-10),margin:'0 1px'}}/>
+            {nb('≡L','justifyLeft')}
+            {nb('≡C','justifyCenter')}
+            {nb('≡R','justifyRight')}
+            <span style={{width:1,height:9,background:shade(p.c1,-10),margin:'0 1px'}}/>
+            {nb('•','insertUnorderedList')}
+            {nb('1.','insertOrderedList')}
+            <span style={{width:1,height:9,background:shade(p.c1,-10),margin:'0 1px'}}/>
+            {nb('✕','removeFormat')}
+          </div>
+        )}
+        {/* Editable / read-only content */}
+        {notesCtx
+          ?<div ref={editorRef} contentEditable suppressContentEditableWarning
+              onInput={()=>notesCtx.onUpdateNotes?.(pageKey,editorRef.current?.innerHTML||'')}
+              style={{flex:1,padding:'2px 4px',fontSize:8.5,outline:'none',overflowY:'auto',fontFamily:'inherit',color:shade(p.c3,40),lineHeight:1.4}}/>
+          :<div style={{flex:1,padding:'2px 4px',fontSize:8.5,color:shade(p.c3,40),lineHeight:1.4,overflow:'hidden'}}
+              dangerouslySetInnerHTML={{__html:savedHtml||`<span style="opacity:.35">Notes…</span>`}}/>
+        }
+      </div>
+    )}
+    <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',fontSize:9,color:shade(p.c3,50)}}>{String(pageIdx+5).padStart(2,'0')}</div>
     <BindingMarks isRing={isRing}/>
   </div>;
 }
@@ -655,18 +711,19 @@ function PageRender({page,state}) {
     case 'index':     return <IndexPage   state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'materials': return <MatPage     state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'category':  return <CatPage     state={state} catName={page.catName} isPortrait={isP} isRing={isR}/>;
-    case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} isPortrait={isP} isRing={isR} rotation={page.rotation} pageUrl={page.pageUrl}/>;
+    case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} isPortrait={isP} isRing={isR} rotation={page.rotation} pageUrl={page.pageUrl} pageKey={page.key}/>;
     case 'notes':     return <NotesPage   state={state} isPortrait={isP} isRing={isR} noteIdx={page.noteIdx||0}/>;
     case 'back':      return <BackPage    state={state} isPortrait={isP} isRing={isR}/>;
     default: return null;
   }
 }
 
-function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH}) {
+function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageNotes}) {
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isP=state.pageFormat.startsWith('v');
   const canvasRef=useRef(null);
   const pageRefs=useRef([]);
+  const notesCtxVal=useMemo(()=>onUpdatePageNotes?{pageNotes:state.pageNotes||{},onUpdateNotes:onUpdatePageNotes}:null,[state.pageNotes,onUpdatePageNotes]);
 
   useEffect(()=>{
     const el=pageRefs.current[activePage];
@@ -703,7 +760,9 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH}) {
             <span>Page {i+1} / {pages.length}</span>
           </div>
           <div style={{background:'#fff',boxShadow:'0 6px 22px rgba(20,20,30,.12)',borderRadius:2,position:'relative'}}>
-            <PageRender page={p} state={state}/>
+            <NotesEditCtx.Provider value={notesCtxVal}>
+              <PageRender page={p} state={state}/>
+            </NotesEditCtx.Provider>
             {p.type==='content'&&onAnnotate&&(
               <div style={{position:'absolute',top:8,right:10,zIndex:10}}>
                 <button onClick={e=>{e.stopPropagation();onAnnotate(p);}} style={{
@@ -1938,6 +1997,7 @@ function Configurator({user,project}) {
   const [annotating,setAnnotating]=useState(null);
   const update=useCallback(patch=>{setState(s=>({...s,...patch,_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const updateNested=useCallback((key,patch)=>{setState(s=>({...s,[key]:{...s[key],...patch},_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
+  const updatePageNotes=useCallback((pageKey,html)=>{setState(s=>({...s,pageNotes:{...(s.pageNotes||{}),[pageKey]:html},_dirty:true}));setDirtySteps(d=>({...d,content:true}));},[]);
   const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2400);};
   const save=()=>{setState(s=>({...s,_dirty:false}));showToast('Projet enregistré');};
   const compl=computeCompletion(state,dirtySteps);
@@ -1949,7 +2009,8 @@ function Configurator({user,project}) {
     <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <Canvas state={state} zoom={zoom} setZoom={setZoom} activePage={activePage}
         paletteH={paletteH}
-        onAnnotate={p=>setAnnotating({pageKey:p.key,pageUrl:p.pageUrl,isPortrait:state.pageFormat.startsWith('v')})}/>
+        onAnnotate={p=>setAnnotating({pageKey:p.key,pageUrl:p.pageUrl,isPortrait:state.pageFormat.startsWith('v')})}
+        onUpdatePageNotes={updatePageNotes}/>
       <ThumbnailPalette state={state} activePage={activePage} onPageClick={setActivePage}
         thumbSize={thumbSize} setThumbSize={setThumbSize}
         onOpenVueEnsemble={()=>setShowVueEnsemble(true)}
