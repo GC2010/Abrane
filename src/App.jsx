@@ -491,7 +491,12 @@ function CoverPage({state,isPortrait,isRing}) {
         </div>
       </div>
     </div>
-    <div style={{background:p.c2,opacity:.65}}/>
+    <div style={{background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
+      <div style={{background:T.navy,borderRadius:3,padding:'5px 0',display:'flex',flexDirection:'column',alignItems:'center',width:'62%',flexShrink:0}}>
+        {'ABRANE'.split('').map((c,i)=><span key={i} style={{color:'#fff',fontWeight:900,fontSize:8,lineHeight:1.25}}>{c}</span>)}
+      </div>
+      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{maxWidth:'80%',maxHeight:'18%',objectFit:'contain',display:'block',flexShrink:0}}/>}
+    </div>
     <BindingMarks isRing={isRing}/>
   </div>;
 }
@@ -567,9 +572,11 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
   );
 
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',position:'relative',overflow:'hidden'}}>
-    <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:p.c1,borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'4%',gap:6,overflow:'hidden'}}>
-      <div style={{width:22,height:22,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:800,flexShrink:0}}>A</div>
-      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{maxWidth:'80%',maxHeight:'18%',objectFit:'contain',display:'block',flexShrink:0}}/>}
+    <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
+      <div style={{background:T.navy,borderRadius:3,padding:'5px 0',display:'flex',flexDirection:'column',alignItems:'center',width:'62%',flexShrink:0}}>
+        {'ABRANE'.split('').map((c,i)=><span key={i} style={{color:'#fff',fontWeight:900,fontSize:8,lineHeight:1.25}}>{c}</span>)}
+      </div>
+      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{maxWidth:'80%',maxHeight:'20%',objectFit:'contain',display:'block',flexShrink:0}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
     <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
