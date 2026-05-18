@@ -76,7 +76,13 @@ function Icon({name, size=18, color, stroke=1.5, style={}}) {
   );
 }
 
+// ── Modifica qui la password admin ────────────────────────────
+const ADMIN_PASS = 'ABRANE2026';
+
+const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',setBrand:()=>{}});
+
 const USERS = [
+  {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
   {id:'u1',name:'Sandro Caron',initials:'SC',role:'admin',hasSig:true,team:'ABRANE FR'},
   {id:'u2',name:'Élise Mercier',initials:'ÉM',role:'editor',hasSig:true,team:'ABRANE FR'},
   {id:'u3',name:'Marco Bianchi',initials:'MB',role:'editor',hasSig:false,team:'ABRANE IT'},
@@ -217,30 +223,137 @@ function MiniCover({palette,client,subtitle}) {
   </div>;
 }
 
+function StripeAbraneLogo() {
+  const {officialLogo}=React.useContext(BrandCtx);
+  if(officialLogo) return <img src={officialLogo} alt="ABRANE" style={{width:'80%',objectFit:'contain',display:'block',flexShrink:0}}/>;
+  return <div style={{background:T.navy,borderRadius:3,padding:'5px 0',display:'flex',flexDirection:'column',alignItems:'center',width:'62%',flexShrink:0}}>
+    {'ABRANE'.split('').map((c,i)=><span key={i} style={{color:'#fff',fontWeight:900,fontSize:8,lineHeight:1.25}}>{c}</span>)}
+  </div>;
+}
+
+function AdminPanel({onClose}) {
+  const {officialLogo,wmLogo,setBrand}=React.useContext(BrandCtx);
+  const upload=(key,cb)=>e=>{
+    const f=e.target.files?.[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{localStorage.setItem(key,ev.target.result);cb(ev.target.result);};
+    r.readAsDataURL(f);
+  };
+  const remove=key=>{localStorage.removeItem(key);setBrand(b=>({...b,[key==='abrane_logo'?'officialLogo':'wmLogo']:''}));};
+
+  return <div style={{position:'fixed',inset:0,background:'rgba(15,20,40,.55)',zIndex:200,display:'grid',placeItems:'center'}}>
+    <div style={{width:480,maxWidth:'94vw',background:T.surface,borderRadius:16,padding:28,boxShadow:'0 24px 80px rgba(0,0,0,.25)',border:`1px solid ${T.line}`}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:26,height:26,borderRadius:'50%',background:T.gold,color:'#fff',display:'grid',placeItems:'center',fontSize:12,fontWeight:800}}>A</div>
+          <span style={{fontSize:15,fontWeight:700,color:T.ink}}>Administration ABRANE</span>
+        </div>
+        <button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:18,color:T.ink3}}>✕</button>
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:16}}>
+        {/* Logo officiel */}
+        <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:8}}>Logo ABRANE officiel</div>
+          <div style={{fontSize:11,color:T.ink3,marginBottom:10}}>Affiché sur la page d'accueil, la barre de navigation et toutes les strisce pages.</div>
+          {officialLogo
+            ?<div style={{display:'flex',alignItems:'center',gap:10}}>
+                <img src={officialLogo} alt="Logo" style={{height:40,maxWidth:180,objectFit:'contain',border:`1px solid ${T.lineSoft}`,borderRadius:6,padding:4}}/>
+                <button onClick={()=>remove('abrane_logo')} style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA'}}>Supprimer</button>
+              </div>
+            :<label style={{...btnSt('primary',false),cursor:'pointer',display:'inline-flex'}}>
+                <Icon name="upload" size={14} color="#fff"/>Importer le logo officiel (PNG / SVG)
+                <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={upload('abrane_logo',v=>setBrand(b=>({...b,officialLogo:v})))}/>
+              </label>
+          }
+        </div>
+
+        {/* Logo filigrane */}
+        <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:8}}>Logo filigrane</div>
+          <div style={{fontSize:11,color:T.ink3,marginBottom:10}}>Répété en diagonale sur toutes les pages quand la filigrane est activée. Préférez un PNG transparent ou un SVG.</div>
+          {wmLogo
+            ?<div style={{display:'flex',alignItems:'center',gap:10}}>
+                <img src={wmLogo} alt="Logo WM" style={{height:40,maxWidth:180,objectFit:'contain',border:`1px solid ${T.lineSoft}`,borderRadius:6,padding:4}}/>
+                <button onClick={()=>remove('abrane_wm')} style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA'}}>Supprimer</button>
+              </div>
+            :<label style={{...btnSt(undefined,false),cursor:'pointer',display:'inline-flex'}}>
+                <Icon name="upload" size={14} color={T.ink}/>Importer logo filigrane (PNG transparent / SVG)
+                <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={upload('abrane_wm',v=>setBrand(b=>({...b,wmLogo:v})))}/>
+              </label>
+          }
+        </div>
+
+        <div style={{padding:'10px 12px',background:T.navyTint,border:`1px solid #D2DBEC`,borderRadius:8,fontSize:11,color:T.ink3}}>
+          <strong style={{color:T.navy}}>Note :</strong> Les logos sont sauvegardés dans le navigateur (localStorage). Ils persistent entre les sessions sur cet appareil. Pour changer le mot de passe admin, modifiez la constante <code style={{background:'#E8EFF8',padding:'0 4px',borderRadius:3}}>ADMIN_PASS</code> dans le fichier <code style={{background:'#E8EFF8',padding:'0 4px',borderRadius:3}}>src/App.jsx</code>.
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+function AbraneLogoBox({size='md'}) {
+  const {officialLogo}=React.useContext(BrandCtx);
+  const h=size==='lg'?56:size==='md'?40:28;
+  if(officialLogo) return <img src={officialLogo} alt="ABRANE" style={{height:h,maxWidth:200,objectFit:'contain',display:'block'}}/>;
+  const fs=size==='lg'?18:size==='md'?13:10;
+  return <div style={{background:T.navy,borderRadius:size==='lg'?6:4,padding:size==='lg'?'10px 24px':size==='md'?'5px 12px':'3px 8px',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+    <span style={{color:'#fff',fontWeight:900,fontSize:fs,letterSpacing:2}}>ABRANE</span>
+    {size==='lg'&&<span style={{color:'rgba(255,255,255,.5)',fontSize:8,letterSpacing:2}}>LE FABRICANT DE MOBILIER</span>}
+  </div>;
+}
+
 function LoginScreen({onLogin}) {
   const [newName,setNewName]=useState('');
+  const [pwdUser,setPwdUser]=useState(null);
+  const [pwd,setPwd]=useState('');
+  const [pwdErr,setPwdErr]=useState(false);
+
+  const handleUserClick=u=>{
+    if(u.requiresPassword){setPwdUser(u);setPwd('');setPwdErr(false);}
+    else onLogin(u);
+  };
+  const doAdminLogin=()=>{
+    if(pwd===ADMIN_PASS){onLogin(pwdUser);setPwdUser(null);}
+    else{setPwdErr(true);}
+  };
   const doCreate=()=>{if(!newName.trim())return;onLogin({id:'new',name:newName.trim(),initials:newName.trim().split(' ').map(s=>s[0]).slice(0,2).join('').toUpperCase(),role:'editor',hasSig:false,team:'ABRANE FR'});};
+
   return <div style={{position:'fixed',inset:0,display:'grid',placeItems:'center',background:T.bg,zIndex:100}}>
     <div style={{width:420,maxWidth:'92vw',background:T.surface,borderRadius:22,padding:'36px 36px 24px',boxShadow:'0 24px 80px rgba(15,20,40,.22)',border:`1px solid ${T.line}`}}>
       <div style={{display:'flex',justifyContent:'center',marginBottom:20}}>
-        <div style={{background:T.navy,borderRadius:6,padding:'10px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-          <span style={{color:'#fff',fontWeight:900,fontSize:18,letterSpacing:3}}>ABRANE</span>
-          <span style={{color:'rgba(255,255,255,.5)',fontSize:8,letterSpacing:2}}>LE FABRICANT DE MOBILIER TEST</span>
-        </div>
+        <AbraneLogoBox size="lg"/>
       </div>
       <h1 style={{fontSize:20,fontWeight:600,textAlign:'center',color:T.ink,margin:'0 0 6px'}}>Bienvenue</h1>
       <p style={{fontSize:12.5,color:T.ink3,textAlign:'center',margin:'0 0 20px'}}>Sélectionnez votre profil pour continuer.</p>
-      <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16}}>
-        {USERS.map(u=><button key={u.id} onClick={()=>onLogin(u)} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:8,border:`1px solid ${T.lineSoft}`,background:T.surface,cursor:'pointer',width:'100%',textAlign:'left'}}>
-          <div style={{width:32,height:32,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontWeight:600,fontSize:11,flexShrink:0}}>{u.initials}</div>
-          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,color:T.ink}}>{u.name}</div><div style={{fontSize:11,color:T.ink3}}>{u.team} · {u.hasSig?'Signature enregistrée':'Pas de signature'}</div></div>
-          <span style={pillSt(u.role==='admin'?'gold':'default')}>{u.role==='admin'?'Admin':u.role==='editor'?'Éditeur':'Lecture'}</span>
-        </button>)}
-      </div>
-      <div style={{borderTop:`1px solid ${T.lineSoft}`,paddingTop:14,display:'flex',gap:8}}>
-        <input style={inputSt} placeholder="Créer un nouveau profil…" value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doCreate()}/>
-        <button style={{...btnSt('primary',true),whiteSpace:'nowrap'}} onClick={doCreate}><Icon name="plus" size={12} color="#fff"/>Créer</button>
-      </div>
+
+      {pwdUser
+        ?<div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{fontSize:12.5,color:T.ink,textAlign:'center',fontWeight:500}}>Accès Administrateur</div>
+          <input type="password" autoFocus style={{...inputSt,textAlign:'center',letterSpacing:3}}
+            placeholder="Mot de passe"
+            value={pwd} onChange={e=>{setPwd(e.target.value);setPwdErr(false);}}
+            onKeyDown={e=>e.key==='Enter'&&doAdminLogin()}/>
+          {pwdErr&&<div style={{fontSize:11,color:'#C53030',textAlign:'center'}}>Mot de passe incorrect</div>}
+          <div style={{display:'flex',gap:8}}>
+            <button style={{...btnSt(undefined,true),flex:1,justifyContent:'center'}} onClick={()=>setPwdUser(null)}>Annuler</button>
+            <button style={{...btnSt('primary',true),flex:1,justifyContent:'center'}} onClick={doAdminLogin}>Connexion</button>
+          </div>
+        </div>
+        :<>
+          <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16}}>
+            {USERS.map(u=><button key={u.id} onClick={()=>handleUserClick(u)} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:8,border:`1px solid ${u.requiresPassword?T.gold:T.lineSoft}`,background:u.requiresPassword?T.goldTint:T.surface,cursor:'pointer',width:'100%',textAlign:'left'}}>
+              <div style={{width:32,height:32,borderRadius:'50%',background:u.requiresPassword?T.gold:T.navy,color:'#fff',display:'grid',placeItems:'center',fontWeight:600,fontSize:11,flexShrink:0}}>{u.initials}</div>
+              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,color:T.ink}}>{u.name}</div><div style={{fontSize:11,color:T.ink3}}>{u.team}{u.requiresPassword?' · 🔒 Accès protégé':u.hasSig?' · Signature enregistrée':' · Pas de signature'}</div></div>
+              <span style={pillSt(u.requiresPassword?'gold':u.role==='admin'?'gold':'default')}>{u.requiresPassword?'Superadmin':u.role==='admin'?'Admin':u.role==='editor'?'Éditeur':'Lecture'}</span>
+            </button>)}
+          </div>
+          <div style={{borderTop:`1px solid ${T.lineSoft}`,paddingTop:14,display:'flex',gap:8}}>
+            <input style={inputSt} placeholder="Créer un nouveau profil…" value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doCreate()}/>
+            <button style={{...btnSt('primary',true),whiteSpace:'nowrap'}} onClick={doCreate}><Icon name="plus" size={12} color="#fff"/>Créer</button>
+          </div>
+        </>
+      }
     </div>
   </div>;
 }
@@ -493,9 +606,7 @@ function CoverPage({state,isPortrait,isRing}) {
       </div>
     </div>
     <div style={{background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
-      <div style={{background:T.navy,borderRadius:3,padding:'5px 0',display:'flex',flexDirection:'column',alignItems:'center',width:'62%',flexShrink:0}}>
-        {'ABRANE'.split('').map((c,i)=><span key={i} style={{color:'#fff',fontWeight:900,fontSize:8,lineHeight:1.25}}>{c}</span>)}
-      </div>
+      <StripeAbraneLogo/>
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     <BindingMarks isRing={isRing}/>
@@ -574,10 +685,8 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
 
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',position:'relative',overflow:'hidden'}}>
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
-      <div style={{background:T.navy,borderRadius:3,padding:'5px 0',display:'flex',flexDirection:'column',alignItems:'center',width:'62%',flexShrink:0}}>
-        {'ABRANE'.split('').map((c,i)=><span key={i} style={{color:'#fff',fontWeight:900,fontSize:8,lineHeight:1.25}}>{c}</span>)}
-      </div>
-      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{maxWidth:'80%',maxHeight:'20%',objectFit:'contain',display:'block',flexShrink:0}}/>}
+      <StripeAbraneLogo/>
+      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
     <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -735,6 +844,7 @@ function PageRender({page,state}) {
 }
 
 function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageNotes}) {
+  const {wmLogo}=React.useContext(BrandCtx);
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isP=state.pageFormat.startsWith('v');
   const canvasRef=useRef(null);
@@ -783,8 +893,11 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
               <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:6}}>
                 <div style={{position:'absolute',inset:'-80%',display:'grid',gridTemplateColumns:'repeat(5,1fr)',gridTemplateRows:'repeat(8,1fr)',transform:'rotate(-40deg)',transformOrigin:'center',opacity:state.wmOpacity/100}}>
                   {Array.from({length:40}).map((_,k)=>(
-                    <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      <span style={{fontWeight:900,letterSpacing:'.25em',fontSize:'clamp(5px,1.1vw,11px)',color:'#1A1F2E',whiteSpace:'nowrap',userSelect:'none',fontFamily:'inherit'}}>ABRANE</span>
+                    <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'4%'}}>
+                      {wmLogo
+                        ?<img src={wmLogo} alt="" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',userSelect:'none'}}/>
+                        :<span style={{fontWeight:900,letterSpacing:'.25em',fontSize:'clamp(5px,1.1vw,11px)',color:'#1A1F2E',whiteSpace:'nowrap',userSelect:'none',fontFamily:'inherit'}}>ABRANE</span>
+                      }
                     </div>
                   ))}
                 </div>
@@ -2286,11 +2399,11 @@ function Configurator({user,project}) {
   </div>;
 }
 
-function TopBar({user,screen,project,onHome,onLogout}) {
+function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin}) {
   const [menuOpen,setMenuOpen]=useState(false);
   return <header style={{display:'flex',alignItems:'center',gap:14,padding:'0 14px 0 12px',background:T.surface,borderBottom:`1px solid ${T.line}`,height:56,flexShrink:0,position:'relative',zIndex:50}}>
     <button onClick={onHome} style={{display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',padding:0,cursor:'pointer'}}>
-      <div style={{background:T.navy,borderRadius:4,padding:'5px 12px'}}><span style={{color:'#fff',fontWeight:900,fontSize:13,letterSpacing:2}}>ABRANE</span></div>
+      <AbraneLogoBox size="md"/>
       <span style={{fontSize:11.5,color:T.ink3,borderLeft:`1px solid ${T.line}`,paddingLeft:10}}>Catalogue</span>
     </button>
     {screen!=='dashboard'&&<>
@@ -2301,6 +2414,7 @@ function TopBar({user,screen,project,onHome,onLogout}) {
       <span style={{fontSize:10.5,color:T.ink3,padding:'2px 8px',border:`1px solid ${T.line}`,borderRadius:999,fontWeight:500}}><Icon name="cloud" size={11} color={T.success} style={{verticalAlign:'-2px',marginRight:4}}/>Enregistré</span>
     </>}
     <div style={{flex:1}}/>
+    {onOpenAdmin&&<button onClick={onOpenAdmin} style={{...btnSt('gold',true)}}><Icon name="shield" size={13} color={T.navy}/>Admin</button>}
     {screen==='configurator'&&<>
       <button style={btnSt(undefined,true)}><Icon name="eye" size={14} color={T.ink}/>Aperçu</button>
       <button style={btnSt('gold',true)}><Icon name="share" size={14} color={T.navy}/>Partager</button>
@@ -2331,10 +2445,26 @@ export default function App() {
   const [user,setUser]=useState(null);
   const [screen,setScreen]=useState('login');
   const [project,setProject]=useState(MY_PROJECTS[0]);
-  if(!user||screen==='login') return <LoginScreen onLogin={u=>{setUser(u);setScreen('dashboard');}}/>;
-  return <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden',fontFamily:'-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif',fontSize:13,color:T.ink,background:T.bg,WebkitFontSmoothing:'antialiased'}}>
-    <TopBar user={user} screen={screen} project={project} onHome={()=>setScreen('dashboard')} onLogout={()=>{setUser(null);setScreen('login');}}/>
-    {screen==='dashboard'&&<Dashboard user={user} onOpenProject={p=>{setProject(p);setScreen('configurator');}} onNewProject={()=>{setProject(null);setScreen('configurator');}} onOpenTemplate={tpl=>{setProject({name:'Nouveau — '+tpl.name,pageFormat:tpl.pageFormat,palette:tpl.palette,client:tpl.kind==='client'?tpl.name:'',basedOn:tpl.name});setScreen('configurator');}}/>}
-    {screen==='configurator'&&<Configurator user={user} project={project}/>}
-  </div>;
+  const [showAdmin,setShowAdmin]=useState(false);
+  const [brand,setBrand]=useState(()=>({
+    officialLogo:localStorage.getItem('abrane_logo')||'',
+    wmLogo:localStorage.getItem('abrane_wm')||'',
+  }));
+  const brandCtxVal=useMemo(()=>({...brand,setBrand}),[brand]);
+
+  if(!user||screen==='login') return (
+    <BrandCtx.Provider value={brandCtxVal}>
+      <LoginScreen onLogin={u=>{setUser(u);setScreen('dashboard');}}/>
+    </BrandCtx.Provider>
+  );
+  return (
+    <BrandCtx.Provider value={brandCtxVal}>
+      <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden',fontFamily:'-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif',fontSize:13,color:T.ink,background:T.bg,WebkitFontSmoothing:'antialiased'}}>
+        <TopBar user={user} screen={screen} project={project} onHome={()=>setScreen('dashboard')} onLogout={()=>{setUser(null);setScreen('login');}} onOpenAdmin={user.role==='superadmin'?()=>setShowAdmin(true):null}/>
+        {screen==='dashboard'&&<Dashboard user={user} onOpenProject={p=>{setProject(p);setScreen('configurator');}} onNewProject={()=>{setProject(null);setScreen('configurator');}} onOpenTemplate={tpl=>{setProject({name:'Nouveau — '+tpl.name,pageFormat:tpl.pageFormat,palette:tpl.palette,client:tpl.kind==='client'?tpl.name:'',basedOn:tpl.name});setScreen('configurator');}}/>}
+        {screen==='configurator'&&<Configurator user={user} project={project}/>}
+        {showAdmin&&<AdminPanel onClose={()=>setShowAdmin(false)}/>}
+      </div>
+    </BrandCtx.Provider>
+  );
 }
