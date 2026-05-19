@@ -185,6 +185,7 @@ const initialState = project => {
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, sigPlacement:'all', wmEnabled:false, wmOpacity:10, sigUrl:'',
     sigScale:30, sigX:78, sigY:88,
+    symEnabled:false, symPlacement:'all', symText:'', symScale:20, symX:50, symY:50, symPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
     notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, _dirty:false,
@@ -196,7 +197,7 @@ const computeCompletion = (s, dirty={}) => ({
   format:dirty.format?'done':'',cover:dirty.cover&&s.mainTitle?.length>0?'done':'',
   index:dirty.index&&s.enIdx?'done':'',mat:dirty.mat&&s.enMat?'done':'',
   notes:dirty.notes&&s.enNotes?'done':'',content:dirty.content&&s.files.length>0?'done':'',
-  back:dirty.back&&s.backLines.some(l=>l)?'done':'',sign:dirty.sign&&s.sigEnabled?'done':'',sym:'',
+  back:dirty.back&&s.backLines.some(l=>l)?'done':'',sign:dirty.sign&&s.sigEnabled?'done':'',sym:dirty.sym&&s.symEnabled?'done':'',
 });
 
 const inputSt = {width:'100%',padding:'7px 10px',background:T.surface,border:`1px solid ${T.line}`,borderRadius:6,fontSize:12.5,color:T.ink,fontFamily:'inherit',outline:'none',boxSizing:'border-box'};
@@ -908,6 +909,19 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
               return show?(
                 <div style={{position:'absolute',left:`${state.sigX??78}%`,top:`${state.sigY??88}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.sigScale??30}%`,maxWidth:'40%'}}>
                   <img src={state.sigUrl} alt="" style={{width:'100%',objectFit:'contain',opacity:0.9}}/>
+                </div>
+              ):null;
+            })()}
+            {state.symEnabled&&(()=>{
+              const pl=state.symPlacement||'all';
+              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content')||(pl==='specific'&&i===(state.symPageNum??1)-1);
+              return show?(
+                <div style={{position:'absolute',left:`${state.symX??50}%`,top:`${state.symY??50}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.symScale??20}%`,maxWidth:'35%',display:'flex',flexDirection:'column',alignItems:'center',gap:'4%'}}>
+                  <svg viewBox="0 0 100 90" style={{width:'100%',display:'block',overflow:'visible',filter:'drop-shadow(0 2px 4px rgba(0,0,0,.25))'}}>
+                    <polygon points="50,4 96,86 4,86" fill="#DC2626" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+                    <text x="50" y="74" textAnchor="middle" fontWeight="900" fontSize="54" fill="#fff" fontFamily="Arial,Helvetica,sans-serif">!</text>
+                  </svg>
+                  {state.symText&&<div style={{fontSize:'clamp(4px,1.4vw,11px)',fontWeight:700,color:'#DC2626',textAlign:'center',lineHeight:1.2,wordBreak:'break-word',width:'180%'}}>{state.symText}</div>}
                 </div>
               ):null;
             })()}
@@ -1681,13 +1695,61 @@ function SignPanel({state,update,user}) {
     </Sect>
   </>;
 }
-function SymbolsPanel() {
-  return <Sect title="Bibliothèque">
-    <div style={{padding:'10px 12px',background:T.panel,border:`1px solid ${T.line}`,borderRadius:8,fontSize:12,color:T.ink3}}>Activez un symbole et glissez-le sur la page.</div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
-      {['star','check','warning','shield','sparkle','bookmark','info','globe'].map(n=><button key={n} style={{aspectRatio:1,background:T.panel,border:`1px solid ${T.lineSoft}`,borderRadius:6,display:'grid',placeItems:'center',cursor:'pointer'}}><Icon name={n} size={20} color={T.navy}/></button>)}
-    </div>
-  </Sect>;
+function SymbolsPanel({state,update}) {
+  const PLACEMENTS=[
+    {v:'all',l:'Toutes les pages'},
+    {v:'first',l:'Couverture uniquement'},
+    {v:'last',l:'Dernière page uniquement'},
+    {v:'content',l:'Pages contenu uniquement'},
+    {v:'specific',l:'Page spécifique'},
+  ];
+  return <>
+    <Sect title="Symbole d'avertissement">
+      <RowItem label="Activer le symbole" sub="Triangle rouge avec point d'exclamation">
+        <Toggle checked={state.symEnabled} onChange={v=>update({symEnabled:v})}/>
+      </RowItem>
+      {state.symEnabled&&<>
+        <Fld label="Texte sous le symbole">
+          <input value={state.symText||''} onChange={e=>update({symText:e.target.value})} placeholder="ex : CONFIDENTIEL" style={{...inputSt}}/>
+        </Fld>
+        <Fld label="Aperçu">
+          <div style={{display:'flex',justifyContent:'center',padding:'12px 0'}}>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
+              <svg viewBox="0 0 100 90" width={56} height={50} style={{display:'block',overflow:'visible',filter:'drop-shadow(0 2px 4px rgba(0,0,0,.2))'}}>
+                <polygon points="50,4 96,86 4,86" fill="#DC2626" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+                <text x="50" y="74" textAnchor="middle" fontWeight="900" fontSize="54" fill="#fff" fontFamily="Arial,Helvetica,sans-serif">!</text>
+              </svg>
+              {state.symText&&<span style={{fontSize:10,fontWeight:700,color:'#DC2626',textAlign:'center'}}>{state.symText}</span>}
+            </div>
+          </div>
+        </Fld>
+        <Fld label="Appliquer sur">
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {PLACEMENTS.map(pl=>(
+              <label key={pl.v} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12,color:T.ink}}>
+                <input type="radio" name="symPlacement" value={pl.v} checked={(state.symPlacement||'all')===pl.v} onChange={()=>update({symPlacement:pl.v})} style={{accentColor:T.navy}}/>
+                {pl.l}
+              </label>
+            ))}
+          </div>
+        </Fld>
+        {(state.symPlacement||'all')==='specific'&&(
+          <Fld label={`Numéro de page · ${state.symPageNum??1}`}>
+            <input type="number" min="1" value={state.symPageNum??1} onChange={e=>update({symPageNum:Math.max(1,parseInt(e.target.value)||1)})} style={{...inputSt,width:'80px'}}/>
+          </Fld>
+        )}
+        <Fld label={`Taille · ${state.symScale??20}%`}>
+          <input type="range" min="4" max="50" value={state.symScale??20} onChange={e=>update({symScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:'#DC2626'}}/>
+        </Fld>
+        <Fld label={`Position horizontale · ${state.symX??50}%`}>
+          <input type="range" min="0" max="100" value={state.symX??50} onChange={e=>update({symX:parseInt(e.target.value)})} style={{width:'100%',accentColor:'#DC2626'}}/>
+        </Fld>
+        <Fld label={`Position verticale · ${state.symY??50}%`}>
+          <input type="range" min="0" max="100" value={state.symY??50} onChange={e=>update({symY:parseInt(e.target.value)})} style={{width:'100%',accentColor:'#DC2626'}}/>
+        </Fld>
+      </>}
+    </Sect>
+  </>;
 }
 
 function StepPanel({step,state,update,updateNested,user}) {
@@ -1702,7 +1764,7 @@ function StepPanel({step,state,update,updateNested,user}) {
     case 'content': return <ContentPanel  state={state} update={update}/>;
     case 'back':    return <BackPanel     state={state} update={update}/>;
     case 'sign':    return <SignPanel     state={state} update={update} user={user}/>;
-    case 'sym':     return <SymbolsPanel/>;
+    case 'sym':     return <SymbolsPanel  state={state} update={update}/>;
     default: return null;
   }
 }
