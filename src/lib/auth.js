@@ -17,26 +17,17 @@ export async function signInByName(name, password) {
   return signIn(email, password);
 }
 
-// ── Sign up with name only (auto-génère un email interne) ─────
+// ── Sign up with name only (via RPC — bypasse signUp et le rate-limit email) ──
 export async function signUpWithName(fullName, password) {
   if (!USE_CLOUD) throw new Error('Cloud auth disabled');
-  const slug = fullName.toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // strip accents
-    .replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/g, '');
-  const email = `${slug}.${Date.now().toString(36)}@abrane.internal`;
-
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error;
-  if (!data?.user) throw new Error('Compte non créé. Désactivez la confirmation email dans Supabase Auth → Settings.');
-
-  const { error: profileError } = await supabase.from('profiles').upsert({
-    id: data.user.id,
-    email,
-    name: fullName,
-    role: 'user',
-  }, { onConflict: 'id' });
-  if (profileError) throw profileError;
-  return data.user;
+  // create_user_by_name insère directement dans auth.users (email confirmé, pas d'envoi email)
+  const { error: rpcError } = await supabase.rpc('create_user_by_name', {
+    p_name: fullName.trim(),
+    p_password: password,
+  });
+  if (rpcError) throw new Error(rpcError.message || 'Erreur création compte.');
+  // Connexion immédiate avec le nom
+  return signInByName(fullName.trim(), password);
 }
 
 // ── Liste des utilisateurs (login screen public) ──────────────
