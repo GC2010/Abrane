@@ -2780,16 +2780,15 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       if(t==='text'){
         if(opt.target)return; // clicked on existing object
         const p=canvas.getPointer(opt.e);
-        const txt=new window.fabric.IText('Texte',{left:p.x,top:p.y,fontSize:18,fill:colorRef.current,fontFamily:'Arial',selectable:false,evented:false});
+        const txt=new window.fabric.IText('Texte',{left:p.x,top:p.y,fontSize:18,fill:colorRef.current,fontFamily:'Arial'});
         canvas.add(txt);canvas.setActiveObject(txt);txt.enterEditing();txt.selectAll();
         return;
       }
       if(!isDrawingRef.current||!shapeRef.current)return;
       isDrawingRef.current=false;
       const shape=shapeRef.current;shapeRef.current=null;
-      const nowSel=toolRef.current==='select';
-      shape.set({selectable:nowSel,evented:nowSel});
-      if(nowSel)canvas.setActiveObject(shape);
+      shape.set({selectable:true,evented:true});
+      canvas.setActiveObject(shape);
       if(t==='rectText'){setTextPrompt(shape);setTextVal('');}
       canvas.requestRenderAll();
     });
@@ -2803,6 +2802,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     if(tool==='pencil'){canvas.freeDrawingBrush.color=color;canvas.freeDrawingBrush.width=strokeW*2;}
     const isSel=tool==='select';
     canvas.selection=isSel;
+    canvas.skipTargetFind=!isSel; // prevent hitting existing objects when drawing
     canvas.defaultCursor=isSel?'default':'crosshair';
     canvas.hoverCursor=isSel?'move':'crosshair';
     canvas.getObjects().forEach(o=>{o.selectable=isSel;o.evented=isSel;});
