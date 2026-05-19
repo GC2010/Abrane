@@ -1,4 +1,5 @@
 import { supabase, USE_CLOUD } from './supabase.js';
+import bcrypt from 'bcryptjs';
 
 // ── Sign in (email + password) ────────────────────────────────
 export async function signIn(email, password) {
@@ -17,16 +18,15 @@ export async function signInByName(name, password) {
   return signIn(email, password);
 }
 
-// ── Sign up with name only (via RPC — bypasse signUp et le rate-limit email) ──
+// ── Sign up with name only (hash JS → RPC → no pgcrypto needed) ──────────────
 export async function signUpWithName(fullName, password) {
   if (!USE_CLOUD) throw new Error('Cloud auth disabled');
-  // create_user_by_name insère directement dans auth.users (email confirmé, pas d'envoi email)
-  const { error: rpcError } = await supabase.rpc('create_user_by_name', {
+  const hash = await bcrypt.hash(password, 10);
+  const { error } = await supabase.rpc('create_user_by_name', {
     p_name: fullName.trim(),
-    p_password: password,
+    p_encrypted_password: hash,
   });
-  if (rpcError) throw new Error(rpcError.message || 'Erreur création compte.');
-  // Connexion immédiate avec le nom
+  if (error) throw new Error(error.message || 'Erreur création compte.');
   return signInByName(fullName.trim(), password);
 }
 
