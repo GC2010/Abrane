@@ -186,6 +186,7 @@ const initialState = project => {
     backDecor:'BOOK', sigEnabled:false, sigPlacement:'all', wmEnabled:false, wmOpacity:10, sigUrl:'',
     sigScale:30, sigX:78, sigY:88,
     symEnabled:false, symPlacement:'all', symText:'', symScale:20, symX:50, symY:50, symPageNum:1,
+    advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advX:85, advY:8, advPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
     notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, _dirty:false,
@@ -922,6 +923,20 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
                     <text x="50" y="74" textAnchor="middle" fontWeight="900" fontSize="54" fill="#fff" fontFamily="Arial,Helvetica,sans-serif">!</text>
                   </svg>
                   {state.symText&&<div style={{fontSize:'clamp(4px,1.4vw,11px)',fontWeight:700,color:'#DC2626',textAlign:'center',lineHeight:1.2,wordBreak:'break-word',width:'180%'}}>{state.symText}</div>}
+                </div>
+              ):null;
+            })()}
+            {state.advEnabled&&(()=>{
+              const pl=state.advPlacement||'all';
+              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content')||(pl==='specific'&&i===(state.advPageNum??1)-1);
+              const st=ADV_STATUSES.find(s=>s.v===(state.advStatus||'AF'))||ADV_STATUSES[0];
+              return show?(
+                <div style={{position:'absolute',left:`${state.advX??85}%`,top:`${state.advY??8}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.advScale??15}%`,maxWidth:'28%'}}>
+                  <div style={{background:st.color+'28',border:`2px solid ${st.color}`,borderRadius:8,padding:'8% 12%',display:'flex',flexDirection:'column',alignItems:'center',gap:'5%',boxShadow:'0 2px 8px rgba(0,0,0,.18)'}}>
+                    <span style={{fontSize:'clamp(7px,2vw,18px)',lineHeight:1}}>{st.emoji}</span>
+                    <span style={{fontSize:'clamp(4px,1.1vw,9px)',fontWeight:900,color:st.color,letterSpacing:'.08em',lineHeight:1}}>{st.v}</span>
+                    <span style={{fontSize:'clamp(3px,.75vw,6px)',fontWeight:600,color:st.color,textAlign:'center',lineHeight:1.25}}>{st.l}</span>
+                  </div>
                 </div>
               ):null;
             })()}
@@ -1695,6 +1710,23 @@ function SignPanel({state,update,user}) {
     </Sect>
   </>;
 }
+const ADV_STATUSES=[
+  {v:'AF',  l:'À faire',                  emoji:'⏳', color:'#6B7280'},
+  {v:'EC',  l:'En cours',                 emoji:'🔄', color:'#3B82F6'},
+  {v:'DEV', l:'En développement',         emoji:'🛠️', color:'#8B5CF6'},
+  {v:'ATT', l:'En attente',               emoji:'⏸️', color:'#F97316'},
+  {v:'EAV', l:'En attente de validation', emoji:'🟡', color:'#EAB308'},
+  {v:'AV',  l:'À valider',                emoji:'📋', color:'#64748B'},
+  {v:'VAL', l:'Validé',                   emoji:'✅', color:'#16A34A'},
+  {v:'REF', l:'Refusé',                   emoji:'❌', color:'#EF4444'},
+  {v:'BLOQ',l:'Bloqué',                   emoji:'🚫', color:'#DC2626'},
+  {v:'TEST',l:'Tests en cours',           emoji:'🧪', color:'#06B6D4'},
+  {v:'CORR',l:'Correction en cours',      emoji:'🔧', color:'#F59E0B'},
+  {v:'TERM',l:'Terminé',                  emoji:'✔️', color:'#15803D'},
+  {v:'LIV', l:'Livré',                    emoji:'📦', color:'#0D9488'},
+  {v:'ARCH',l:'Archivé',                  emoji:'🗂️', color:'#9CA3AF'},
+];
+
 function SymbolsPanel({state,update}) {
   const PLACEMENTS=[
     {v:'all',l:'Toutes les pages'},
@@ -1746,6 +1778,64 @@ function SymbolsPanel({state,update}) {
         </Fld>
         <Fld label={`Position verticale · ${state.symY??50}%`}>
           <input type="range" min="0" max="100" value={state.symY??50} onChange={e=>update({symY:parseInt(e.target.value)})} style={{width:'100%',accentColor:'#DC2626'}}/>
+        </Fld>
+      </>}
+    </Sect>
+    <Sect title="Avancement projet">
+      <RowItem label="Activer le badge" sub="Statut coloré avec icône et libellé">
+        <Toggle checked={state.advEnabled} onChange={v=>update({advEnabled:v})}/>
+      </RowItem>
+      {state.advEnabled&&<>
+        <Fld label="Statut">
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
+            {ADV_STATUSES.map(s=>{
+              const active=(state.advStatus||'AF')===s.v;
+              return <button key={s.v} onClick={()=>update({advStatus:s.v})} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 8px',borderRadius:6,border:`1.5px solid ${active?s.color:T.line}`,background:active?s.color+'18':T.surface,cursor:'pointer',fontFamily:'inherit',transition:'border-color .15s'}}>
+                <span style={{fontSize:13}}>{s.emoji}</span>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start',minWidth:0}}>
+                  <span style={{fontSize:9.5,fontWeight:700,color:active?s.color:T.ink,letterSpacing:'.04em'}}>{s.v}</span>
+                  <span style={{fontSize:8,color:active?s.color:T.ink3,lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:70}}>{s.l}</span>
+                </div>
+              </button>;
+            })}
+          </div>
+        </Fld>
+        <Fld label="Aperçu">
+          {(()=>{const s=ADV_STATUSES.find(x=>x.v===(state.advStatus||'AF'))||ADV_STATUSES[0];return(
+            <div style={{display:'flex',justifyContent:'center',padding:'8px 0'}}>
+              <div style={{background:s.color+'28',border:`2px solid ${s.color}`,borderRadius:8,padding:'8px 16px',display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:20}}>{s.emoji}</span>
+                <div>
+                  <div style={{fontSize:11,fontWeight:900,color:s.color,letterSpacing:'.06em'}}>{s.v}</div>
+                  <div style={{fontSize:9,fontWeight:600,color:s.color}}>{s.l}</div>
+                </div>
+              </div>
+            </div>
+          );})()}
+        </Fld>
+        <Fld label="Appliquer sur">
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {PLACEMENTS.map(pl=>(
+              <label key={pl.v} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12,color:T.ink}}>
+                <input type="radio" name="advPlacement" value={pl.v} checked={(state.advPlacement||'all')===pl.v} onChange={()=>update({advPlacement:pl.v})} style={{accentColor:T.navy}}/>
+                {pl.l}
+              </label>
+            ))}
+          </div>
+        </Fld>
+        {(state.advPlacement||'all')==='specific'&&(
+          <Fld label={`Numéro de page · ${state.advPageNum??1}`}>
+            <input type="number" min="1" value={state.advPageNum??1} onChange={e=>update({advPageNum:Math.max(1,parseInt(e.target.value)||1)})} style={{...inputSt,width:'80px'}}/>
+          </Fld>
+        )}
+        <Fld label={`Taille · ${state.advScale??15}%`}>
+          <input type="range" min="4" max="40" value={state.advScale??15} onChange={e=>update({advScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position horizontale · ${state.advX??85}%`}>
+          <input type="range" min="0" max="100" value={state.advX??85} onChange={e=>update({advX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position verticale · ${state.advY??8}%`}>
+          <input type="range" min="0" max="100" value={state.advY??8} onChange={e=>update({advY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
       </>}
     </Sect>
