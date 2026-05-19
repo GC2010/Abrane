@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { createRoot } from 'react-dom/client';
 import { USE_CLOUD } from './lib/supabase.js';
-import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, toAppUser, listUsers } from './lib/auth.js';
+import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, toAppUser, listUsers, deleteUser } from './lib/auth.js';
 import { loadProjects, upsertProject, deleteProject, projectToDisplay,
          loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay,
          findTemplateByName } from './lib/db.js';
@@ -257,9 +257,27 @@ function StripeAbraneLogo() {
   </div>;
 }
 
-function AdminPanel({onClose}) {
+function AdminPanel({onClose, currentUserId}) {
   const {officialLogo,wmLogo,shopLogos,setBrand}=React.useContext(BrandCtx);
   const [newShopName,setNewShopName]=useState('');
+  const [userList,setUserList]=useState([]);
+  const [usersLoaded,setUsersLoaded]=useState(false);
+  const [deletingId,setDeletingId]=useState(null);
+  const [confirmDelete,setConfirmDelete]=useState(null); // {id, name}
+
+  React.useEffect(()=>{
+    listUsers().then(list=>{setUserList(list);setUsersLoaded(true);}).catch(()=>setUsersLoaded(true));
+  },[]);
+
+  const doDelete=async()=>{
+    if(!confirmDelete) return;
+    setDeletingId(confirmDelete.id);
+    try{
+      await deleteUser(confirmDelete.id);
+      setUserList(l=>l.filter(u=>u.id!==confirmDelete.id));
+    }catch(e){ alert(e.message); }
+    finally{ setDeletingId(null); setConfirmDelete(null); }
+  };
   const upload=(key,cb)=>e=>{
     const f=e.target.files?.[0];if(!f)return;
     const r=new FileReader();
@@ -354,6 +372,50 @@ function AdminPanel({onClose}) {
           </div>
           {!newShopName.trim()&&<div style={{fontSize:10,color:T.ink4,marginTop:4}}>Saisissez le nom de la boutique avant d'importer.</div>}
         </div>
+
+        {/* Gestion des utilisateurs */}
+        <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:10}}>Utilisateurs</div>
+          {!usersLoaded
+            ?<div style={{fontSize:11,color:T.ink4}}>Chargement…</div>
+            :userList.length===0
+              ?<div style={{fontSize:11,color:T.ink4}}>Aucun utilisateur trouvé.</div>
+              :<div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {userList.map(u=>(
+                  <div key={u.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 8px',background:T.panel,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
+                    <div style={{width:26,height:26,borderRadius:'50%',background:T.panel2,color:T.ink3,display:'grid',placeItems:'center',fontWeight:700,fontSize:10,flexShrink:0}}>
+                      {(u.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+                    </div>
+                    <span style={{flex:1,fontSize:12,fontWeight:500,color:T.ink,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.name}</span>
+                    {u.id!==currentUserId&&(
+                      <button onClick={()=>setConfirmDelete(u)} disabled={!!deletingId}
+                        style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA',padding:'3px 8px',flexShrink:0}}>
+                        <Icon name="trash" size={12} color="#C53030"/>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+
+        {confirmDelete&&(
+          <div style={{position:'fixed',inset:0,background:'rgba(15,20,40,.55)',zIndex:300,display:'grid',placeItems:'center'}}>
+            <div style={{width:340,background:T.surface,borderRadius:14,padding:24,boxShadow:'0 16px 60px rgba(0,0,0,.22)',border:`1px solid ${T.line}`}}>
+              <div style={{fontSize:14,fontWeight:700,color:T.ink,marginBottom:8}}>Supprimer l'utilisateur ?</div>
+              <div style={{fontSize:12.5,color:T.ink2,marginBottom:18}}>
+                <strong>{confirmDelete.name}</strong> sera définitivement supprimé. Cette action est irréversible.
+              </div>
+              <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                <button onClick={()=>setConfirmDelete(null)} style={btnSt(undefined,true)}>Annuler</button>
+                <button onClick={doDelete} disabled={!!deletingId}
+                  style={{...btnSt('primary'),background:'#C53030',borderColor:'#C53030',opacity:deletingId?.7:1}}>
+                  {deletingId?'Suppression…':'Supprimer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={{padding:'10px 12px',background:'#FFF8E6',border:`1px solid #F6D860`,borderRadius:8,fontSize:11,color:'#7A5C00',lineHeight:1.5}}>
           <strong>⚠ Logo en stockage local</strong> — visible uniquement sur cet appareil. Pour l'intégrer définitivement dans le code (visible par tous) : copiez la chaîne base64 ci-dessous et envoyez-la au développeur (ou dans le chat IA) pour l'incorporer comme constante dans <code style={{background:'rgba(0,0,0,.06)',padding:'0 3px',borderRadius:2}}>App.jsx</code>.
@@ -3160,7 +3222,7 @@ export default function App() {
           }}/>}
         {screen==='configurator'&&<Configurator user={user} project={project}
           onSaveStateChange={setSaveBarProps}/>}
-        {showAdmin&&<AdminPanel onClose={()=>setShowAdmin(false)}/>}
+        {showAdmin&&<AdminPanel onClose={()=>setShowAdmin(false)} currentUserId={user?.id}/>}
       </div>
     </BrandCtx.Provider>
   );

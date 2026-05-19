@@ -1,5 +1,4 @@
 import { supabase, USE_CLOUD } from './supabase.js';
-import bcrypt from 'bcryptjs';
 
 // ── Sign in (email + password) ────────────────────────────────
 export async function signIn(email, password) {
@@ -18,16 +17,21 @@ export async function signInByName(name, password) {
   return signIn(email, password);
 }
 
-// ── Sign up with name only (hash JS → RPC → no pgcrypto needed) ──────────────
+// ── Sign up with name only (auto-génère un email @abrane.internal) ────────────
 export async function signUpWithName(fullName, password) {
   if (!USE_CLOUD) throw new Error('Cloud auth disabled');
-  const hash = await bcrypt.hash(password, 10);
-  const { error } = await supabase.rpc('create_user_by_name', {
-    p_name: fullName.trim(),
-    p_encrypted_password: hash,
-  });
-  if (error) throw new Error(error.message || 'Erreur création compte.');
-  return signInByName(fullName.trim(), password);
+  const slug = fullName.trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/g, '');
+  const email = `${slug}.${Date.now().toString(36)}@abrane.internal`;
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  if (!data?.user) throw new Error('Compte non créé.');
+  const { error: profileError } = await supabase.from('profiles').upsert({
+    id: data.user.id, email, name: fullName.trim(), role: 'user',
+  }, { onConflict: 'id' });
+  if (profileError) throw profileError;
+  return data.user;
 }
 
 // ── Liste des utilisateurs (login screen public) ──────────────
@@ -68,6 +72,13 @@ export async function updateProfile(userId, patch) {
 export async function signOut() {
   if (!USE_CLOUD) return;
   await supabase.auth.signOut();
+}
+
+// ── Delete user (admin only) ──────────────────────────────────
+export async function deleteUser(userId) {
+  if (!USE_CLOUD) throw new Error('Cloud auth disabled');
+  const { error } = await supabase.rpc('delete_user_by_id', { p_id: userId });
+  if (error) throw error;
 }
 
 // ── Listen to auth state changes ──────────────────────────────
