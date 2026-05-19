@@ -97,6 +97,16 @@ export async function deleteTemplate(templateId) {
   if (error) throw error;
 }
 
+export async function findTemplateByName(name) {
+  if (!USE_CLOUD) return null;
+  const { data } = await supabase
+    .from('templates')
+    .select('id, name')
+    .ilike('name', name.trim())
+    .maybeSingle();
+  return data || null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 
 export function projectToDisplay(row) {

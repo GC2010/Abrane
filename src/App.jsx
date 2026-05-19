@@ -2,7 +2,8 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import { USE_CLOUD } from './lib/supabase.js';
 import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, toAppUser, listUsers } from './lib/auth.js';
 import { loadProjects, upsertProject, deleteProject, projectToDisplay,
-         loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay } from './lib/db.js';
+         loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay,
+         findTemplateByName } from './lib/db.js';
 
 const T = {
   bg:"#F4F1EA",surface:"#FFFFFF",panel:"#FAF8F3",panel2:"#F0EBE0",tint:"#FBF7EE",
@@ -190,7 +191,7 @@ const initialState = project => {
     projectDate:`${dd}/${mm}/${t.getFullYear()}`, mainTitle:project?.mainTitle||'BOOK',
     pageFormat:project?.pageFormat||'h-full',
     palette:{c1:project?.palette?.[0]||'#E8DCC8',c2:project?.palette?.[1]||'#C8A96E',c3:project?.palette?.[2]||'#2B2B2B'},
-    logoScale:100, clientLogoUrl:'',
+    logoScale:100, logoX:80, logoY:5, clientLogoUrl:'',
     showQuoteRef:false,quoteRef:'',showInternalRef:false,internalRef:'',
     showContact:false,contact:'',showSendDate:false,sendDate:'',showProjectType:false,projectType:'',
     tags:[],
@@ -418,7 +419,12 @@ function LoginScreen({onLogin}) {
       const sbUser=await signUpWithName(fullName.trim(),pwd);
       const profile=await getProfile(sbUser.id);
       onLogin(toAppUser(sbUser,profile));
-    }catch(e){setErr(e.message);}
+    }catch(e){
+      const msg=e.message||'';
+      if(/rate limit|over_email/i.test(msg))
+        setErr('Limite Supabase atteinte. Dans le dashboard Supabase → Authentication → Settings → désactivez "Enable email confirmations".');
+      else setErr(msg);
+    }
     finally{setLoading(false);}
   };
 
@@ -435,16 +441,16 @@ function LoginScreen({onLogin}) {
         {authMode==='login'&&<>
           {/* User list from Supabase */}
           {listLoaded&&userList.length>0&&<>
-            <div style={{fontSize:11,color:T.ink4,marginBottom:7,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Sélectionnez votre profil</div>
+            <div style={{fontSize:12.5,fontFamily:'inherit',color:T.ink4,marginBottom:7,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Sélectionnez votre profil</div>
             <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:14,maxHeight:180,overflowY:'auto'}}>
-              {userList.map(u=><button key={u.id} onClick={()=>{setSelectedUser(u);setManualName('');setErr('');}} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,border:`1.5px solid ${selectedUser?.id===u.id?T.navy:T.lineSoft}`,background:selectedUser?.id===u.id?T.navyTint:T.surface,cursor:'pointer',width:'100%',textAlign:'left'}}>
-                <div style={{width:28,height:28,borderRadius:'50%',background:selectedUser?.id===u.id?T.navy:T.panel2,color:selectedUser?.id===u.id?'#fff':T.ink3,display:'grid',placeItems:'center',fontWeight:700,fontSize:10,flexShrink:0}}>
+              {userList.map(u=><button key={u.id} onClick={()=>{setSelectedUser(u);setManualName('');setErr('');}} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,border:`1.5px solid ${selectedUser?.id===u.id?T.navy:T.lineSoft}`,background:selectedUser?.id===u.id?T.navyTint:T.surface,cursor:'pointer',width:'100%',textAlign:'left',fontFamily:'inherit'}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:selectedUser?.id===u.id?T.navy:T.panel2,color:selectedUser?.id===u.id?'#fff':T.ink3,display:'grid',placeItems:'center',fontWeight:700,fontSize:10,flexShrink:0,fontFamily:'inherit'}}>
                   {(u.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
                 </div>
-                <span style={{fontSize:13,fontWeight:selectedUser?.id===u.id?600:400,color:T.ink}}>{u.name}</span>
+                <span style={{fontSize:12.5,fontFamily:'inherit',fontWeight:selectedUser?.id===u.id?600:400,color:T.ink}}>{u.name}</span>
               </button>)}
             </div>
-            <div style={{fontSize:11,color:T.ink4,marginBottom:6,textAlign:'center'}}>— ou saisir manuellement —</div>
+            <div style={{fontSize:12.5,fontFamily:'inherit',color:T.ink4,marginBottom:6,textAlign:'center'}}>— ou saisir manuellement —</div>
           </>}
           <div style={{display:'flex',flexDirection:'column',gap:9}}>
             <input autoFocus={!selectedUser} style={inputSt}
@@ -455,7 +461,7 @@ function LoginScreen({onLogin}) {
             <input id="login-pwd" type="password" style={inputSt} placeholder="Mot de passe"
               value={pwd} onChange={e=>{setPwd(e.target.value);setErr('');}}
               onKeyDown={e=>e.key==='Enter'&&doLogin()} autoFocus={!!selectedUser}/>
-            {err&&<div style={{fontSize:11,color:'#C53030',textAlign:'center'}}>{err}</div>}
+            {err&&<div style={{fontSize:12.5,fontFamily:'inherit',color:'#C53030',textAlign:'center'}}>{err}</div>}
             <button style={{...btnSt('primary'),justifyContent:'center',opacity:loading?.7:1}} onClick={doLogin} disabled={loading}>
               {loading?'Connexion…':'Se connecter'}
             </button>
@@ -472,11 +478,11 @@ function LoginScreen({onLogin}) {
           <input id="reg-cpwd" type="password" style={inputSt} placeholder="Confirmer le mot de passe"
             value={confirmPwd} onChange={e=>{setConfirmPwd(e.target.value);setErr('');}}
             onKeyDown={e=>e.key==='Enter'&&doRegister()}/>
-          {err&&<div style={{fontSize:11,color:'#C53030',textAlign:'center'}}>{err}</div>}
+          {err&&<div style={{fontSize:12.5,fontFamily:'inherit',color:'#C53030',textAlign:'center'}}>{err}</div>}
           <button style={{...btnSt('primary'),justifyContent:'center',opacity:loading?.7:1}} onClick={doRegister} disabled={loading}>
             {loading?'Création du compte…':'Créer mon compte'}
           </button>
-          <div style={{fontSize:10.5,color:T.ink4,textAlign:'center',lineHeight:1.5}}>Pas besoin d'e-mail. Un identifiant interne sera généré automatiquement.</div>
+          <div style={{fontSize:11,fontFamily:'inherit',color:T.ink4,textAlign:'center',lineHeight:1.5}}>Pas besoin d'e-mail · Un identifiant interne sera généré automatiquement.</div>
         </div>}
       </div>
     </div>
@@ -782,11 +788,11 @@ function CoverPage({state,isPortrait,isRing}) {
   if(state.showProjectType&&state.projectType) bits.push({k:'Type',v:state.projectType});
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',display:'grid',gridTemplateColumns:'1fr 8%',position:'relative',overflow:'hidden'}}>
     <div style={{padding:'6% 5% 5% '+(isRing?'12%':'5%'),display:'flex',flexDirection:'column',justifyContent:'space-between',position:'relative'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',position:'relative',zIndex:3,height:'20%',flexShrink:0,overflow:'hidden'}}>
+      <div style={{position:'relative',zIndex:3,height:'20%',flexShrink:0,overflow:'hidden'}}>
         <AbraneLogoBox size="lg"/>
-        {state.clientLogoUrl
-          ?<img src={state.clientLogoUrl} alt={state.client} style={{height:`${state.logoScale}%`,maxHeight:'100%',maxWidth:'40%',objectFit:'contain',display:'block'}}/>
-          :<div style={{width:16}}/>
+        {state.clientLogoUrl&&
+          <img src={state.clientLogoUrl} alt={state.client}
+            style={{position:'absolute',left:`${state.logoX??80}%`,top:`${state.logoY??5}%`,height:`${state.logoScale}%`,maxHeight:'90%',maxWidth:'55%',objectFit:'contain',display:'block',transform:'translate(-50%,-50%)'}}/>
         }
       </div>
       <div style={{position:'absolute',top:'26%',left:isRing?'12%':'0',right:'0',height:'44%',zIndex:1,overflow:'hidden'}}>
@@ -813,7 +819,6 @@ function CoverPage({state,isPortrait,isRing}) {
       </div>
     </div>
     <div style={{background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
-      {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     <BindingMarks isRing={isRing}/>
   </div>;
@@ -1259,10 +1264,16 @@ function ProjectPanel({state,update}) {
         <Fld label={`Taille logo couverture · ${state.logoScale}%`}>
           <input type="range" min="20" max="300" value={state.logoScale} onChange={e=>update({logoScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
-        <Fld label={`Taille logo striscia · ${state.stripeLogoScale||80}%`}>
+        <Fld label={`Position X couverture · ${state.logoX??80}%`}>
+          <input type="range" min="0" max="100" value={state.logoX??80} onChange={e=>update({logoX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position Y couverture · ${state.logoY??5}%`}>
+          <input type="range" min="0" max="100" value={state.logoY??5} onChange={e=>update({logoY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Taille logo pages contenu · ${state.stripeLogoScale||80}%`}>
           <input type="range" min="20" max="100" value={state.stripeLogoScale||80} onChange={e=>update({stripeLogoScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
-        <Fld label={`Position verticale striscia · ${state.stripeLogoY||0}%`}>
+        <Fld label={`Position verticale pages contenu · ${state.stripeLogoY||0}%`}>
           <input type="range" min="0" max="70" value={state.stripeLogoY||0} onChange={e=>update({stripeLogoY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
       </>}
@@ -2823,14 +2834,23 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const [savingTpl,setSavingTpl]=useState(false);
   const [tplModal,setTplModal]=useState(false);
   const [tplName,setTplName]=useState('');
+  const [tplConflict,setTplConflict]=useState(null); // {id, name}
 
-  const saveAsTemplate=useCallback(async(name)=>{
+  const saveAsTemplate=useCallback(async(name, overwriteId=null)=>{
     if(!USE_CLOUD){showToast('Cloud requis pour sauvegarder un modèle');return;}
     setSavingTpl(true);
     try{
-      await upsertTemplate(user.id,null,name||state.client||state.name,state);
+      if(!overwriteId){
+        const existing=await findTemplateByName(name);
+        if(existing){
+          setTplConflict({id:existing.id,name});
+          return;
+        }
+      }
+      await upsertTemplate(user.id,overwriteId||null,name||state.client||state.name,state);
       showToast('Modèle sauvegardé');
       setTplModal(false);
+      setTplConflict(null);
     }catch(e){showToast('Erreur modèle : '+e.message);}
     finally{setSavingTpl(false);}
   },[user,state]);
@@ -2887,6 +2907,20 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
             style={{...btnSt('primary'),opacity:(!tplName.trim()||savingTpl)?.7:1}}>
             <Icon name={savingTpl?'history':'bookmark'} size={13} color="#fff"/>
             {savingTpl?'Sauvegarde…':'Sauvegarder'}
+          </button>
+        </div>
+      </div>
+    </Scrim>}
+    {tplConflict&&<Scrim onClose={()=>{setTplConflict(null);setSavingTpl(false);}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:12,padding:28,width:360,boxShadow:'0 24px 60px rgba(0,0,0,.18)'}}>
+        <div style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:8}}>Modèle existant</div>
+        <div style={{fontSize:13,color:T.ink3,marginBottom:20}}>Un modèle nommé <strong style={{color:T.ink}}>«&nbsp;{tplConflict.name}&nbsp;»</strong> existe déjà. Voulez-vous le remplacer ?</div>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button onClick={()=>{setTplConflict(null);setSavingTpl(false);}} style={btnSt()}>Annuler</button>
+          <button onClick={()=>saveAsTemplate(tplConflict.name,tplConflict.id)} disabled={savingTpl}
+            style={{...btnSt('primary'),background:'#C53030',borderColor:'#C53030',opacity:savingTpl?.7:1}}>
+            <Icon name="save" size={13} color="#fff"/>
+            {savingTpl?'Sauvegarde…':'Remplacer'}
           </button>
         </div>
       </div>
