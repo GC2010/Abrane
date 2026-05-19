@@ -220,11 +220,12 @@ const inputSt = {width:'100%',padding:'7px 10px',background:T.surface,border:`1p
 const pillSt = (v='default') => ({display:'inline-flex',alignItems:'center',gap:5,padding:'2px 8px',borderRadius:999,fontSize:10.5,fontWeight:500,background:v==='gold'?T.goldTint:v==='navy'?T.navyTint:T.panel2,color:v==='gold'?T.navy:v==='navy'?T.navy:T.ink2,border:`1px solid ${v==='gold'?T.goldSoft:v==='navy'?'#D2DBEC':T.lineSoft}`});
 const btnSt = (v='default',sm=false) => ({display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${v==='primary'?T.navy:v==='gold'?T.goldSoft:T.line}`,background:v==='primary'?T.navy:v==='gold'?T.goldTint:v==='ghost'?'transparent':T.surface,color:v==='primary'?'#fff':v==='gold'?T.navy:T.ink,fontSize:sm?11.5:12.5,fontWeight:500,padding:sm?'5px 9px':'7px 12px',borderRadius:6,cursor:'pointer',fontFamily:'inherit'});
 
-function MiniCover({palette,client,subtitle}) {
+function MiniCover({palette,client,subtitle,clientLogoUrl}) {
   const {officialLogo,shopLogos}=React.useContext(BrandCtx);
   const [c1,c2,c3]=palette;
   const isAbrane=client==='ABRANE';
-  const logo=isAbrane?officialLogo:(shopLogos?.[client]||'');
+  // Priority: explicit url from project data → shopLogos context → official logo (for ABRANE)
+  const logo=clientLogoUrl||(isAbrane?officialLogo:(shopLogos?.[client]||''));
   return <div style={{position:'absolute',inset:0,background:c1,display:'grid',gridTemplateColumns:'1fr 7%'}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',padding:'9% 12%',overflow:'hidden'}}>
       {logo
@@ -493,18 +494,21 @@ function LoginScreen({onLogin}) {
   </div>;
 }
 
-function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
+function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProject}) {
   const [tab,setTab]=useState('projects');
   const [q,setQ]=useState('');
   const [viewMode,setViewMode]=useState('grid');
   const [sort,setSort]=useState('recent');
   const [applyModal,setApplyModal]=useState(null);
   const [updateModal,setUpdateModal]=useState(null);
+  const [deleteConfirm,setDeleteConfirm]=useState(null); // {type,id,name}
   const [dbProjects,setDbProjects]=useState([]);
   const [loadingProjects,setLoadingProjects]=useState(true);
   const [projectsError,setProjectsError]=useState(null);
   const [dbTemplates,setDbTemplates]=useState([]);
   const [loadingTemplates,setLoadingTemplates]=useState(true);
+  const importRef=useRef(null);
+  const isAdmin=user.role==='admin'||user.role==='superadmin';
 
   const refreshProjects=useCallback(()=>{
     if(!USE_CLOUD){setLoadingProjects(false);return;}
@@ -515,9 +519,7 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
       .finally(()=>setLoadingProjects(false));
   },[user.id]);
 
-  useEffect(()=>{refreshProjects();},[refreshProjects]);
-
-  useEffect(()=>{
+  const refreshTemplates=useCallback(()=>{
     if(!USE_CLOUD){setLoadingTemplates(false);return;}
     setLoadingTemplates(true);
     loadTemplates()
@@ -525,6 +527,35 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
       .catch(()=>{})
       .finally(()=>setLoadingTemplates(false));
   },[]);
+
+  useEffect(()=>{refreshProjects();},[refreshProjects]);
+  useEffect(()=>{refreshTemplates();},[refreshTemplates]);
+
+  const handleDeleteConfirmed=async()=>{
+    if(!deleteConfirm)return;
+    try{
+      if(deleteConfirm.type==='project') await deleteProject(deleteConfirm.id,user.id);
+      else await deleteTemplate(deleteConfirm.id);
+    }catch(e){alert('Erreur : '+e.message);}
+    setDeleteConfirm(null);
+    if(deleteConfirm.type==='project') refreshProjects();
+    else refreshTemplates();
+  };
+
+  const handleImportJson=e=>{
+    const file=e.target.files?.[0];if(!file)return;
+    const r=new FileReader();
+    r.onload=ev=>{
+      try{
+        const parsed=JSON.parse(ev.target.result);
+        const data=parsed.data||parsed;
+        if(typeof data!=='object'||!data.client&&!data.name) throw new Error('Format invalide');
+        onImportProject({name:parsed.name||data.name||'Projet importé',data});
+      }catch{alert('Fichier .abrane.json invalide ou corrompu');}
+    };
+    r.readAsText(file);
+    e.target.value='';
+  };
 
   const allProjects=USE_CLOUD?dbProjects:MY_PROJECTS;
   const projects=allProjects.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||p.client.toLowerCase().includes(q.toLowerCase()));
@@ -537,7 +568,13 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
           <h1 style={{fontSize:26,fontWeight:600,color:T.ink,margin:0}}>Bonjour {user.name.split(' ')[0]}.</h1>
           <p style={{fontSize:13.5,color:T.ink3,marginTop:4,marginBottom:0}}>Reprenez un projet ou démarrez depuis un modèle client.</p>
         </div>
-        <button style={{...btnSt('primary'),padding:'10px 16px',fontSize:13.5,borderRadius:8}} onClick={onNewProject}><Icon name="plus" size={14} color="#fff"/>Nouveau projet</button>
+        <div style={{display:'flex',gap:8}}>
+          <label style={{...btnSt(undefined),padding:'8px 14px',cursor:'pointer'}} title="Importer un fichier .abrane.json">
+            <Icon name="upload" size={14} color={T.ink}/>Importer JSON
+            <input ref={importRef} type="file" accept=".json" hidden onChange={handleImportJson}/>
+          </label>
+          <button style={{...btnSt('primary'),padding:'10px 16px',fontSize:13.5,borderRadius:8}} onClick={onNewProject}><Icon name="plus" size={14} color="#fff"/>Nouveau projet</button>
+        </div>
       </div>
       <div style={{display:'inline-flex',gap:2,padding:3,background:T.panel2,borderRadius:8,border:`1px solid ${T.lineSoft}`,marginBottom:16}}>
         {[{id:'projects',icon:'folder',label:'Mes projets',cnt:allProjects.length},{id:'templates',icon:'folderTeam',label:'Modèles',cnt:allTemplates.length}].map(tb=>(
@@ -570,18 +607,20 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
         <button onClick={onNewProject} style={{minHeight:200,border:`1.5px dashed ${T.lineStrong}`,borderRadius:12,background:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,flexDirection:'column',color:T.ink2}}>
           <Icon name="plus" size={22} color={T.ink3}/><div><div style={{fontWeight:600,fontSize:13}}>Nouveau projet</div><div style={{fontSize:11,color:T.ink3,marginTop:2}}>Vierge ou depuis un modèle</div></div>
         </button>
-        {projects.map(p=><div key={p.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,overflow:'hidden',cursor:'pointer'}} onClick={()=>onOpenProject(p._raw||p)}>
+        {projects.map(p=><div key={p.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,overflow:'hidden',cursor:'pointer',position:'relative'}} onClick={()=>onOpenProject(p._raw||p)}>
+          <button onClick={e=>{e.stopPropagation();setDeleteConfirm({type:'project',id:p.id,name:p.name});}} title="Supprimer" style={{position:'absolute',top:8,right:8,zIndex:3,width:22,height:22,borderRadius:'50%',background:'rgba(20,20,30,.55)',backdropFilter:'blur(4px)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
+            <Icon name="close" size={11} color="#fff"/>
+          </button>
           <div style={{aspectRatio:'297/210',background:T.panel,borderBottom:`1px solid ${T.lineSoft}`,position:'relative',overflow:'hidden'}}>
-            <MiniCover palette={p.palette} client={p.client} subtitle={p.subtitle}/>
-            {p.templateUpdateAvailable&&<button style={{position:'absolute',top:10,right:10,display:'inline-flex',alignItems:'center',gap:5,background:T.gold,color:'#1A1F2E',border:'none',padding:'4px 10px',borderRadius:999,fontSize:10.5,fontWeight:600,cursor:'pointer',zIndex:2}} onClick={e=>{e.stopPropagation();setUpdateModal(p);}}><Icon name="sparkle" size={12} color="#1A1F2E"/>Mise à jour</button>}
+            <MiniCover palette={p.palette} client={p.client} subtitle={p.subtitle} clientLogoUrl={p.clientLogoUrl}/>
           </div>
           <div style={{padding:'12px 14px'}}>
             <div style={{fontSize:13,fontWeight:600,color:T.ink}}>{p.name}</div>
-            <div style={{fontSize:11,color:T.ink3,marginTop:3,display:'flex',gap:6,flexWrap:'wrap'}}><span>{p.client}</span><span>·</span><span>{p.pages} pages</span><span>·</span><span style={{fontWeight:500,color:T.ink2}}>{p.rev}</span></div>
-            <div style={{fontSize:10.5,color:T.ink4,marginTop:2,display:'flex',gap:4,alignItems:'center'}}><Icon name="history" size={11} color={T.ink4}/>{p.updated} · Créé {p.createdAt}</div>
+            <div style={{fontSize:11,color:T.ink3,marginTop:3,display:'flex',gap:6,flexWrap:'wrap'}}><span>{p.client}</span><span>·</span><span style={{fontWeight:500,color:T.ink2}}>{p.rev}</span></div>
+            <div style={{fontSize:10.5,color:T.ink4,marginTop:2,display:'flex',gap:4,alignItems:'center'}}><Icon name="history" size={11} color={T.ink4}/>{p.updated} · {p.createdAt}</div>
             <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
               <span style={pillSt()}><Icon name={p.pageFormat.startsWith('h')?'page':'pageVert'} size={11} color={T.ink2}/>{p.pageFormat.startsWith('h')?'Paysage':'Portrait'}</span>
-              <span style={pillSt('gold')}><Icon name="layers" size={11} color={T.navy}/>{p.basedOn}</span>
+              {p.basedOn&&<span style={pillSt('gold')}><Icon name="layers" size={11} color={T.navy}/>{p.basedOn}</span>}
             </div>
           </div>
         </div>)}
@@ -590,13 +629,18 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
         <div style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px',gap:12,padding:'8px 14px',background:T.panel,borderBottom:`1px solid ${T.line}`,fontSize:10.5,fontWeight:600,color:T.ink4,textTransform:'uppercase',letterSpacing:'.06em'}}>
           <div/><div>Nom</div><div>Client</div><div>Révision</div><div>Pages</div><div>Modifié</div>
         </div>
-        {projects.map((p,i)=><div key={p.id} onClick={()=>onOpenProject(p._raw||p)} style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px',gap:12,padding:'10px 14px',borderBottom:i<projects.length-1?`1px solid ${T.lineSoft}`:'none',cursor:'pointer',alignItems:'center',background:T.surface}} onMouseEnter={e=>e.currentTarget.style.background=T.tint} onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
-          <div style={{width:32,height:32,borderRadius:6,display:'grid',gridTemplateColumns:'1fr 30%',overflow:'hidden',border:`1px solid ${T.line}`}}><div style={{background:p.palette[0]}}/><div style={{background:p.palette[1]}}/></div>
-          <div><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{p.name}</div><div style={{fontSize:10.5,color:T.ink4}}>Créé {p.createdAt}</div></div>
-          <div style={{fontSize:12,color:T.ink2}}>{p.client}</div>
-          <span style={{...pillSt('navy'),fontSize:10}}>{p.rev}</span>
-          <div style={{fontSize:12,color:T.ink2}}>{p.pages} p.</div>
-          <div style={{fontSize:11.5,color:T.ink3}}>{p.updated}</div>
+        {projects.map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px 32px',gap:12,padding:'10px 14px',borderBottom:i<projects.length-1?`1px solid ${T.lineSoft}`:'none',cursor:'pointer',alignItems:'center',background:T.surface}} onMouseEnter={e=>e.currentTarget.style.background=T.tint} onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
+          <div style={{width:32,height:32,borderRadius:6,overflow:'hidden',border:`1px solid ${T.line}`,position:'relative',flexShrink:0}} onClick={()=>onOpenProject(p._raw||p)}>
+            <MiniCover palette={p.palette} client={p.client} subtitle="" clientLogoUrl={p.clientLogoUrl}/>
+          </div>
+          <div onClick={()=>onOpenProject(p._raw||p)}><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{p.name}</div><div style={{fontSize:10.5,color:T.ink4}}>Créé {p.createdAt}</div></div>
+          <div style={{fontSize:12,color:T.ink2}} onClick={()=>onOpenProject(p._raw||p)}>{p.client}</div>
+          <span style={{...pillSt('navy'),fontSize:10}} onClick={()=>onOpenProject(p._raw||p)}>{p.rev}</span>
+          <div style={{fontSize:12,color:T.ink2}} onClick={()=>onOpenProject(p._raw||p)}>{p.pages} p.</div>
+          <div style={{fontSize:11.5,color:T.ink3}} onClick={()=>onOpenProject(p._raw||p)}>{p.updated}</div>
+          <button onClick={e=>{e.stopPropagation();setDeleteConfirm({type:'project',id:p.id,name:p.name});}} style={{width:28,height:28,borderRadius:6,background:'transparent',border:`1px solid ${T.line}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}} title="Supprimer">
+            <Icon name="trash" size={13} color={T.ink3}/>
+          </button>
         </div>)}
       </div>}
       {tab==='templates'&&<div style={{display:'flex',flexDirection:'column',gap:16}}>
@@ -618,15 +662,18 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
           {dbTemplates.length>0&&<>
             <div style={{fontSize:11,fontWeight:700,color:T.ink4,textTransform:'uppercase',letterSpacing:'.08em',marginTop:4}}>Modèles clients</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:14}}>
-              {dbTemplates.map(t=><button key={t.id} onClick={()=>setApplyModal(t)} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,overflow:'hidden',cursor:'pointer',textAlign:'left',padding:0}}>
+              {dbTemplates.map(t=><div key={t.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,overflow:'hidden',cursor:'pointer',textAlign:'left',position:'relative'}} onClick={()=>setApplyModal(t)}>
+                {isAdmin&&<button onClick={e=>{e.stopPropagation();setDeleteConfirm({type:'template',id:t.id,name:t.name});}} title="Supprimer" style={{position:'absolute',top:8,right:8,zIndex:3,width:22,height:22,borderRadius:'50%',background:'rgba(20,20,30,.55)',backdropFilter:'blur(4px)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
+                  <Icon name="close" size={11} color="#fff"/>
+                </button>}
                 <div style={{aspectRatio:'297/210',background:T.panel,borderBottom:`1px solid ${T.lineSoft}`,position:'relative',overflow:'hidden'}}>
-                  <MiniCover palette={t.palette} client={t.author||t.name} subtitle="MODÈLE CLIENT"/>
+                  <MiniCover palette={t.palette} client={t.author||t.name} subtitle="MODÈLE CLIENT" clientLogoUrl={t.clientLogoUrl}/>
                 </div>
                 <div style={{padding:'12px 14px'}}>
                   <div style={{fontSize:13,fontWeight:600,color:T.ink}}>{t.name}</div>
                   <div style={{fontSize:11,color:T.ink4,marginTop:3}}>{t.author} · {t.updated}</div>
                 </div>
-              </button>)}
+              </div>)}
             </div>
           </>}
           {dbTemplates.length===0&&<div style={{background:T.panel,border:`1px solid ${T.lineSoft}`,borderRadius:10,padding:'14px 18px',display:'flex',alignItems:'center',gap:14}}>
@@ -643,6 +690,18 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
     </div>
     {applyModal&&<TemplateApplyModal template={applyModal} onClose={()=>setApplyModal(null)} onConfirm={opts=>{setApplyModal(null);onOpenTemplate({...applyModal,...opts});}}/>}
     {updateModal&&<TemplateUpdateModal project={updateModal} onClose={()=>setUpdateModal(null)} onDecision={()=>setUpdateModal(null)}/>}
+    {deleteConfirm&&<Scrim onClose={()=>setDeleteConfirm(null)}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:12,padding:28,width:340,boxShadow:'0 24px 60px rgba(0,0,0,.18)'}}>
+        <div style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:6}}>Supprimer ce {deleteConfirm.type==='project'?'projet':'modèle'} ?</div>
+        <div style={{fontSize:12.5,color:T.ink3,marginBottom:20}}>«{deleteConfirm.name}» sera supprimé définitivement.</div>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button onClick={()=>setDeleteConfirm(null)} style={btnSt()}>Annuler</button>
+          <button onClick={handleDeleteConfirmed} style={{...btnSt('primary'),background:'#DC2626',borderColor:'#DC2626'}}>
+            <Icon name="trash" size={13} color="#fff"/>Supprimer
+          </button>
+        </div>
+      </div>
+    </Scrim>}
   </div>;
 }
 
@@ -2855,10 +2914,10 @@ function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin,onSave,onSaveAs
     <div style={{flex:1}}/>
     {onOpenAdmin&&<button onClick={onOpenAdmin} style={{...btnSt('gold',true)}}><Icon name="shield" size={13} color={T.navy}/>Admin</button>}
     {screen==='configurator'&&<>
-      {onSaveAsTemplate&&<button onClick={onSaveAsTemplate} style={btnSt('gold',true)}><Icon name="bookmark" size={13} color={T.navy}/>Modèle</button>}
+      {onSaveAsTemplate&&<button onClick={onSaveAsTemplate} style={btnSt('gold',true)}><Icon name="bookmark" size={13} color={T.navy}/>Sauver modèle</button>}
       <button onClick={onSave} disabled={saving||!dirty} style={{...btnSt(dirty?'primary':'default',true),opacity:(saving||!dirty)?.6:1}}>
-        <Icon name={saving?'history':'cloud'} size={13} color={dirty?'#fff':T.ink3}/>
-        {saving?'Sauvegarde…':'Sauvegarder'}
+        <Icon name={saving?'history':'save'} size={13} color={dirty?'#fff':T.ink3}/>
+        {saving?'Sauvegarde…':'Sauver projet'}
       </button>
       <button onClick={onExportJson} style={btnSt(undefined,true)}><Icon name="download" size={14} color={T.ink}/>JSON</button>
       <div style={{width:1,height:22,background:T.line}}/>
@@ -2933,12 +2992,11 @@ export default function App() {
         {screen==='dashboard'&&<Dashboard user={user}
           onOpenProject={p=>{setProject(p);setScreen('configurator');}}
           onNewProject={()=>{setProject(null);setScreen('configurator');}}
+          onImportProject={proj=>{setProject(proj);setScreen('configurator');}}
           onOpenTemplate={tpl=>{
             if(tpl._raw?.data){
-              // Supabase template: use saved setup, clear content
               setProject({_isTemplate:true,name:'Nouveau — '+(tpl.author||tpl.name),basedOn:tpl.name,data:tpl._raw.data});
             } else {
-              // Static ABRANE template (TEAM_TEMPLATES)
               setProject({name:'Nouveau — '+tpl.name,pageFormat:tpl.pageFormat,palette:tpl.palette,client:'',basedOn:tpl.name});
             }
             setScreen('configurator');
