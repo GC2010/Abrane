@@ -606,7 +606,6 @@ function CoverPage({state,isPortrait,isRing}) {
       </div>
     </div>
     <div style={{background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
-      <StripeAbraneLogo/>
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     <BindingMarks isRing={isRing}/>
@@ -792,7 +791,7 @@ function BackPage({state,isPortrait,isRing}) {
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:isRing?'6% 5% 6% 12%':'6% 5%',position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
     <div style={{position:'absolute',top:'15%',left:isRing?'13%':'4%',fontSize:'clamp(48px,8vw,110px)',fontWeight:900,color:shade(p.c1,-8),lineHeight:1}}>{state.backDecor}</div>
     <div style={{position:'absolute',top:'6%',right:'5%',textAlign:'right',fontSize:10,color:shade(p.c3,40),lineHeight:1.7}}>
-      <div style={{padding:'4px 10px',background:T.navy,borderRadius:3,marginLeft:'auto',marginBottom:8,display:'inline-block'}}><span style={{color:'#fff',fontWeight:900,fontSize:9,letterSpacing:1}}>ABRANE</span></div>
+      <div style={{marginLeft:'auto',marginBottom:8,display:'inline-block'}}><AbraneLogoBox size="sm"/></div>
       {state.backLines.map((l,i)=><div key={i}>{l}</div>)}
     </div>
     <div style={{position:'absolute',right:0,bottom:0,width:'48%',height:'50%',overflow:'hidden'}}>
