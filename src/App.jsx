@@ -2690,7 +2690,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     const objs=JSON.parse(histRef.current[idx]);
     canvas.getObjects().slice().forEach(o=>canvas.remove(o));
     if(objs.length===0){canvas.requestRenderAll();isLoadingRef.current=false;}
-    else{window.fabric.util.enlivenObjects(objs,en=>{en.forEach(o=>canvas.add(o));canvas.requestRenderAll();isLoadingRef.current=false;});}
+    else{window.fabric.util.enlivenObjects(objs,en=>{en.forEach(o=>{o.selectable=true;o.evented=true;canvas.add(o);});canvas.requestRenderAll();isLoadingRef.current=false;});}
     histIdxRef.current=idx;
     updHist();
   };
@@ -2717,7 +2717,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       try{
         isLoadingRef.current=true;
         window.fabric.util.enlivenObjects(JSON.parse(saved),en=>{
-          en.forEach(o=>canvas.add(o));
+          en.forEach(o=>{o.selectable=true;o.evented=true;canvas.add(o);});
           canvas.requestRenderAll();
           isLoadingRef.current=false;
           pushHist(canvas);
@@ -2802,10 +2802,9 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     if(tool==='pencil'){canvas.freeDrawingBrush.color=color;canvas.freeDrawingBrush.width=strokeW*2;}
     const isSel=tool==='select';
     canvas.selection=isSel;
-    canvas.skipTargetFind=!isSel; // prevent hitting existing objects when drawing
+    canvas.skipTargetFind=!isSel;
     canvas.defaultCursor=isSel?'default':'crosshair';
     canvas.hoverCursor=isSel?'move':'crosshair';
-    canvas.getObjects().forEach(o=>{o.selectable=isSel;o.evented=isSel;});
     canvas.requestRenderAll();
   },[tool]);
 
