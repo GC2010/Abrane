@@ -178,6 +178,7 @@ const initialState = project => {
     sigScale:30, sigX:78, sigY:88,
     symEnabled:false, symPlacement:'all', symText:'', symScale:20, symX:50, symY:50, symPageNum:1,
     advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advX:85, advY:8, advPageNum:1,
+    disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
     notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, _dirty:false,
@@ -947,6 +948,22 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
                     <span style={{fontSize:'clamp(4px,1.1vw,9px)',fontWeight:900,color:st.color,letterSpacing:'.08em',lineHeight:1}}>{st.v}</span>
                     <span style={{fontSize:'clamp(3px,.75vw,6px)',fontWeight:600,color:st.color,textAlign:'center',lineHeight:1.25}}>{st.l}</span>
                   </div>
+                </div>
+              ):null;
+            })()}
+            {state.disclaimerEnabled&&(()=>{
+              const pl=state.disclaimerPlacement||'all';
+              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content')||(pl==='specific'&&i===(state.disclaimerPageNum??1)-1);
+              const sz=state.disclaimerSize??6;
+              const lang=state.disclaimerLang||'fr';
+              const FR='Tous les dessins techniques et documents associés sont la propriété exclusive de ABRANE France S.A.S. Toute reproduction ou utilisation sans autorisation est interdite.';
+              const EN='All technical drawings and associated documents are the exclusive property of ABRANE France S.A.S. Any reproduction or use without authorization is prohibited.';
+              const txt=lang==='both'?`${FR}\n${EN}`:lang==='en'?EN:FR;
+              return show?(
+                <div style={{position:'absolute',left:`${state.disclaimerX??50}%`,top:`${state.disclaimerY??95}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:'88%',textAlign:'center'}}>
+                  {txt.split('\n').map((line,li)=>(
+                    <div key={li} style={{fontSize:`clamp(2px,${sz*0.09}vw,${sz}pt)`,color:'rgba(0,0,0,0.3)',fontStyle:'italic',lineHeight:1.5,letterSpacing:'.01em',marginTop:li?'0.3em':0}}>{line}</div>
+                  ))}
                 </div>
               ):null;
             })()}
@@ -1846,6 +1863,50 @@ function SymbolsPanel({state,update}) {
         </Fld>
         <Fld label={`Position verticale · ${state.advY??8}%`}>
           <input type="range" min="0" max="100" value={state.advY??8} onChange={e=>update({advY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+      </>}
+    </Sect>
+    <Sect title="Mention légale">
+      <RowItem label="Activer la mention" sub="Texte de confidentialité discret en bas de page">
+        <Toggle checked={state.disclaimerEnabled} onChange={v=>update({disclaimerEnabled:v})}/>
+      </RowItem>
+      {state.disclaimerEnabled&&<>
+        <Fld label="Langue">
+          <div style={{display:'flex',gap:4}}>
+            {[{v:'fr',l:'Français'},{v:'en',l:'English'},{v:'both',l:'FR + EN'}].map(o=>(
+              <button key={o.v} onClick={()=>update({disclaimerLang:o.v})} style={{...btnSt((state.disclaimerLang||'fr')===o.v?'primary':'default',true),flex:1,justifyContent:'center'}}>{o.l}</button>
+            ))}
+          </div>
+        </Fld>
+        <Fld label="Aperçu">
+          <div style={{padding:'8px 10px',background:T.panel,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
+            {(state.disclaimerLang||'fr')!=='en'&&<p style={{margin:'0 0 4px',fontSize:9,color:'rgba(0,0,0,0.4)',fontStyle:'italic',lineHeight:1.5}}>Tous les dessins techniques et documents associés sont la propriété exclusive de ABRANE France S.A.S. Toute reproduction ou utilisation sans autorisation est interdite.</p>}
+            {(state.disclaimerLang||'fr')!=='fr'&&<p style={{margin:0,fontSize:9,color:'rgba(0,0,0,0.4)',fontStyle:'italic',lineHeight:1.5}}>All technical drawings and associated documents are the exclusive property of ABRANE France S.A.S. Any reproduction or use without authorization is prohibited.</p>}
+          </div>
+        </Fld>
+        <Fld label="Appliquer sur">
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {PLACEMENTS.map(pl=>(
+              <label key={pl.v} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12,color:T.ink}}>
+                <input type="radio" name="disclaimerPlacement" value={pl.v} checked={(state.disclaimerPlacement||'all')===pl.v} onChange={()=>update({disclaimerPlacement:pl.v})} style={{accentColor:T.navy}}/>
+                {pl.l}
+              </label>
+            ))}
+          </div>
+        </Fld>
+        {(state.disclaimerPlacement||'all')==='specific'&&(
+          <Fld label={`Numéro de page · ${state.disclaimerPageNum??1}`}>
+            <input type="number" min="1" value={state.disclaimerPageNum??1} onChange={e=>update({disclaimerPageNum:Math.max(1,parseInt(e.target.value)||1)})} style={{...inputSt,width:'80px'}}/>
+          </Fld>
+        )}
+        <Fld label={`Taille · ${state.disclaimerSize??6}pt`}>
+          <input type="range" min="4" max="14" value={state.disclaimerSize??6} onChange={e=>update({disclaimerSize:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position horizontale · ${state.disclaimerX??50}%`}>
+          <input type="range" min="0" max="100" value={state.disclaimerX??50} onChange={e=>update({disclaimerX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position verticale · ${state.disclaimerY??95}%`}>
+          <input type="range" min="0" max="100" value={state.disclaimerY??95} onChange={e=>update({disclaimerY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
       </>}
     </Sect>
