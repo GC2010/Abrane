@@ -2735,6 +2735,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     canvas.on('mouse:down',opt=>{
       const t=toolRef.current;
       if(t==='select'||t==='pencil'||t==='text')return;
+      if(opt.target)return; // clicked on existing object — don't start drawing
       isDrawingRef.current=true;
       const p=canvas.getPointer(opt.e);
       originRef.current={x:p.x,y:p.y};
@@ -2777,16 +2778,18 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     canvas.on('mouse:up',opt=>{
       const t=toolRef.current;
       if(t==='text'){
+        if(opt.target)return; // clicked on existing object
         const p=canvas.getPointer(opt.e);
-        const txt=new window.fabric.IText('Texte',{left:p.x,top:p.y,fontSize:18,fill:colorRef.current,fontFamily:'Arial'});
+        const txt=new window.fabric.IText('Texte',{left:p.x,top:p.y,fontSize:18,fill:colorRef.current,fontFamily:'Arial',selectable:false,evented:false});
         canvas.add(txt);canvas.setActiveObject(txt);txt.enterEditing();txt.selectAll();
         return;
       }
       if(!isDrawingRef.current||!shapeRef.current)return;
       isDrawingRef.current=false;
       const shape=shapeRef.current;shapeRef.current=null;
-      shape.set({selectable:true,evented:true});
-      canvas.setActiveObject(shape);
+      const nowSel=toolRef.current==='select';
+      shape.set({selectable:nowSel,evented:nowSel});
+      if(nowSel)canvas.setActiveObject(shape);
       if(t==='rectText'){setTextPrompt(shape);setTextVal('');}
       canvas.requestRenderAll();
     });
