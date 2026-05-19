@@ -1,6 +1,6 @@
 import { supabase, USE_CLOUD } from './supabase.js';
 
-// ── Sign in ───────────────────────────────────────────────────
+// ── Sign in (email + password) ────────────────────────────────
 export async function signIn(email, password) {
   if (!USE_CLOUD) throw new Error('Cloud auth disabled');
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -8,18 +8,43 @@ export async function signIn(email, password) {
   return data.user;
 }
 
-// ── Sign up + create profile ──────────────────────────────────
-export async function signUp(email, password, role = 'user') {
+// ── Sign in by name (nom → email interne → signIn) ────────────
+export async function signInByName(name, password) {
   if (!USE_CLOUD) throw new Error('Cloud auth disabled');
+  const { data: email, error } = await supabase.rpc('get_email_by_name', { p_name: name });
+  if (error) throw error;
+  if (!email) throw new Error('Utilisateur introuvable. Vérifiez le nom saisi.');
+  return signIn(email, password);
+}
+
+// ── Sign up with name only (auto-génère un email interne) ─────
+export async function signUpWithName(fullName, password) {
+  if (!USE_CLOUD) throw new Error('Cloud auth disabled');
+  const slug = fullName.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // strip accents
+    .replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/g, '');
+  const email = `${slug}.${Date.now().toString(36)}@abrane.internal`;
+
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
-  const { error: profileError } = await supabase.from('profiles').insert({
+  if (!data?.user) throw new Error('Compte non créé. Désactivez la confirmation email dans Supabase Auth → Settings.');
+
+  const { error: profileError } = await supabase.from('profiles').upsert({
     id: data.user.id,
     email,
-    role,
-  });
+    name: fullName,
+    role: 'user',
+  }, { onConflict: 'id' });
   if (profileError) throw profileError;
   return data.user;
+}
+
+// ── Liste des utilisateurs (login screen public) ──────────────
+export async function listUsers() {
+  if (!USE_CLOUD) return [];
+  const { data, error } = await supabase.rpc('list_users');
+  if (error) return [];
+  return data || [];
 }
 
 // ── Get current session user ──────────────────────────────────
@@ -63,12 +88,17 @@ export function onAuthChange(callback) {
 
 // ── Map Supabase user + profile → app user object ─────────────
 export function toAppUser(sbUser, profile) {
+  const displayName = profile?.name || sbUser.email?.split('@')[0] || 'Utilisateur';
+  const parts = displayName.trim().split(/\s+/);
+  const initials = parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : displayName.slice(0, 2).toUpperCase();
   return {
     id:               sbUser.id,
-    name:             profile?.name || sbUser.email,
+    name:             displayName,
     email:            sbUser.email,
     role:             profile?.role || 'user',
-    initials:         (profile?.name || sbUser.email).slice(0,2).toUpperCase(),
+    initials,
     hasSig:           !!profile?.firma_url,
     sigUrl:           profile?.firma_url || '',
     team:             'ABRANE FR',

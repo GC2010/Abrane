@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { USE_CLOUD } from './lib/supabase.js';
-import { signIn, signUp, signOut, getSession, getProfile, toAppUser } from './lib/auth.js';
+import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, toAppUser, listUsers } from './lib/auth.js';
 import { loadProjects, upsertProject, deleteProject, projectToDisplay,
          loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay } from './lib/db.js';
 
@@ -373,123 +373,125 @@ function AbraneLogoBox({size='md'}) {
 }
 
 function LoginScreen({onLogin}) {
-  // ── Local mode state ──────────────────────────────────────────
-  const [newName,setNewName]=useState('');
-  const [pwdUser,setPwdUser]=useState(null);
-  const [pwd,setPwd]=useState('');
-  const [pwdErr,setPwdErr]=useState(false);
-
-  const handleUserClick=u=>{
-    if(u.requiresPassword){setPwdUser(u);setPwd('');setPwdErr(false);}
-    else onLogin(u);
-  };
-  const doAdminLogin=()=>{
-    if(pwd===ADMIN_PASS){onLogin(pwdUser);setPwdUser(null);}
-    else{setPwdErr(true);}
-  };
-  const doCreate=()=>{if(!newName.trim())return;onLogin({id:'new',name:newName.trim(),initials:newName.trim().split(' ').map(s=>s[0]).slice(0,2).join('').toUpperCase(),role:'editor',hasSig:false,team:'ABRANE FR'});};
-
-  // ── Cloud mode state ──────────────────────────────────────────
-  const [email,setEmail]=useState('');
-  const [cloudPwd,setCloudPwd]=useState('');
-  const [loading,setLoading]=useState(false);
-  const [cloudErr,setCloudErr]=useState('');
-
-  const doCloudLogin=async()=>{
-    if(!email.trim()||!cloudPwd) return;
-    setLoading(true); setCloudErr('');
-    try {
-      const sbUser=await signIn(email.trim(),cloudPwd);
-      const profile=await getProfile(sbUser.id);
-      onLogin(toAppUser(sbUser,profile));
-    } catch(e) {
-      setCloudErr(e.message==='Invalid login credentials'?'Email ou mot de passe incorrect.':e.message);
-    } finally { setLoading(false); }
-  };
-
   const logoBox=<div style={{display:'flex',justifyContent:'center',marginBottom:20}}><AbraneLogoBox size="lg"/></div>;
 
-  // ── Cloud auth mode (login | register) ───────────────────────
-  const [authMode,setAuthMode]=useState('login');
+  // ── Cloud login (USE_CLOUD = true) ────────────────────────────
+  const [authMode,setAuthMode]=useState('login'); // 'login' | 'register'
+  const [selectedUser,setSelectedUser]=useState(null); // user picked from list
+  const [manualName,setManualName]=useState('');       // typed name (login)
+  const [fullName,setFullName]=useState('');           // new user name (register)
+  const [pwd,setPwd]=useState('');
   const [confirmPwd,setConfirmPwd]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState('');
+  const [userList,setUserList]=useState([]);           // [{id, name}]
+  const [listLoaded,setListLoaded]=useState(false);
 
-  const doCloudRegister=async()=>{
-    if(!email.trim()||!cloudPwd) return;
-    if(cloudPwd!==confirmPwd){setCloudErr('Les mots de passe ne correspondent pas.');return;}
-    if(cloudPwd.length<8){setCloudErr('Mot de passe : 8 caractères minimum.');return;}
-    setLoading(true);setCloudErr('');
+  useEffect(()=>{
+    if(!USE_CLOUD) return;
+    listUsers().then(list=>{setUserList(list);setListLoaded(true);}).catch(()=>setListLoaded(true));
+  },[]);
+
+  const resetForm=()=>{setPwd('');setConfirmPwd('');setErr('');setSelectedUser(null);setManualName('');setFullName('');};
+
+  const doLogin=async()=>{
+    const name=(selectedUser?.name||manualName).trim();
+    if(!name||!pwd){setErr('Renseignez votre nom et votre mot de passe.');return;}
+    setLoading(true);setErr('');
     try{
-      const sbUser=await signUp(email.trim(),cloudPwd,'user');
+      // Admin can use email directly; others use name lookup
+      const sbUser=name.includes('@')?await signIn(name,pwd):await signInByName(name,pwd);
       const profile=await getProfile(sbUser.id);
       onLogin(toAppUser(sbUser,profile));
-    }catch(e){setCloudErr(e.message);}
+    }catch(e){
+      setErr(e.message==='Invalid login credentials'?'Nom ou mot de passe incorrect.':e.message);
+    }finally{setLoading(false);}
+  };
+
+  const doRegister=async()=>{
+    if(!fullName.trim()){setErr('Saisissez votre prénom et nom.');return;}
+    if(!pwd){setErr('Choisissez un mot de passe.');return;}
+    if(pwd!==confirmPwd){setErr('Les mots de passe ne correspondent pas.');return;}
+    if(pwd.length<6){setErr('Mot de passe : 6 caractères minimum.');return;}
+    setLoading(true);setErr('');
+    try{
+      const sbUser=await signUpWithName(fullName.trim(),pwd);
+      const profile=await getProfile(sbUser.id);
+      onLogin(toAppUser(sbUser,profile));
+    }catch(e){setErr(e.message);}
     finally{setLoading(false);}
   };
 
   if(USE_CLOUD) return (
     <div style={{position:'fixed',inset:0,display:'grid',placeItems:'center',background:T.bg,zIndex:100}}>
-      <div style={{width:400,maxWidth:'92vw',background:T.surface,borderRadius:22,padding:'36px 36px 28px',boxShadow:'0 24px 80px rgba(15,20,40,.22)',border:`1px solid ${T.line}`}}>
+      <div style={{width:420,maxWidth:'93vw',background:T.surface,borderRadius:22,padding:'36px 36px 28px',boxShadow:'0 24px 80px rgba(15,20,40,.22)',border:`1px solid ${T.line}`}}>
         {logoBox}
         <div style={{display:'inline-flex',width:'100%',padding:3,background:T.panel2,borderRadius:8,border:`1px solid ${T.lineSoft}`,marginBottom:22,boxSizing:'border-box'}}>
           {[{v:'login',l:'Se connecter'},{v:'register',l:'Créer un compte'}].map(m=>(
-            <button key={m.v} onClick={()=>{setAuthMode(m.v);setCloudErr('');}} style={{flex:1,padding:'6px 0',borderRadius:6,border:'none',background:authMode===m.v?'#fff':'transparent',color:authMode===m.v?T.ink:T.ink3,fontSize:12.5,fontWeight:authMode===m.v?600:400,cursor:'pointer',boxShadow:authMode===m.v?'0 1px 3px rgba(0,0,0,.06)':'none'}}>{m.l}</button>
+            <button key={m.v} onClick={()=>{setAuthMode(m.v);resetForm();}} style={{flex:1,padding:'6px 0',borderRadius:6,border:'none',background:authMode===m.v?'#fff':'transparent',color:authMode===m.v?T.ink:T.ink3,fontSize:12.5,fontWeight:authMode===m.v?600:400,cursor:'pointer',boxShadow:authMode===m.v?'0 1px 3px rgba(0,0,0,.06)':'none'}}>{m.l}</button>
           ))}
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <input type="email" autoFocus style={inputSt} placeholder="Adresse e-mail"
-            value={email} onChange={e=>{setEmail(e.target.value);setCloudErr('');}}
-            onKeyDown={e=>e.key==='Enter'&&document.getElementById('cloud-pwd-input')?.focus()}/>
-          <input id="cloud-pwd-input" type="password" style={inputSt} placeholder="Mot de passe"
-            value={cloudPwd} onChange={e=>{setCloudPwd(e.target.value);setCloudErr('');}}
-            onKeyDown={e=>e.key==='Enter'&&(authMode==='login'?doCloudLogin():document.getElementById('cloud-cpwd')?.focus())}/>
-          {authMode==='register'&&(
-            <input id="cloud-cpwd" type="password" style={inputSt} placeholder="Confirmer le mot de passe"
-              value={confirmPwd} onChange={e=>{setConfirmPwd(e.target.value);setCloudErr('');}}
-              onKeyDown={e=>e.key==='Enter'&&doCloudRegister()}/>
-          )}
-          {cloudErr&&<div style={{fontSize:11,color:'#C53030',textAlign:'center',padding:'4px 0'}}>{cloudErr}</div>}
-          <button style={{...btnSt('primary'),justifyContent:'center',opacity:loading?.7:1}}
-            onClick={authMode==='login'?doCloudLogin:doCloudRegister} disabled={loading}>
-            {loading?(authMode==='login'?'Connexion…':'Création…'):(authMode==='login'?'Se connecter':'Créer mon compte')}
+
+        {authMode==='login'&&<>
+          {/* User list from Supabase */}
+          {listLoaded&&userList.length>0&&<>
+            <div style={{fontSize:11,color:T.ink4,marginBottom:7,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Sélectionnez votre profil</div>
+            <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:14,maxHeight:180,overflowY:'auto'}}>
+              {userList.map(u=><button key={u.id} onClick={()=>{setSelectedUser(u);setManualName('');setErr('');}} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,border:`1.5px solid ${selectedUser?.id===u.id?T.navy:T.lineSoft}`,background:selectedUser?.id===u.id?T.navyTint:T.surface,cursor:'pointer',width:'100%',textAlign:'left'}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:selectedUser?.id===u.id?T.navy:T.panel2,color:selectedUser?.id===u.id?'#fff':T.ink3,display:'grid',placeItems:'center',fontWeight:700,fontSize:10,flexShrink:0}}>
+                  {(u.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+                </div>
+                <span style={{fontSize:13,fontWeight:selectedUser?.id===u.id?600:400,color:T.ink}}>{u.name}</span>
+              </button>)}
+            </div>
+            <div style={{fontSize:11,color:T.ink4,marginBottom:6,textAlign:'center'}}>— ou saisir manuellement —</div>
+          </>}
+          <div style={{display:'flex',flexDirection:'column',gap:9}}>
+            <input autoFocus={!selectedUser} style={inputSt}
+              placeholder={selectedUser?`Connecté en tant que : ${selectedUser.name}`:'Votre nom ou e-mail admin'}
+              value={selectedUser?selectedUser.name:manualName}
+              onChange={e=>{setSelectedUser(null);setManualName(e.target.value);setErr('');}}
+              onKeyDown={e=>e.key==='Enter'&&document.getElementById('login-pwd')?.focus()}/>
+            <input id="login-pwd" type="password" style={inputSt} placeholder="Mot de passe"
+              value={pwd} onChange={e=>{setPwd(e.target.value);setErr('');}}
+              onKeyDown={e=>e.key==='Enter'&&doLogin()} autoFocus={!!selectedUser}/>
+            {err&&<div style={{fontSize:11,color:'#C53030',textAlign:'center'}}>{err}</div>}
+            <button style={{...btnSt('primary'),justifyContent:'center',opacity:loading?.7:1}} onClick={doLogin} disabled={loading}>
+              {loading?'Connexion…':'Se connecter'}
+            </button>
+          </div>
+        </>}
+
+        {authMode==='register'&&<div style={{display:'flex',flexDirection:'column',gap:9}}>
+          <input autoFocus style={inputSt} placeholder="Prénom et Nom (ex: Marie Dupont)"
+            value={fullName} onChange={e=>{setFullName(e.target.value);setErr('');}}
+            onKeyDown={e=>e.key==='Enter'&&document.getElementById('reg-pwd')?.focus()}/>
+          <input id="reg-pwd" type="password" style={inputSt} placeholder="Mot de passe (6 caractères min.)"
+            value={pwd} onChange={e=>{setPwd(e.target.value);setErr('');}}
+            onKeyDown={e=>e.key==='Enter'&&document.getElementById('reg-cpwd')?.focus()}/>
+          <input id="reg-cpwd" type="password" style={inputSt} placeholder="Confirmer le mot de passe"
+            value={confirmPwd} onChange={e=>{setConfirmPwd(e.target.value);setErr('');}}
+            onKeyDown={e=>e.key==='Enter'&&doRegister()}/>
+          {err&&<div style={{fontSize:11,color:'#C53030',textAlign:'center'}}>{err}</div>}
+          <button style={{...btnSt('primary'),justifyContent:'center',opacity:loading?.7:1}} onClick={doRegister} disabled={loading}>
+            {loading?'Création du compte…':'Créer mon compte'}
           </button>
-        </div>
+          <div style={{fontSize:10.5,color:T.ink4,textAlign:'center',lineHeight:1.5}}>Pas besoin d'e-mail. Un identifiant interne sera généré automatiquement.</div>
+        </div>}
       </div>
     </div>
   );
 
-  // ── Local login UI (inchangé) ─────────────────────────────────
+  // ── Local mode (USE_CLOUD = false, inchangé) ──────────────────
+  const [newName,setNewName]=useState('');
+  const doCreate=()=>{if(!newName.trim())return;onLogin({id:'new',name:newName.trim(),initials:newName.trim().split(' ').map(s=>s[0]).slice(0,2).join('').toUpperCase(),role:'editor',hasSig:false,team:'ABRANE FR'});};
   return <div style={{position:'fixed',inset:0,display:'grid',placeItems:'center',background:T.bg,zIndex:100}}>
     <div style={{width:420,maxWidth:'92vw',background:T.surface,borderRadius:22,padding:'36px 36px 24px',boxShadow:'0 24px 80px rgba(15,20,40,.22)',border:`1px solid ${T.line}`}}>
       {logoBox}
-      <h1 style={{fontSize:20,fontWeight:600,textAlign:'center',color:T.ink,margin:'0 0 6px'}}>Bienvenue</h1>
-      <p style={{fontSize:12.5,color:T.ink3,textAlign:'center',margin:'0 0 20px'}}>Sélectionnez votre profil pour continuer.</p>
-      {pwdUser
-        ?<div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <div style={{fontSize:12.5,color:T.ink,textAlign:'center',fontWeight:500}}>Accès Administrateur</div>
-          <input type="password" autoFocus style={{...inputSt,textAlign:'center',letterSpacing:3}}
-            placeholder="Mot de passe"
-            value={pwd} onChange={e=>{setPwd(e.target.value);setPwdErr(false);}}
-            onKeyDown={e=>e.key==='Enter'&&doAdminLogin()}/>
-          {pwdErr&&<div style={{fontSize:11,color:'#C53030',textAlign:'center'}}>Mot de passe incorrect</div>}
-          <div style={{display:'flex',gap:8}}>
-            <button style={{...btnSt(undefined,true),flex:1,justifyContent:'center'}} onClick={()=>setPwdUser(null)}>Annuler</button>
-            <button style={{...btnSt('primary',true),flex:1,justifyContent:'center'}} onClick={doAdminLogin}>Connexion</button>
-          </div>
-        </div>
-        :<>
-          <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:16}}>
-            {USERS.map(u=><button key={u.id} onClick={()=>handleUserClick(u)} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:8,border:`1px solid ${u.requiresPassword?T.gold:T.lineSoft}`,background:u.requiresPassword?T.goldTint:T.surface,cursor:'pointer',width:'100%',textAlign:'left'}}>
-              <div style={{width:32,height:32,borderRadius:'50%',background:u.requiresPassword?T.gold:T.navy,color:'#fff',display:'grid',placeItems:'center',fontWeight:600,fontSize:11,flexShrink:0}}>{u.initials}</div>
-              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,color:T.ink}}>{u.name}</div><div style={{fontSize:11,color:T.ink3}}>{u.team}{u.requiresPassword?' · 🔒 Accès protégé':u.hasSig?' · Signature enregistrée':' · Pas de signature'}</div></div>
-              <span style={pillSt(u.requiresPassword?'gold':u.role==='admin'?'gold':'default')}>{u.requiresPassword?'Superadmin':u.role==='admin'?'Admin':u.role==='editor'?'Éditeur':'Lecture'}</span>
-            </button>)}
-          </div>
-          <div style={{borderTop:`1px solid ${T.lineSoft}`,paddingTop:14,display:'flex',gap:8}}>
-            <input style={inputSt} placeholder="Créer un nouveau profil…" value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doCreate()}/>
-            <button style={{...btnSt('primary',true),whiteSpace:'nowrap'}} onClick={doCreate}><Icon name="plus" size={12} color="#fff"/>Créer</button>
-          </div>
-        </>
-      }
+      <div style={{borderTop:`1px solid ${T.lineSoft}`,paddingTop:14,display:'flex',gap:8}}>
+        <input style={inputSt} placeholder="Votre prénom et nom…" value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doCreate()}/>
+        <button style={{...btnSt('primary',true),whiteSpace:'nowrap'}} onClick={doCreate}><Icon name="plus" size={12} color="#fff"/>Créer</button>
+      </div>
     </div>
   </div>;
 }
