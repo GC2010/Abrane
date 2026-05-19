@@ -202,21 +202,18 @@ function MiniCover({palette,client,subtitle}) {
   const [c1,c2,c3]=palette;
   const isAbrane=client==='ABRANE';
   const logo=isAbrane?officialLogo:(shopLogos?.[client]||'');
-  return <div style={{position:'absolute',inset:0,background:c1,display:'grid',gridTemplateColumns:'1fr 12%'}}>
-    <div style={{padding:'12% 8% 10% 10%',display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
-      <div style={{display:'flex',gap:8,alignItems:'center',height:24,overflow:'hidden'}}>
-        {logo
-          ?<img src={logo} alt={client} style={{height:20,maxWidth:64,objectFit:'contain',display:'block',flexShrink:0}}/>
-          :<div style={{width:22,height:22,borderRadius:4,background:paletteHash(client||'A'),color:'#fff',display:'grid',placeItems:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{initialsFrom(client||'A')}</div>
-        }
-        <div style={{fontSize:8,letterSpacing:'.15em',color:c3,opacity:.6}}>BOOK</div>
-      </div>
-      <div>
-        <div style={{fontWeight:900,color:c3,fontSize:16,lineHeight:.9}}>{(client||'').toUpperCase()}</div>
-        <div style={{fontSize:8,color:c3,opacity:.6,marginTop:4}}>{subtitle||''}</div>
-      </div>
+  return <div style={{position:'absolute',inset:0,background:c1,display:'grid',gridTemplateColumns:'1fr 7%'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'flex-start',padding:'9% 12%',overflow:'hidden'}}>
+      {logo
+        ?<img src={logo} alt={client} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',display:'block'}}/>
+        :<div style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:5}}>
+          <div style={{width:46,height:46,borderRadius:10,background:paletteHash(client||'A'),color:'#fff',display:'grid',placeItems:'center',fontSize:17,fontWeight:900,flexShrink:0}}>{initialsFrom(client||'A')}</div>
+          <div style={{fontWeight:900,color:c3,fontSize:13,letterSpacing:'.03em',lineHeight:1,marginTop:2}}>{(client||'').toUpperCase()}</div>
+          {subtitle&&<div style={{fontSize:7.5,color:c3,opacity:.5,letterSpacing:'.1em',textTransform:'uppercase'}}>{subtitle}</div>}
+        </div>
+      }
     </div>
-    <div style={{background:c2}}/>
+    <div style={{background:c2,borderLeft:`2px solid ${shade(c2,-10)}`}}/>
   </div>;
 }
 
