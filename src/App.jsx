@@ -2665,8 +2665,39 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
   const [canRedo,setCanRedo]=useState(false);
 
   const setTool=t=>{toolRef.current=t;setToolState(t);};
-  const setColor=c=>{colorRef.current=c;setColorState(c);};
-  const setStrokeW=w=>{strokeWRef.current=w;setStrokeWState(w);};
+
+  const applyToSel=props=>{
+    const canvas=fc.current;if(!canvas)return false;
+    const objs=canvas.getActiveObjects();if(!objs.length)return false;
+    objs.forEach(o=>{
+      if(o.type==='i-text'||o.type==='text'){
+        if(props.color!=null)o.set({fill:props.color});
+      }else if(o.type==='group'){
+        (o._objects||[]).forEach(ch=>{
+          if(props.color!=null&&ch.type==='rect')ch.set({stroke:props.color});
+          if(props.color!=null&&(ch.type==='i-text'||ch.type==='text'))ch.set({fill:props.color});
+          if(props.sw!=null&&ch.type==='rect')ch.set({strokeWidth:props.sw});
+        });
+      }else{
+        if(props.color!=null)o.set({stroke:props.color});
+        if(props.sw!=null)o.set({strokeWidth:props.sw});
+      }
+    });
+    canvas.requestRenderAll();
+    return true;
+  };
+
+  const setColor=c=>{
+    colorRef.current=c;setColorState(c);
+    if(applyToSel({color:c}))pushHist(fc.current);
+  };
+  const setStrokeW=w=>{
+    strokeWRef.current=w;setStrokeWState(w);
+    applyToSel({sw:w});
+  };
+  const commitStrokeW=()=>{
+    if(fc.current?.getActiveObjects().length)pushHist(fc.current);
+  };
 
   const ratio=isPortrait?(210/297):(297/210);
   const CW=isPortrait?560:840;
@@ -2730,6 +2761,19 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     canvas.on('object:added',()=>pushHist(canvas));
     canvas.on('object:modified',()=>pushHist(canvas));
     canvas.on('object:removed',()=>pushHist(canvas));
+
+    const syncSel=opt=>{
+      const o=(opt.selected||[])[0]||canvas.getActiveObject();
+      if(!o)return;
+      let c=null,sw=null;
+      if(o.type==='i-text'||o.type==='text'){c=o.fill;}
+      else if(o.type==='group'){const r=(o._objects||[]).find(ch=>ch.type==='rect');c=r?.stroke;sw=r?.strokeWidth;}
+      else{c=o.stroke;sw=o.strokeWidth;}
+      if(c&&c!=='transparent'){colorRef.current=c;setColorState(c);}
+      if(sw>0){strokeWRef.current=sw;setStrokeWState(sw);}
+    };
+    canvas.on('selection:created',syncSel);
+    canvas.on('selection:updated',syncSel);
 
     // Mouse handlers (read tool/color/stroke via refs to avoid stale closures)
     canvas.on('mouse:down',opt=>{
@@ -2934,7 +2978,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
               <input type="color" value={color} onChange={e=>setColor(e.target.value)} title="Couleur libre" style={{width:20,height:20,border:'1px solid rgba(255,255,255,.2)',padding:0,cursor:'pointer',borderRadius:'50%',overflow:'hidden',background:'transparent'}}/>
             </div>
             <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginTop:10,marginBottom:4}}>Épaisseur · {strokeW}</div>
-            <input type="range" min="1" max="8" value={strokeW} onChange={e=>setStrokeW(parseInt(e.target.value))} style={{width:'100%',accentColor:T.gold}}/>
+            <input type="range" min="1" max="8" value={strokeW} onChange={e=>setStrokeW(parseInt(e.target.value))} onMouseUp={commitStrokeW} style={{width:'100%',accentColor:T.gold}}/>
           </div>
           <div style={{borderTop:'1px solid rgba(255,255,255,.08)',margin:'4px 0',paddingTop:8}}>
             <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginBottom:6}}>Rotation</div>
