@@ -1247,8 +1247,8 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
 
   const botPad=(paletteH||120)+24;
 
-  return <main ref={canvasRef} style={{flex:1,minWidth:0,overflowY:'auto',background:T.bg,display:'flex',flexDirection:'column',alignItems:'center',padding:`36px 32px ${botPad}px`,position:'relative'}}>
-    <div style={{width:'100%',maxWidth:isP?700:1000,display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18,flexShrink:0,position:'sticky',top:0,zIndex:10,background:T.bg,paddingTop:8,paddingBottom:8,marginTop:-8}}>
+  return <main ref={canvasRef} style={{flex:1,minWidth:0,overflowY:'auto',background:T.bg,display:'flex',flexDirection:'column',alignItems:'center',padding:`0 32px ${botPad}px`,position:'relative'}}>
+    <div style={{width:'100%',maxWidth:isP?700:1000,display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18,flexShrink:0,position:'sticky',top:0,zIndex:10,background:T.bg,paddingTop:10,paddingBottom:10}}>
       <div style={{fontSize:11,color:T.ink3,display:'flex',alignItems:'center',gap:10}}>
         <Icon name="layers" size={14} color={T.ink3}/>
         <span>{pages.length} pages · {isP?'A4 Portrait':'A4 Paysage'}</span>
