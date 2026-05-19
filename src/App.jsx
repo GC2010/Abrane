@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { USE_CLOUD } from './lib/supabase.js';
+import { signIn, signOut, getSession, getProfile, toAppUser } from './lib/auth.js';
 
 const T = {
   bg:"#F4F1EA",surface:"#FFFFFF",panel:"#FAF8F3",panel2:"#F0EBE0",tint:"#FBF7EE",
@@ -349,6 +351,7 @@ function AbraneLogoBox({size='md'}) {
 }
 
 function LoginScreen({onLogin}) {
+  // ── Local mode state ──────────────────────────────────────────
   const [newName,setNewName]=useState('');
   const [pwdUser,setPwdUser]=useState(null);
   const [pwd,setPwd]=useState('');
@@ -364,14 +367,56 @@ function LoginScreen({onLogin}) {
   };
   const doCreate=()=>{if(!newName.trim())return;onLogin({id:'new',name:newName.trim(),initials:newName.trim().split(' ').map(s=>s[0]).slice(0,2).join('').toUpperCase(),role:'editor',hasSig:false,team:'ABRANE FR'});};
 
+  // ── Cloud mode state ──────────────────────────────────────────
+  const [email,setEmail]=useState('');
+  const [cloudPwd,setCloudPwd]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [cloudErr,setCloudErr]=useState('');
+
+  const doCloudLogin=async()=>{
+    if(!email.trim()||!cloudPwd) return;
+    setLoading(true); setCloudErr('');
+    try {
+      const sbUser=await signIn(email.trim(),cloudPwd);
+      const profile=await getProfile(sbUser.id);
+      onLogin(toAppUser(sbUser,profile));
+    } catch(e) {
+      setCloudErr(e.message==='Invalid login credentials'?'Email ou mot de passe incorrect.':e.message);
+    } finally { setLoading(false); }
+  };
+
+  const logoBox=<div style={{display:'flex',justifyContent:'center',marginBottom:20}}><AbraneLogoBox size="lg"/></div>;
+
+  // ── Cloud login UI ────────────────────────────────────────────
+  if(USE_CLOUD) return (
+    <div style={{position:'fixed',inset:0,display:'grid',placeItems:'center',background:T.bg,zIndex:100}}>
+      <div style={{width:400,maxWidth:'92vw',background:T.surface,borderRadius:22,padding:'36px 36px 28px',boxShadow:'0 24px 80px rgba(15,20,40,.22)',border:`1px solid ${T.line}`}}>
+        {logoBox}
+        <h1 style={{fontSize:20,fontWeight:600,textAlign:'center',color:T.ink,margin:'0 0 6px'}}>Connexion</h1>
+        <p style={{fontSize:12.5,color:T.ink3,textAlign:'center',margin:'0 0 22px'}}>Accès réservé aux équipes ABRANE.</p>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <input type="email" autoFocus style={inputSt} placeholder="Adresse e-mail"
+            value={email} onChange={e=>{setEmail(e.target.value);setCloudErr('');}}
+            onKeyDown={e=>e.key==='Enter'&&document.getElementById('cloud-pwd-input')?.focus()}/>
+          <input id="cloud-pwd-input" type="password" style={inputSt} placeholder="Mot de passe"
+            value={cloudPwd} onChange={e=>{setCloudPwd(e.target.value);setCloudErr('');}}
+            onKeyDown={e=>e.key==='Enter'&&doCloudLogin()}/>
+          {cloudErr&&<div style={{fontSize:11,color:'#C53030',textAlign:'center',padding:'4px 0'}}>{cloudErr}</div>}
+          <button style={{...btnSt('primary'),justifyContent:'center',opacity:loading?.7:1}}
+            onClick={doCloudLogin} disabled={loading}>
+            {loading?'Connexion…':'Se connecter'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Local login UI (inchangé) ─────────────────────────────────
   return <div style={{position:'fixed',inset:0,display:'grid',placeItems:'center',background:T.bg,zIndex:100}}>
     <div style={{width:420,maxWidth:'92vw',background:T.surface,borderRadius:22,padding:'36px 36px 24px',boxShadow:'0 24px 80px rgba(15,20,40,.22)',border:`1px solid ${T.line}`}}>
-      <div style={{display:'flex',justifyContent:'center',marginBottom:20}}>
-        <AbraneLogoBox size="lg"/>
-      </div>
+      {logoBox}
       <h1 style={{fontSize:20,fontWeight:600,textAlign:'center',color:T.ink,margin:'0 0 6px'}}>Bienvenue</h1>
       <p style={{fontSize:12.5,color:T.ink3,textAlign:'center',margin:'0 0 20px'}}>Sélectionnez votre profil pour continuer.</p>
-
       {pwdUser
         ?<div style={{display:'flex',flexDirection:'column',gap:10}}>
           <div style={{fontSize:12.5,color:T.ink,textAlign:'center',fontWeight:500}}>Accès Administrateur</div>
@@ -2674,7 +2719,7 @@ function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin}) {
 export default function App() {
   const [user,setUser]=useState(null);
   const [screen,setScreen]=useState('login');
-  const [project,setProject]=useState(MY_PROJECTS[0]);
+  const [project,setProject]=useState(null);
   const [showAdmin,setShowAdmin]=useState(false);
   const [brand,setBrand]=useState(()=>({
     officialLogo:localStorage.getItem('abrane_logo')||'',
@@ -2682,6 +2727,24 @@ export default function App() {
     shopLogos:JSON.parse(localStorage.getItem('abrane_shop_logos')||'{}'),
   }));
   const brandCtxVal=useMemo(()=>({...brand,setBrand}),[brand]);
+
+  // Ripristina sessione Supabase esistente al caricamento
+  useEffect(()=>{
+    if(!USE_CLOUD) return;
+    getSession().then(async sbUser=>{
+      if(!sbUser) return;
+      const profile=await getProfile(sbUser.id);
+      setUser(toAppUser(sbUser,profile));
+      setScreen('dashboard');
+    });
+  },[]);
+
+  const handleLogout=async()=>{
+    if(USE_CLOUD) await signOut();
+    setUser(null);
+    setProject(null);
+    setScreen('login');
+  };
 
   if(!user||screen==='login') return (
     <BrandCtx.Provider value={brandCtxVal}>
@@ -2691,7 +2754,7 @@ export default function App() {
   return (
     <BrandCtx.Provider value={brandCtxVal}>
       <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden',fontFamily:'-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif',fontSize:13,color:T.ink,background:T.bg,WebkitFontSmoothing:'antialiased'}}>
-        <TopBar user={user} screen={screen} project={project} onHome={()=>setScreen('dashboard')} onLogout={()=>{setUser(null);setScreen('login');}} onOpenAdmin={user.role==='superadmin'?()=>setShowAdmin(true):null}/>
+        <TopBar user={user} screen={screen} project={project} onHome={()=>setScreen('dashboard')} onLogout={handleLogout} onOpenAdmin={user.role==='superadmin'?()=>setShowAdmin(true):null}/>
         {screen==='dashboard'&&<Dashboard user={user} onOpenProject={p=>{setProject(p);setScreen('configurator');}} onNewProject={()=>{setProject(null);setScreen('configurator');}} onOpenTemplate={tpl=>{setProject({name:'Nouveau — '+tpl.name,pageFormat:tpl.pageFormat,palette:tpl.palette,client:tpl.kind==='client'?tpl.name:'',basedOn:tpl.name});setScreen('configurator');}}/>}
         {screen==='configurator'&&<Configurator user={user} project={project}/>}
         {showAdmin&&<AdminPanel onClose={()=>setShowAdmin(false)}/>}
