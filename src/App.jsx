@@ -1,9 +1,16 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { createRoot } from 'react-dom/client';
 import { USE_CLOUD } from './lib/supabase.js';
 import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, toAppUser, listUsers } from './lib/auth.js';
 import { loadProjects, upsertProject, deleteProject, projectToDisplay,
          loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay,
          findTemplateByName } from './lib/db.js';
+
+const PDF_QUALITY = [
+  {id:'web',      label:'Web',      sub:'72 dpi · partage en ligne',     scale:1.5, q:0.72},
+  {id:'standard', label:'Standard', sub:'150 dpi · impression courante',  scale:2,   q:0.82},
+  {id:'hd',       label:'HD',       sub:'300 dpi · haute qualité',        scale:3,   q:0.92},
+];
 
 const T = {
   bg:"#F4F1EA",surface:"#FFFFFF",panel:"#FAF8F3",panel2:"#F0EBE0",tint:"#FBF7EE",
@@ -1052,6 +1059,115 @@ function PageRender({page,state}) {
     case 'back':      return <BackPage    state={state} isPortrait={isP} isRing={isR}/>;
     default: return null;
   }
+}
+
+function PdfExportModal({state,onClose}) {
+  const [quality,setQuality]=useState('standard');
+  const [withAnnot,setWithAnnot]=useState(true);
+  const [exporting,setExporting]=useState(false);
+  const [done,setDone]=useState(0);
+  const abortRef=useRef(false);
+  const brandCtx=React.useContext(BrandCtx);
+  const pages=useMemo(()=>buildPageList(state),[state]);
+  const cfg=PDF_QUALITY.find(q=>q.id===quality);
+
+  const isP=state.pageFormat.startsWith('v');
+  const BW=isP?794:1123, BH=isP?1123:794;
+
+  const doExport=useCallback(async()=>{
+    abortRef.current=false;
+    setExporting(true);
+    setDone(0);
+    const exportState=withAnnot?state:{...state,annotSnaps:{}};
+    let el=null,root=null;
+    try{
+      const [{jsPDF},{default:h2c}]=await Promise.all([import('jspdf'),import('html2canvas')]);
+      const pdf=new jsPDF({orientation:isP?'portrait':'landscape',unit:'mm',format:'a4',compress:true});
+      for(let i=0;i<pages.length;i++){
+        if(abortRef.current) break;
+        el=document.createElement('div');
+        el.style.cssText=`position:absolute;left:-${BW*4}px;top:0;width:${BW}px;height:${BH}px;overflow:hidden;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;`;
+        document.body.appendChild(el);
+        root=createRoot(el);
+        root.render(
+          <BrandCtx.Provider value={brandCtx}>
+            <NotesEditCtx.Provider value={null}>
+              <PageRender page={pages[i]} state={exportState}/>
+            </NotesEditCtx.Provider>
+          </BrandCtx.Provider>
+        );
+        await new Promise(r=>setTimeout(r,280));
+        if(abortRef.current){root.unmount();document.body.removeChild(el);el=null;root=null;break;}
+        const canvas=await h2c(el,{scale:cfg.scale,useCORS:true,allowTaint:true,logging:false,width:BW,height:BH,windowWidth:BW,windowHeight:BH,imageTimeout:5000});
+        if(i>0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg',cfg.q),'JPEG',0,0,isP?210:297,isP?297:210);
+        root.unmount();document.body.removeChild(el);el=null;root=null;
+        setDone(i+1);
+      }
+      if(!abortRef.current){
+        pdf.save((state.name||'catalogue').replace(/[^a-z0-9]/gi,'_')+'.pdf');
+        setTimeout(onClose,400);
+      }
+    }catch(e){alert('Erreur export PDF : '+e.message);}
+    finally{
+      if(el){try{root?.unmount();document.body.removeChild(el);}catch(_){}}
+      setExporting(false);
+    }
+  },[state,isP,BW,BH,quality,withAnnot,pages,brandCtx,cfg,onClose]);
+
+  return(
+    <Scrim onClose={exporting?()=>{}:onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:12,padding:28,width:420,boxShadow:'0 24px 60px rgba(0,0,0,.18)'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+          <div style={{fontSize:15,fontWeight:700,color:T.ink}}>Exporter en PDF</div>
+          {!exporting&&<button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',padding:4,display:'grid',placeItems:'center'}}><Icon name="close" size={16} color={T.ink3}/></button>}
+        </div>
+
+        <div style={{fontSize:11,fontWeight:600,color:T.ink4,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:8,fontFamily:'inherit'}}>Qualité</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:18}}>
+          {PDF_QUALITY.map(q=>(
+            <button key={q.id} onClick={()=>!exporting&&setQuality(q.id)}
+              style={{padding:'10px 8px',borderRadius:8,border:`2px solid ${quality===q.id?T.navy:T.line}`,background:quality===q.id?T.navyTint:T.panel,cursor:exporting?'default':'pointer',textAlign:'center',fontFamily:'inherit'}}>
+              <div style={{fontSize:13,fontWeight:700,color:quality===q.id?T.navy:T.ink,marginBottom:3,fontFamily:'inherit'}}>{q.label}</div>
+              <div style={{fontSize:10,color:T.ink4,lineHeight:1.35,fontFamily:'inherit'}}>{q.sub}</div>
+            </button>
+          ))}
+        </div>
+
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:T.panel,borderRadius:8,border:`1px solid ${T.lineSoft}`,marginBottom:18,cursor:exporting?'default':'pointer'}}
+          onClick={()=>!exporting&&setWithAnnot(v=>!v)}>
+          <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${withAnnot?T.navy:T.line}`,background:withAnnot?T.navy:'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'.15s'}}>
+            {withAnnot&&<Icon name="check" size={11} color="#fff" stroke={3}/>}
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:500,color:T.ink,fontFamily:'inherit'}}>Inclure les annotations</div>
+            <div style={{fontSize:11,color:T.ink4,fontFamily:'inherit'}}>Les calques annotés sont superposés sur les pages</div>
+          </div>
+        </div>
+
+        <div style={{fontSize:12,color:T.ink3,marginBottom:exporting?12:20,fontFamily:'inherit'}}>
+          {pages.length} pages · {isP?'A4 Portrait':'A4 Paysage'}</div>
+
+        {exporting&&<div style={{marginBottom:18}}>
+          <div style={{height:6,background:T.panel,borderRadius:3,overflow:'hidden',marginBottom:6}}>
+            <div style={{height:'100%',width:`${pages.length?Math.round(done/pages.length*100):0}%`,background:T.navy,borderRadius:3,transition:'width .25s'}}/>
+          </div>
+          <div style={{fontSize:11,color:T.ink4,textAlign:'center',fontFamily:'inherit'}}>Page {done} / {pages.length}…</div>
+        </div>}
+
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button onClick={()=>{if(exporting){abortRef.current=true;}else{onClose();}}} style={{...btnSt(),fontFamily:'inherit'}}>
+            {exporting?'Annuler':'Fermer'}
+          </button>
+          <button onClick={doExport} disabled={exporting}
+            style={{...btnSt('primary'),opacity:exporting?.6:1,fontFamily:'inherit'}}>
+            <Icon name={exporting?'history':'pdf'} size={13} color="#fff"/>
+            {exporting?'Export en cours…':'Exporter PDF'}
+          </button>
+        </div>
+      </div>
+    </Scrim>
+  );
 }
 
 function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageNotes}) {
@@ -2835,6 +2951,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const [tplModal,setTplModal]=useState(false);
   const [tplName,setTplName]=useState('');
   const [tplConflict,setTplConflict]=useState(null); // {id, name}
+  const [showPdfModal,setShowPdfModal]=useState(false);
 
   const saveAsTemplate=useCallback(async(name, overwriteId=null)=>{
     if(!USE_CLOUD){showToast('Cloud requis pour sauvegarder un modèle');return;}
@@ -2871,6 +2988,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       onSave:save,
       onSaveAsTemplate:isAdmin?()=>{ setTplName(state.client||state.name||''); setTplModal(true); }:null,
       onExportJson:exportJson,
+      onExportPdf:()=>setShowPdfModal(true),
     });
   },[state._dirty,saving,lastSaved,save,exportJson,user,onSaveStateChange]);
 
@@ -2911,6 +3029,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
         </div>
       </div>
     </Scrim>}
+    {showPdfModal&&<PdfExportModal state={state} onClose={()=>setShowPdfModal(false)}/>}
     {tplConflict&&<Scrim onClose={()=>{setTplConflict(null);setSavingTpl(false);}}>
       <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:12,padding:28,width:360,boxShadow:'0 24px 60px rgba(0,0,0,.18)'}}>
         <div style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:8}}>Modèle existant</div>
@@ -2932,7 +3051,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   </div>;
 }
 
-function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin,onSave,onSaveAsTemplate,onExportJson,saving,dirty,lastSaved}) {
+function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin,onSave,onSaveAsTemplate,onExportJson,onExportPdf,saving,dirty,lastSaved}) {
   const [menuOpen,setMenuOpen]=useState(false);
   return <header style={{display:'flex',alignItems:'center',gap:14,padding:'0 14px 0 12px',background:T.surface,borderBottom:`1px solid ${T.line}`,height:56,flexShrink:0,position:'relative',zIndex:50}}>
     <button onClick={onHome} style={{display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',padding:0,cursor:'pointer'}}>
@@ -2955,6 +3074,7 @@ function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin,onSave,onSaveAs
         <Icon name={saving?'history':'save'} size={13} color={dirty?'#fff':T.ink3}/>
         {saving?'Sauvegarde…':'Sauver projet'}
       </button>
+      {onExportPdf&&<button onClick={onExportPdf} style={btnSt(undefined,true)}><Icon name="pdf" size={13} color={T.ink}/>PDF</button>}
       <button onClick={onExportJson} style={btnSt(undefined,true)}><Icon name="download" size={14} color={T.ink}/>JSON</button>
       <div style={{width:1,height:22,background:T.line}}/>
     </>}
@@ -3024,7 +3144,8 @@ export default function App() {
           onSave={saveBarProps.onSave} saving={saveBarProps.saving}
           dirty={saveBarProps.dirty} lastSaved={saveBarProps.lastSaved}
           onSaveAsTemplate={saveBarProps.onSaveAsTemplate||null}
-          onExportJson={saveBarProps.onExportJson||null}/>
+          onExportJson={saveBarProps.onExportJson||null}
+          onExportPdf={saveBarProps.onExportPdf||null}/>
         {screen==='dashboard'&&<Dashboard user={user}
           onOpenProject={p=>{setProject(p);setScreen('configurator');}}
           onNewProject={()=>{setProject(null);setScreen('configurator');}}
