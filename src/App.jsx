@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { USE_CLOUD } from './lib/supabase.js';
-import { signIn, signOut, getSession, getProfile, toAppUser } from './lib/auth.js';
+import { signIn, signUp, signOut, getSession, getProfile, toAppUser } from './lib/auth.js';
+import { loadProjects, upsertProject, deleteProject, projectToDisplay } from './lib/db.js';
 
 const T = {
   bg:"#F4F1EA",surface:"#FFFFFF",panel:"#FAF8F3",panel2:"#F0EBE0",tint:"#FBF7EE",
@@ -162,6 +163,10 @@ const renderPdfToDataUrls = async file => {
 };
 
 const initialState = project => {
+  // Supabase project: has .data with the full saved state
+  if(project?.data && typeof project.data==='object' && 'client' in project.data){
+    return {...project.data, _dirty:false};
+  }
   const t=new Date(), dd=String(t.getDate()).padStart(2,'0'), mm=String(t.getMonth()+1).padStart(2,'0');
   return {
     name:project?.name||'Nouveau projet', client:project?.client||'SANDRO',
@@ -387,24 +392,48 @@ function LoginScreen({onLogin}) {
 
   const logoBox=<div style={{display:'flex',justifyContent:'center',marginBottom:20}}><AbraneLogoBox size="lg"/></div>;
 
-  // ── Cloud login UI ────────────────────────────────────────────
+  // ── Cloud auth mode (login | register) ───────────────────────
+  const [authMode,setAuthMode]=useState('login');
+  const [confirmPwd,setConfirmPwd]=useState('');
+
+  const doCloudRegister=async()=>{
+    if(!email.trim()||!cloudPwd) return;
+    if(cloudPwd!==confirmPwd){setCloudErr('Les mots de passe ne correspondent pas.');return;}
+    if(cloudPwd.length<8){setCloudErr('Mot de passe : 8 caractères minimum.');return;}
+    setLoading(true);setCloudErr('');
+    try{
+      const sbUser=await signUp(email.trim(),cloudPwd,'user');
+      const profile=await getProfile(sbUser.id);
+      onLogin(toAppUser(sbUser,profile));
+    }catch(e){setCloudErr(e.message);}
+    finally{setLoading(false);}
+  };
+
   if(USE_CLOUD) return (
     <div style={{position:'fixed',inset:0,display:'grid',placeItems:'center',background:T.bg,zIndex:100}}>
       <div style={{width:400,maxWidth:'92vw',background:T.surface,borderRadius:22,padding:'36px 36px 28px',boxShadow:'0 24px 80px rgba(15,20,40,.22)',border:`1px solid ${T.line}`}}>
         {logoBox}
-        <h1 style={{fontSize:20,fontWeight:600,textAlign:'center',color:T.ink,margin:'0 0 6px'}}>Connexion</h1>
-        <p style={{fontSize:12.5,color:T.ink3,textAlign:'center',margin:'0 0 22px'}}>Accès réservé aux équipes ABRANE.</p>
+        <div style={{display:'inline-flex',width:'100%',padding:3,background:T.panel2,borderRadius:8,border:`1px solid ${T.lineSoft}`,marginBottom:22,boxSizing:'border-box'}}>
+          {[{v:'login',l:'Se connecter'},{v:'register',l:'Créer un compte'}].map(m=>(
+            <button key={m.v} onClick={()=>{setAuthMode(m.v);setCloudErr('');}} style={{flex:1,padding:'6px 0',borderRadius:6,border:'none',background:authMode===m.v?'#fff':'transparent',color:authMode===m.v?T.ink:T.ink3,fontSize:12.5,fontWeight:authMode===m.v?600:400,cursor:'pointer',boxShadow:authMode===m.v?'0 1px 3px rgba(0,0,0,.06)':'none'}}>{m.l}</button>
+          ))}
+        </div>
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           <input type="email" autoFocus style={inputSt} placeholder="Adresse e-mail"
             value={email} onChange={e=>{setEmail(e.target.value);setCloudErr('');}}
             onKeyDown={e=>e.key==='Enter'&&document.getElementById('cloud-pwd-input')?.focus()}/>
           <input id="cloud-pwd-input" type="password" style={inputSt} placeholder="Mot de passe"
             value={cloudPwd} onChange={e=>{setCloudPwd(e.target.value);setCloudErr('');}}
-            onKeyDown={e=>e.key==='Enter'&&doCloudLogin()}/>
+            onKeyDown={e=>e.key==='Enter'&&(authMode==='login'?doCloudLogin():document.getElementById('cloud-cpwd')?.focus())}/>
+          {authMode==='register'&&(
+            <input id="cloud-cpwd" type="password" style={inputSt} placeholder="Confirmer le mot de passe"
+              value={confirmPwd} onChange={e=>{setConfirmPwd(e.target.value);setCloudErr('');}}
+              onKeyDown={e=>e.key==='Enter'&&doCloudRegister()}/>
+          )}
           {cloudErr&&<div style={{fontSize:11,color:'#C53030',textAlign:'center',padding:'4px 0'}}>{cloudErr}</div>}
           <button style={{...btnSt('primary'),justifyContent:'center',opacity:loading?.7:1}}
-            onClick={doCloudLogin} disabled={loading}>
-            {loading?'Connexion…':'Se connecter'}
+            onClick={authMode==='login'?doCloudLogin:doCloudRegister} disabled={loading}>
+            {loading?(authMode==='login'?'Connexion…':'Création…'):(authMode==='login'?'Se connecter':'Créer mon compte')}
           </button>
         </div>
       </div>
@@ -455,7 +484,20 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
   const [sort,setSort]=useState('recent');
   const [applyModal,setApplyModal]=useState(null);
   const [updateModal,setUpdateModal]=useState(null);
-  const projects=MY_PROJECTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||p.client.toLowerCase().includes(q.toLowerCase()));
+  const [dbProjects,setDbProjects]=useState([]);
+  const [loadingProjects,setLoadingProjects]=useState(true);
+
+  useEffect(()=>{
+    if(!USE_CLOUD){setLoadingProjects(false);return;}
+    setLoadingProjects(true);
+    loadProjects(user.id)
+      .then(rows=>setDbProjects(rows.map(projectToDisplay)))
+      .catch(()=>{})
+      .finally(()=>setLoadingProjects(false));
+  },[user.id]);
+
+  const allProjects=USE_CLOUD?dbProjects:MY_PROJECTS;
+  const projects=allProjects.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||p.client.toLowerCase().includes(q.toLowerCase()));
   return <div style={{flex:1,overflowY:'auto',background:T.bg}}>
     <div style={{maxWidth:1100,margin:'0 auto',padding:'32px 36px 80px'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:24,marginBottom:26}}>
@@ -486,11 +528,12 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
           {[['grid','grid'],['list','index']].map(([k,ico])=><button key={k} onClick={()=>setViewMode(k)} style={{border:'none',background:viewMode===k?'#fff':'transparent',padding:'5px 8px',borderRadius:5,cursor:'pointer',display:'flex',alignItems:'center'}}><Icon name={ico} size={14} color={viewMode===k?T.navy:T.ink3}/></button>)}
         </div>}
       </div>
-      {tab==='projects'&&viewMode==='grid'&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:16}}>
+      {tab==='projects'&&loadingProjects&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:60,color:T.ink3,fontSize:13}}>Chargement…</div>}
+      {tab==='projects'&&!loadingProjects&&viewMode==='grid'&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:16}}>
         <button onClick={onNewProject} style={{minHeight:200,border:`1.5px dashed ${T.lineStrong}`,borderRadius:12,background:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,flexDirection:'column',color:T.ink2}}>
           <Icon name="plus" size={22} color={T.ink3}/><div><div style={{fontWeight:600,fontSize:13}}>Nouveau projet</div><div style={{fontSize:11,color:T.ink3,marginTop:2}}>Vierge ou depuis un modèle</div></div>
         </button>
-        {projects.map(p=><div key={p.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,overflow:'hidden',cursor:'pointer'}} onClick={()=>onOpenProject(p)}>
+        {projects.map(p=><div key={p.id} style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,overflow:'hidden',cursor:'pointer'}} onClick={()=>onOpenProject(p._raw||p)}>
           <div style={{aspectRatio:'297/210',background:T.panel,borderBottom:`1px solid ${T.lineSoft}`,position:'relative',overflow:'hidden'}}>
             <MiniCover palette={p.palette} client={p.client} subtitle={p.subtitle}/>
             {p.templateUpdateAvailable&&<button style={{position:'absolute',top:10,right:10,display:'inline-flex',alignItems:'center',gap:5,background:T.gold,color:'#1A1F2E',border:'none',padding:'4px 10px',borderRadius:999,fontSize:10.5,fontWeight:600,cursor:'pointer',zIndex:2}} onClick={e=>{e.stopPropagation();setUpdateModal(p);}}><Icon name="sparkle" size={12} color="#1A1F2E"/>Mise à jour</button>}
@@ -506,11 +549,11 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
           </div>
         </div>)}
       </div>}
-      {tab==='projects'&&viewMode==='list'&&<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,overflow:'hidden'}}>
+      {tab==='projects'&&!loadingProjects&&viewMode==='list'&&<div style={{background:T.surface,border:`1px solid ${T.line}`,borderRadius:12,overflow:'hidden'}}>
         <div style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px',gap:12,padding:'8px 14px',background:T.panel,borderBottom:`1px solid ${T.line}`,fontSize:10.5,fontWeight:600,color:T.ink4,textTransform:'uppercase',letterSpacing:'.06em'}}>
           <div/><div>Nom</div><div>Client</div><div>Révision</div><div>Pages</div><div>Modifié</div>
         </div>
-        {projects.map((p,i)=><div key={p.id} onClick={()=>onOpenProject(p)} style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px',gap:12,padding:'10px 14px',borderBottom:i<projects.length-1?`1px solid ${T.lineSoft}`:'none',cursor:'pointer',alignItems:'center',background:T.surface}} onMouseEnter={e=>e.currentTarget.style.background=T.tint} onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
+        {projects.map((p,i)=><div key={p.id} onClick={()=>onOpenProject(p._raw||p)} style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px',gap:12,padding:'10px 14px',borderBottom:i<projects.length-1?`1px solid ${T.lineSoft}`:'none',cursor:'pointer',alignItems:'center',background:T.surface}} onMouseEnter={e=>e.currentTarget.style.background=T.tint} onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
           <div style={{width:32,height:32,borderRadius:6,display:'grid',gridTemplateColumns:'1fr 30%',overflow:'hidden',border:`1px solid ${T.line}`}}><div style={{background:p.palette[0]}}/><div style={{background:p.palette[1]}}/></div>
           <div><div style={{fontSize:13,fontWeight:600,color:T.ink}}>{p.name}</div><div style={{fontSize:10.5,color:T.ink4}}>Créé {p.createdAt}</div></div>
           <div style={{fontSize:12,color:T.ink2}}>{p.client}</div>
@@ -2629,8 +2672,12 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
   );
 }
 
-function Configurator({user,project}) {
-  const [state,setState]=useState(()=>initialState(project));
+function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
+  const [state,setState]=useState(()=>{
+    const s=initialState(project);
+    // Inject user signature from profile (never from saved project data)
+    return {...s, sigUrl: user?.sigUrl||s.sigUrl||''};
+  });
   const [activeStep,setActiveStep]=useState('project');
   const [dirtySteps,setDirtySteps]=useState({});
   const activeStepRef=React.useRef('project');
@@ -2641,11 +2688,32 @@ function Configurator({user,project}) {
   const [showVueEnsemble,setShowVueEnsemble]=useState(false);
   const [paletteCollapsed,setPaletteCollapsed]=useState(false);
   const [annotating,setAnnotating]=useState(null);
+  const [projectId,setProjectId]=useState(project?.id||null);
+  const [saving,setSaving]=useState(false);
+  const [lastSaved,setLastSaved]=useState(project?.id?'cloud':null);
+
   const update=useCallback(patch=>{setState(s=>({...s,...patch,_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const updateNested=useCallback((key,patch)=>{setState(s=>({...s,[key]:{...s[key],...patch},_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const updatePageNotes=useCallback((pageKey,html)=>{setState(s=>({...s,pageNotes:{...(s.pageNotes||{}),[pageKey]:html},_dirty:true}));setDirtySteps(d=>({...d,content:true}));},[]);
-  const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2400);};
-  const save=()=>{setState(s=>({...s,_dirty:false}));showToast('Projet enregistré');};
+  const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2800);};
+
+  const save=useCallback(async()=>{
+    if(!USE_CLOUD){setState(s=>({...s,_dirty:false}));showToast('Projet enregistré (local)');return;}
+    setSaving(true);
+    try{
+      const id=await upsertProject(user.id,projectId,state.name,state);
+      setProjectId(id);
+      setLastSaved('cloud');
+      setState(s=>({...s,_dirty:false}));
+      showToast('Projet sauvegardé');
+      if(onProjectSaved) onProjectSaved(id);
+    }catch(e){showToast('Erreur : '+e.message);}
+    finally{setSaving(false);}
+  },[user,projectId,state,onProjectSaved]);
+
+  useEffect(()=>{
+    if(onSaveStateChange) onSaveStateChange({dirty:state._dirty||false,saving,lastSaved,onSave:save});
+  },[state._dirty,saving,lastSaved,save,onSaveStateChange]);
   const compl=computeCompletion(state,dirtySteps);
   const PALETTE_H={S:99,M:122,L:150};
   const paletteH=paletteCollapsed?32:PALETTE_H[thumbSize];
@@ -2674,7 +2742,7 @@ function Configurator({user,project}) {
   </div>;
 }
 
-function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin}) {
+function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin,onSave,saving,dirty,lastSaved}) {
   const [menuOpen,setMenuOpen]=useState(false);
   return <header style={{display:'flex',alignItems:'center',gap:14,padding:'0 14px 0 12px',background:T.surface,borderBottom:`1px solid ${T.line}`,height:56,flexShrink:0,position:'relative',zIndex:50}}>
     <button onClick={onHome} style={{display:'flex',alignItems:'center',gap:10,background:'transparent',border:'none',padding:0,cursor:'pointer'}}>
@@ -2686,13 +2754,16 @@ function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin}) {
       <button style={{...btnSt('ghost',true),border:'none'}} onClick={onHome}><Icon name="back" size={14} color={T.ink2}/>Mes projets</button>
       <div style={{width:1,height:22,background:T.line}}/>
       <div style={{display:'inline-flex',alignItems:'center',gap:8,fontSize:13,fontWeight:600,color:T.ink}}><Icon name="doc" size={14} color={T.ink3}/>{project?.name||'Nouveau projet'}</div>
-      <span style={{fontSize:10.5,color:T.ink3,padding:'2px 8px',border:`1px solid ${T.line}`,borderRadius:999,fontWeight:500}}><Icon name="cloud" size={11} color={T.success} style={{verticalAlign:'-2px',marginRight:4}}/>Enregistré</span>
+      {lastSaved==='cloud'&&!dirty&&<span style={{fontSize:10.5,color:T.success,padding:'2px 8px',border:`1px solid ${T.successT}`,borderRadius:999,fontWeight:500,display:'inline-flex',alignItems:'center',gap:4}}><Icon name="cloud" size={11} color={T.success}/>Sauvegardé</span>}
+      {dirty&&<span style={{fontSize:10.5,color:T.ink4,padding:'2px 8px',border:`1px solid ${T.lineSoft}`,borderRadius:999}}>Modifications non sauvegardées</span>}
     </>}
     <div style={{flex:1}}/>
     {onOpenAdmin&&<button onClick={onOpenAdmin} style={{...btnSt('gold',true)}}><Icon name="shield" size={13} color={T.navy}/>Admin</button>}
     {screen==='configurator'&&<>
-      <button style={btnSt(undefined,true)}><Icon name="eye" size={14} color={T.ink}/>Aperçu</button>
-      <button style={btnSt('gold',true)}><Icon name="share" size={14} color={T.navy}/>Partager</button>
+      <button onClick={onSave} disabled={saving||!dirty} style={{...btnSt(dirty?'primary':'default',true),opacity:(saving||!dirty)?.6:1}}>
+        <Icon name={saving?'history':'cloud'} size={13} color={dirty?'#fff':T.ink3}/>
+        {saving?'Sauvegarde…':'Sauvegarder'}
+      </button>
       <button style={btnSt('primary',true)}><Icon name="download" size={14} color="#fff"/>Exporter</button>
       <div style={{width:1,height:22,background:T.line}}/>
     </>}
@@ -2721,6 +2792,7 @@ export default function App() {
   const [screen,setScreen]=useState('login');
   const [project,setProject]=useState(null);
   const [showAdmin,setShowAdmin]=useState(false);
+  const [saveBarProps,setSaveBarProps]=useState({dirty:false,saving:false,lastSaved:null,onSave:()=>{}});
   const [brand,setBrand]=useState(()=>({
     officialLogo:localStorage.getItem('abrane_logo')||'',
     wmLogo:localStorage.getItem('abrane_wm')||'',
@@ -2751,12 +2823,21 @@ export default function App() {
       <LoginScreen onLogin={u=>{setUser(u);setScreen('dashboard');}}/>
     </BrandCtx.Provider>
   );
+
   return (
     <BrandCtx.Provider value={brandCtxVal}>
       <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden',fontFamily:'-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif',fontSize:13,color:T.ink,background:T.bg,WebkitFontSmoothing:'antialiased'}}>
-        <TopBar user={user} screen={screen} project={project} onHome={()=>setScreen('dashboard')} onLogout={handleLogout} onOpenAdmin={user.role==='superadmin'?()=>setShowAdmin(true):null}/>
-        {screen==='dashboard'&&<Dashboard user={user} onOpenProject={p=>{setProject(p);setScreen('configurator');}} onNewProject={()=>{setProject(null);setScreen('configurator');}} onOpenTemplate={tpl=>{setProject({name:'Nouveau — '+tpl.name,pageFormat:tpl.pageFormat,palette:tpl.palette,client:tpl.kind==='client'?tpl.name:'',basedOn:tpl.name});setScreen('configurator');}}/>}
-        {screen==='configurator'&&<Configurator user={user} project={project}/>}
+        <TopBar user={user} screen={screen} project={project}
+          onHome={()=>setScreen('dashboard')} onLogout={handleLogout}
+          onOpenAdmin={user.role==='superadmin'?()=>setShowAdmin(true):null}
+          onSave={saveBarProps.onSave} saving={saveBarProps.saving}
+          dirty={saveBarProps.dirty} lastSaved={saveBarProps.lastSaved}/>
+        {screen==='dashboard'&&<Dashboard user={user}
+          onOpenProject={p=>{setProject(p);setScreen('configurator');}}
+          onNewProject={()=>{setProject(null);setScreen('configurator');}}
+          onOpenTemplate={tpl=>{setProject({name:'Nouveau — '+tpl.name,pageFormat:tpl.pageFormat,palette:tpl.palette,client:tpl.kind==='client'?tpl.name:'',basedOn:tpl.name});setScreen('configurator');}}/>}
+        {screen==='configurator'&&<Configurator user={user} project={project}
+          onSaveStateChange={setSaveBarProps}/>}
         {showAdmin&&<AdminPanel onClose={()=>setShowAdmin(false)}/>}
       </div>
     </BrandCtx.Provider>
