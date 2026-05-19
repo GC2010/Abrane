@@ -15,13 +15,12 @@ export async function loadProjects(userId) {
 
 export async function upsertProject(userId, projectId, name, stateData) {
   if (!USE_CLOUD) return null;
-  // Never persist the user's signature inside the project row
-  const { sigUrl: _sig, ...dataToSave } = stateData;
-  const now = new Date().toISOString();
+  // Strip non-serialisable / user-specific fields before saving
+  const { sigUrl: _sig, _dirty: _d, ...dataToSave } = stateData;
   if (projectId) {
     const { data, error } = await supabase
       .from('projects')
-      .update({ name, data: dataToSave, updated_at: now })
+      .update({ name, data: dataToSave })
       .eq('id', projectId)
       .eq('user_id', userId)
       .select('id')
@@ -31,7 +30,7 @@ export async function upsertProject(userId, projectId, name, stateData) {
   } else {
     const { data, error } = await supabase
       .from('projects')
-      .insert({ user_id: userId, name, data: dataToSave, updated_at: now })
+      .insert({ user_id: userId, name, data: dataToSave })
       .select('id')
       .single();
     if (error) throw error;
@@ -49,9 +48,57 @@ export async function deleteProject(projectId, userId) {
   if (error) throw error;
 }
 
+// ── Templates ─────────────────────────────────────────────────
+
+export async function loadTemplates() {
+  if (!USE_CLOUD) return [];
+  const { data, error } = await supabase
+    .from('templates')
+    .select('id, name, created_at, updated_at, created_by, data')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function upsertTemplate(userId, templateId, name, stateData) {
+  if (!USE_CLOUD) return null;
+  // Templates store only the "setup" — no content files or user-specific data
+  const {
+    sigUrl: _sig, _dirty: _d,
+    files: _f, contentOrder: _co, annotations: _an, annotSnaps: _as, pageNotes: _pn,
+    ...dataToSave
+  } = stateData;
+  if (templateId) {
+    const { data, error } = await supabase
+      .from('templates')
+      .update({ name, data: dataToSave })
+      .eq('id', templateId)
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id;
+  } else {
+    const { data, error } = await supabase
+      .from('templates')
+      .insert({ name, data: dataToSave, created_by: userId })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id;
+  }
+}
+
+export async function deleteTemplate(templateId) {
+  if (!USE_CLOUD) return;
+  const { error } = await supabase
+    .from('templates')
+    .delete()
+    .eq('id', templateId);
+  if (error) throw error;
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 
-// Convert Supabase project row → Dashboard display shape
 export function projectToDisplay(row) {
   const d = row.data || {};
   return {
@@ -69,7 +116,27 @@ export function projectToDisplay(row) {
                   : row.created_at ? formatRelative(new Date(row.created_at)) : '',
     basedOn:    d.basedOn || '',
     templateUpdateAvailable: false,
-    _raw: row,   // keep full row for opening
+    _raw: row,
+  };
+}
+
+export function templateToDisplay(row) {
+  const d = row.data || {};
+  return {
+    id:         row.id,
+    name:       row.name,
+    kind:       'client',
+    desc:       `Modèle client — ${d.client || row.name}`,
+    palette:    [d.palette?.c1||'#E8DCC8', d.palette?.c2||'#C8A96E', d.palette?.c3||'#2B2B2B'],
+    pageFormat: d.pageFormat || 'h-full',
+    badges:     ['Client'],
+    author:     d.client || '',
+    updated:    row.updated_at
+                  ? formatRelative(new Date(row.updated_at))
+                  : row.created_at ? formatRelative(new Date(row.created_at)) : '',
+    uses:       0,
+    lastAdminNote: null,
+    _raw: row,
   };
 }
 
