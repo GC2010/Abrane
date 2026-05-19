@@ -4,6 +4,9 @@
 -- Extension pgcrypto pour bcrypt (activée par défaut dans Supabase)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Idempotent : ajoute name si la migration 006 n'a pas encore été jouée
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS name text;
+
 -- Fonction : créer un utilisateur par nom + mot de passe
 --   - génère un email @abrane.internal
 --   - hache le mot de passe en bcrypt
