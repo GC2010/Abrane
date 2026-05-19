@@ -493,7 +493,7 @@ function LoginScreen({onLogin}) {
   </div>;
 }
 
-function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onRefreshNeeded}) {
+function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
   const [tab,setTab]=useState('projects');
   const [q,setQ]=useState('');
   const [viewMode,setViewMode]=useState('grid');
@@ -502,17 +502,20 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onRefreshNeed
   const [updateModal,setUpdateModal]=useState(null);
   const [dbProjects,setDbProjects]=useState([]);
   const [loadingProjects,setLoadingProjects]=useState(true);
+  const [projectsError,setProjectsError]=useState(null);
   const [dbTemplates,setDbTemplates]=useState([]);
   const [loadingTemplates,setLoadingTemplates]=useState(true);
 
-  useEffect(()=>{
+  const refreshProjects=useCallback(()=>{
     if(!USE_CLOUD){setLoadingProjects(false);return;}
-    setLoadingProjects(true);
+    setLoadingProjects(true);setProjectsError(null);
     loadProjects(user.id)
       .then(rows=>setDbProjects(rows.map(projectToDisplay)))
-      .catch(()=>{})
+      .catch(e=>setProjectsError(e.message))
       .finally(()=>setLoadingProjects(false));
   },[user.id]);
+
+  useEffect(()=>{refreshProjects();},[refreshProjects]);
 
   useEffect(()=>{
     if(!USE_CLOUD){setLoadingTemplates(false);return;}
@@ -558,6 +561,11 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onRefreshNeed
         </div>}
       </div>
       {tab==='projects'&&loadingProjects&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:60,color:T.ink3,fontSize:13}}>Chargement…</div>}
+      {tab==='projects'&&!loadingProjects&&projectsError&&<div style={{background:'#FEF2F2',border:'1px solid #FCA5A5',borderRadius:10,padding:'14px 18px',display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+        <Icon name="info" size={16} color="#DC2626"/>
+        <div style={{flex:1}}><strong style={{color:'#991B1B'}}>Erreur de chargement</strong><div style={{fontSize:11.5,color:'#991B1B',marginTop:2}}>{projectsError}</div></div>
+        <button onClick={refreshProjects} style={btnSt(undefined,true)}><Icon name="refresh" size={13} color={T.ink}/>Réessayer</button>
+      </div>}
       {tab==='projects'&&!loadingProjects&&viewMode==='grid'&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:16}}>
         <button onClick={onNewProject} style={{minHeight:200,border:`1.5px dashed ${T.lineStrong}`,borderRadius:12,background:'transparent',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,flexDirection:'column',color:T.ink2}}>
           <Icon name="plus" size={22} color={T.ink3}/><div><div style={{fontWeight:600,fontSize:13}}>Nouveau projet</div><div style={{fontSize:11,color:T.ink3,marginTop:2}}>Vierge ou depuis un modèle</div></div>

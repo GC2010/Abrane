@@ -6,9 +6,9 @@ export async function loadProjects(userId) {
   if (!USE_CLOUD) return [];
   const { data, error } = await supabase
     .from('projects')
-    .select('id, name, created_at, updated_at, template_id, data')
+    .select('id, name, created_at, template_id, data')
     .eq('user_id', userId)
-    .order('updated_at', { ascending: false, nullsFirst: false });
+    .order('created_at', { ascending: false });
   if (error) throw error;
   return data || [];
 }
@@ -54,7 +54,7 @@ export async function loadTemplates() {
   if (!USE_CLOUD) return [];
   const { data, error } = await supabase
     .from('templates')
-    .select('id, name, created_at, updated_at, created_by, data')
+    .select('id, name, created_at, created_by, data')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data || [];
@@ -111,9 +111,7 @@ export function projectToDisplay(row) {
     rev:        d.rev || 'REV 01',
     pages:      0,
     createdAt:  row.created_at ? new Date(row.created_at).toLocaleDateString('fr-FR') : '',
-    updated:    row.updated_at
-                  ? formatRelative(new Date(row.updated_at))
-                  : row.created_at ? formatRelative(new Date(row.created_at)) : '',
+    updated:    row.created_at ? formatRelative(new Date(row.created_at)) : '',
     basedOn:    d.basedOn || '',
     templateUpdateAvailable: false,
     _raw: row,
@@ -131,9 +129,7 @@ export function templateToDisplay(row) {
     pageFormat: d.pageFormat || 'h-full',
     badges:     ['Client'],
     author:     d.client || '',
-    updated:    row.updated_at
-                  ? formatRelative(new Date(row.updated_at))
-                  : row.created_at ? formatRelative(new Date(row.created_at)) : '',
+    updated:    row.created_at ? formatRelative(new Date(row.created_at)) : '',
     uses:       0,
     lastAdminNote: null,
     _raw: row,
