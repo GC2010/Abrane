@@ -79,24 +79,15 @@ function Icon({name, size=18, color, stroke=1.5, style={}}) {
 // ── Modifica qui la password admin ────────────────────────────
 const ADMIN_PASS = 'ABRANE2026';
 
-const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',setBrand:()=>{}});
+const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},setBrand:()=>{}});
 
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
 ];
 const TEAM_TEMPLATES = [
   {id:'t-std',name:'ABRANE — Standard',kind:'generic',desc:'Modèle de base ABRANE. Couleurs crème + or.',palette:['#E8DCC8','#C8A96E','#2B2B2B'],pageFormat:'h-full',badges:['Officiel'],author:'Sandro Caron',updated:'Il y a 3 j',uses:28,lastAdminNote:null},
-  {id:'t-san',name:'SANDRO Group',kind:'client',desc:'Identité SANDRO complète.',palette:['#E8DCC8','#C8A96E','#2B2B2B'],pageFormat:'h-full',badges:['Client','Mat.'],author:'Sandro Caron',updated:'Il y a 3 j',uses:12,lastAdminNote:null},
-  {id:'t-lux',name:'LUXOR',kind:'client',desc:'Marine luxe profond + finitions or.',palette:['#22344F','#B89556','#0F1820'],pageFormat:'h-full',badges:['Client','Luxe'],author:'Élise Mercier',updated:'Hier',uses:4,lastAdminNote:{author:'Sandro Caron',date:'Hier',text:'Palette ajustée.'}},
-  {id:'t-at7',name:'Atelier 7',kind:'client',desc:'Reliure premium, palette terre.',palette:['#F0EBE0','#8B6F47','#2B2B2B'],pageFormat:'h-ring',badges:['Client','Reliure'],author:'Sandro Caron',updated:'Il y a 2 sem',uses:3,lastAdminNote:null},
-  {id:'t-car',name:'Maison Caron',kind:'client',desc:'Format vertical, palette claire.',palette:['#FBF5E8','#1B2E5C','#1A1F2E'],pageFormat:'v-full',badges:['Client','Vertical'],author:'Camille Rouvière',updated:'Il y a 1 sem',uses:2,lastAdminNote:null},
 ];
-const MY_PROJECTS = [
-  {id:'p1',name:'SANDRO — Collection Hiver',client:'SANDRO',subtitle:'Détails — Coll. AH26',pages:32,files:18,pageFormat:'h-full',palette:['#E8DCC8','#C8A96E','#2B2B2B'],updated:"Aujourd'hui",createdAt:'12/01/2026',rev:'REV 03',basedOn:'ABRANE — Standard',templateUpdateAvailable:false},
-  {id:'p2',name:'LUXOR — Book Commercial',client:'LUXOR',subtitle:'Catalogue 2026',pages:24,files:11,pageFormat:'h-full',palette:['#22344F','#B89556','#0F1820'],updated:'Hier',createdAt:'05/03/2026',rev:'REV 01',basedOn:'Luxe Marine',templateUpdateAvailable:true,templateUpdateNote:'Palette ajustée.',templateUpdateAuthor:'Sandro Caron',templateUpdateDate:'Hier'},
-  {id:'p3',name:'ATELIER 7 — Reliure',client:'Atelier 7',subtitle:'Showroom',pages:48,files:28,pageFormat:'h-ring',palette:['#F0EBE0','#8B6F47','#2B2B2B'],updated:'Lundi',createdAt:'18/02/2026',rev:'REV 02',basedOn:'Reliure Atelier',templateUpdateAvailable:false},
-  {id:'p4',name:'Maison Caron — Devis Visuel',client:'Maison Caron',subtitle:'REV 02',pages:12,files:6,pageFormat:'v-full',palette:['#FBF5E8','#1B2E5C','#1A1F2E'],updated:'Il y a 1 sem',createdAt:'02/04/2026',rev:'REV 02',basedOn:'Fiche Produit V',templateUpdateAvailable:false},
-];
+const MY_PROJECTS = [];
 const PALETTE_PRESETS = [
   {id:'pp1',c:['#E8DCC8','#C8A96E','#2B2B2B'],name:'Crème & Or'},
   {id:'pp2',c:['#22344F','#B89556','#0F1820'],name:'Marine Luxe'},
@@ -206,11 +197,17 @@ const pillSt = (v='default') => ({display:'inline-flex',alignItems:'center',gap:
 const btnSt = (v='default',sm=false) => ({display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${v==='primary'?T.navy:v==='gold'?T.goldSoft:T.line}`,background:v==='primary'?T.navy:v==='gold'?T.goldTint:v==='ghost'?'transparent':T.surface,color:v==='primary'?'#fff':v==='gold'?T.navy:T.ink,fontSize:sm?11.5:12.5,fontWeight:500,padding:sm?'5px 9px':'7px 12px',borderRadius:6,cursor:'pointer',fontFamily:'inherit'});
 
 function MiniCover({palette,client,subtitle}) {
+  const {officialLogo,shopLogos}=React.useContext(BrandCtx);
   const [c1,c2,c3]=palette;
+  const isAbrane=client==='ABRANE';
+  const logo=isAbrane?officialLogo:(shopLogos?.[client]||'');
   return <div style={{position:'absolute',inset:0,background:c1,display:'grid',gridTemplateColumns:'1fr 12%'}}>
     <div style={{padding:'12% 8% 10% 10%',display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
-      <div style={{display:'flex',gap:8,alignItems:'center'}}>
-        <div style={{width:22,height:22,borderRadius:4,background:paletteHash(client||'A'),color:'#fff',display:'grid',placeItems:'center',fontSize:9,fontWeight:700}}>{initialsFrom(client||'A')}</div>
+      <div style={{display:'flex',gap:8,alignItems:'center',height:24,overflow:'hidden'}}>
+        {logo
+          ?<img src={logo} alt={client} style={{height:20,maxWidth:64,objectFit:'contain',display:'block',flexShrink:0}}/>
+          :<div style={{width:22,height:22,borderRadius:4,background:paletteHash(client||'A'),color:'#fff',display:'grid',placeItems:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{initialsFrom(client||'A')}</div>
+        }
         <div style={{fontSize:8,letterSpacing:'.15em',color:c3,opacity:.6}}>BOOK</div>
       </div>
       <div>
@@ -231,7 +228,8 @@ function StripeAbraneLogo() {
 }
 
 function AdminPanel({onClose}) {
-  const {officialLogo,wmLogo,setBrand}=React.useContext(BrandCtx);
+  const {officialLogo,wmLogo,shopLogos,setBrand}=React.useContext(BrandCtx);
+  const [newShopName,setNewShopName]=useState('');
   const upload=(key,cb)=>e=>{
     const f=e.target.files?.[0];if(!f)return;
     const r=new FileReader();
@@ -239,6 +237,25 @@ function AdminPanel({onClose}) {
     r.readAsDataURL(f);
   };
   const remove=key=>{localStorage.removeItem(key);setBrand(b=>({...b,[key==='abrane_logo'?'officialLogo':'wmLogo']:''}));};
+  const uploadShop=e=>{
+    const f=e.target.files?.[0];if(!f||!newShopName.trim())return;
+    const name=newShopName.trim();
+    const r=new FileReader();
+    r.onload=ev=>{
+      const updated={...(shopLogos||{}), [name]:ev.target.result};
+      localStorage.setItem('abrane_shop_logos',JSON.stringify(updated));
+      setBrand(b=>({...b,shopLogos:updated}));
+      setNewShopName('');
+    };
+    r.readAsDataURL(f);
+    e.target.value='';
+  };
+  const removeShop=name=>{
+    const updated={...(shopLogos||{})};
+    delete updated[name];
+    localStorage.setItem('abrane_shop_logos',JSON.stringify(updated));
+    setBrand(b=>({...b,shopLogos:updated}));
+  };
 
   return <div style={{position:'fixed',inset:0,background:'rgba(15,20,40,.55)',zIndex:200,display:'grid',placeItems:'center'}}>
     <div style={{width:480,maxWidth:'94vw',background:T.surface,borderRadius:16,padding:28,boxShadow:'0 24px 80px rgba(0,0,0,.25)',border:`1px solid ${T.line}`}}>
@@ -281,6 +298,31 @@ function AdminPanel({onClose}) {
                 <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={upload('abrane_wm',v=>setBrand(b=>({...b,wmLogo:v})))}/>
               </label>
           }
+        </div>
+
+        {/* Logos boutiques */}
+        <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:4}}>Logos boutiques clients</div>
+          <div style={{fontSize:11,color:T.ink3,marginBottom:10}}>Le logo s'affiche automatiquement dans les miniatures dès que le nom du client correspond exactement.</div>
+          {Object.keys(shopLogos||{}).length>0&&(
+            <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
+              {Object.entries(shopLogos||{}).map(([name,url])=>(
+                <div key={name} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 8px',background:T.panel,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
+                  <img src={url} alt={name} style={{height:28,maxWidth:80,objectFit:'contain',display:'block',flexShrink:0}}/>
+                  <span style={{flex:1,fontSize:12,fontWeight:600,color:T.ink,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</span>
+                  <button onClick={()=>removeShop(name)} style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA',fontSize:10,flexShrink:0}}>Supprimer</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            <input value={newShopName} onChange={e=>setNewShopName(e.target.value)} placeholder="Nom de la boutique…" style={{...inputSt,flex:1}}/>
+            <label style={{...btnSt(undefined,false),cursor:newShopName.trim()?'pointer':'not-allowed',display:'inline-flex',whiteSpace:'nowrap',opacity:newShopName.trim()?1:.5,flexShrink:0}}>
+              <Icon name="upload" size={13} color={T.ink}/>Importer logo
+              <input type="file" accept="image/*,.svg" disabled={!newShopName.trim()} style={{display:'none'}} onChange={uploadShop}/>
+            </label>
+          </div>
+          {!newShopName.trim()&&<div style={{fontSize:10,color:T.ink4,marginTop:4}}>Saisissez le nom de la boutique avant d'importer.</div>}
         </div>
 
         <div style={{padding:'10px 12px',background:'#FFF8E6',border:`1px solid #F6D860`,borderRadius:8,fontSize:11,color:'#7A5C00',lineHeight:1.5}}>
@@ -368,11 +410,9 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
   const [q,setQ]=useState('');
   const [viewMode,setViewMode]=useState('grid');
   const [sort,setSort]=useState('recent');
-  const [tplKind,setTplKind]=useState('all');
   const [applyModal,setApplyModal]=useState(null);
   const [updateModal,setUpdateModal]=useState(null);
   const projects=MY_PROJECTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||p.client.toLowerCase().includes(q.toLowerCase()));
-  const templates=TEAM_TEMPLATES.filter(t=>(tplKind==='all'||t.kind===tplKind)&&(!q||t.name.toLowerCase().includes(q.toLowerCase())));
   return <div style={{flex:1,overflowY:'auto',background:T.bg}}>
     <div style={{maxWidth:1100,margin:'0 auto',padding:'32px 36px 80px'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:24,marginBottom:26}}>
@@ -383,7 +423,7 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
         <button style={{...btnSt('primary'),padding:'10px 16px',fontSize:13.5,borderRadius:8}} onClick={onNewProject}><Icon name="plus" size={14} color="#fff"/>Nouveau projet</button>
       </div>
       <div style={{display:'inline-flex',gap:2,padding:3,background:T.panel2,borderRadius:8,border:`1px solid ${T.lineSoft}`,marginBottom:16}}>
-        {[{id:'projects',icon:'folder',label:'Mes projets',cnt:MY_PROJECTS.length},{id:'templates',icon:'folderTeam',label:'Modèles Clients',cnt:TEAM_TEMPLATES.length},{id:'shared',icon:'share',label:'Partagés avec moi',cnt:0}].map(tb=>(
+        {[{id:'projects',icon:'folder',label:'Mes projets',cnt:MY_PROJECTS.length},{id:'templates',icon:'folderTeam',label:'Modèles',cnt:TEAM_TEMPLATES.length}].map(tb=>(
           <button key={tb.id} onClick={()=>setTab(tb.id)} style={{display:'inline-flex',alignItems:'center',gap:7,padding:'6px 14px',borderRadius:7,fontSize:12.5,fontWeight:500,color:tab===tb.id?T.ink:T.ink2,border:'none',background:tab===tb.id?'#fff':'transparent',cursor:'pointer',boxShadow:tab===tb.id?'0 1px 2px rgba(0,0,0,.05)':'none'}}>
             <Icon name={tb.icon} size={14} color={tab===tb.id?T.ink:T.ink3}/>{tb.label}
             <span style={{fontSize:10,padding:'1px 6px',borderRadius:999,background:tab===tb.id?T.navyTint:T.panel2,color:tab===tb.id?T.navy:T.ink3}}>{tb.cnt}</span>
@@ -397,9 +437,6 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
         </div>
         {tab==='projects'&&<div style={{display:'inline-flex',padding:2,background:T.panel2,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
           {[['recent','Récents'],['name','A–Z'],['client','Client']].map(([k,l])=><button key={k} onClick={()=>setSort(k)} style={{border:'none',background:sort===k?'#fff':'transparent',color:sort===k?T.ink:T.ink2,padding:'4px 10px',fontSize:11.5,borderRadius:5,cursor:'pointer',fontWeight:500}}>{l}</button>)}
-        </div>}
-        {tab==='templates'&&<div style={{display:'inline-flex',padding:2,background:T.panel2,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
-          {[['all','Tous'],['generic','Génériques'],['client','Clients']].map(([k,l])=><button key={k} onClick={()=>setTplKind(k)} style={{border:'none',background:tplKind===k?'#fff':'transparent',color:tplKind===k?T.ink:T.ink2,padding:'4px 11px',fontSize:11.5,borderRadius:5,cursor:'pointer',fontWeight:500}}>{l}</button>)}
         </div>}
         <div style={{flex:1}}/>
         {tab==='projects'&&<div style={{display:'inline-flex',padding:2,background:T.panel2,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
@@ -439,58 +476,31 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate}) {
           <div style={{fontSize:11.5,color:T.ink3}}>{p.updated}</div>
         </div>)}
       </div>}
-      {tab==='templates'&&(()=>{
-        const generics=templates.filter(t=>t.kind==='generic');
-        const clients=templates.filter(t=>t.kind==='client');
-        return <div style={{display:'flex',flexDirection:'column',gap:32}}>
-          {generics.length>0&&<div>
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
-              <div style={{width:36,height:36,borderRadius:8,background:T.navy,display:'grid',placeItems:'center',flexShrink:0}}><Icon name="layers" size={18} color="#fff"/></div>
-              <div><div style={{fontSize:14,fontWeight:700,color:T.ink}}>Modèle standard ABRANE</div><div style={{fontSize:11.5,color:T.ink3}}>Base officielle validée par l'admin</div></div>
-            </div>
-            {generics.map(t=><button key={t.id} onClick={()=>setApplyModal(t)} style={{width:'100%',display:'grid',gridTemplateColumns:'180px 1fr auto',background:T.surface,border:`2px solid ${T.navy}`,borderRadius:12,overflow:'hidden',cursor:'pointer',textAlign:'left',padding:0,boxShadow:`0 0 0 4px ${T.navyTint}`}}>
-              <div style={{aspectRatio:'297/210',background:T.panel,position:'relative',overflow:'hidden',borderRight:`1px solid ${T.line}`}}>
-                <MiniCover palette={t.palette} client="ABRANE" subtitle="MODÈLE STANDARD"/>
-                <div style={{position:'absolute',top:8,left:8,background:T.navy,color:'#fff',fontSize:9,fontWeight:700,letterSpacing:'.1em',padding:'2px 7px',borderRadius:4}}>OFFICIEL</div>
-              </div>
-              <div style={{padding:'18px 22px',display:'flex',flexDirection:'column',justifyContent:'center',gap:6}}>
-                <div style={{fontSize:16,fontWeight:700,color:T.ink}}>{t.name}</div>
-                <div style={{fontSize:12.5,color:T.ink3,lineHeight:1.5}}>{t.desc}</div>
-                <div style={{fontSize:11,color:T.ink4}}>{t.uses} utilisations · {t.updated}</div>
-              </div>
-              <div style={{padding:'18px 20px',display:'flex',alignItems:'center',borderLeft:`1px solid ${T.line}`,background:T.navyTint}}>
-                <div style={{...btnSt('primary'),justifyContent:'center'}}><Icon name="plus" size={13} color="#fff"/>Utiliser</div>
-              </div>
-            </button>)}
-          </div>}
-          {clients.length>0&&<div>
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
-              <div style={{width:36,height:36,borderRadius:8,background:T.gold,display:'grid',placeItems:'center',flexShrink:0}}><Icon name="users" size={18} color="#fff"/></div>
-              <div><div style={{fontSize:14,fontWeight:700,color:T.ink}}>Modèles clients</div><div style={{fontSize:11.5,color:T.ink3}}>Logo, palette, matériaux pré-chargés</div></div>
-              {user.role==='admin'&&<button style={{...btnSt(undefined,true),marginLeft:'auto'}}><Icon name="plus" size={12} color={T.ink3}/>Ajouter</button>}
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
-              {clients.map(t=><button key={t.id} onClick={()=>setApplyModal(t)} style={{background:T.surface,border:`1px solid ${T.goldSoft}`,borderRadius:10,overflow:'hidden',cursor:'pointer',textAlign:'left',padding:0}}>
-                <div style={{height:6,background:`linear-gradient(90deg,${t.palette[0]},${t.palette[1]},${t.palette[2]})`}}/>
-                <div style={{aspectRatio:'297/210',background:T.panel,position:'relative',overflow:'hidden',borderBottom:`1px solid ${T.lineSoft}`}}>
-                  <MiniCover palette={t.palette} client={t.name} subtitle="MODÈLE CLIENT"/>
-                  {t.lastAdminNote&&<div style={{position:'absolute',top:6,right:6,background:T.gold,color:'#1A1F2E',padding:'2px 7px',borderRadius:999,fontSize:9,fontWeight:700}}>MÀJ</div>}
-                </div>
-                <div style={{padding:'10px 12px'}}>
-                  <div style={{fontSize:12.5,fontWeight:700,color:T.ink,marginBottom:2}}>{t.name}</div>
-                  <div style={{fontSize:10.5,color:T.ink3,lineHeight:1.4,marginBottom:8}}>{t.desc}</div>
-                  <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{t.badges.map((b,i)=><span key={i} style={{...pillSt(i===0?'gold':'default'),fontSize:9.5,padding:'1px 6px'}}>{b}</span>)}</div>
-                </div>
-              </button>)}
-            </div>
-          </div>}
-          <div style={{background:T.panel,border:`1px solid ${T.lineSoft}`,borderRadius:10,padding:'14px 18px',display:'flex',alignItems:'center',gap:14}}>
-            <div style={{width:32,height:32,borderRadius:8,background:T.successT,display:'grid',placeItems:'center',flexShrink:0}}><Icon name="folder" size={16} color={T.success}/></div>
-            <div style={{flex:1}}><div style={{fontSize:12.5,fontWeight:600,color:T.ink}}>Vos projets personnels</div><div style={{fontSize:11,color:T.ink3,marginTop:2}}>Retrouvez vos documents dans <strong style={{color:T.ink}}>Mes projets</strong>.</div></div>
-            <button onClick={()=>setTab('projects')} style={btnSt(undefined,true)}><Icon name="folder" size={12} color={T.ink}/>Mes projets</button>
+      {tab==='templates'&&<div style={{display:'flex',flexDirection:'column',gap:24}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:2}}>
+          <div style={{width:36,height:36,borderRadius:8,background:T.navy,display:'grid',placeItems:'center',flexShrink:0}}><Icon name="layers" size={18} color="#fff"/></div>
+          <div><div style={{fontSize:14,fontWeight:700,color:T.ink}}>Modèle officiel ABRANE</div><div style={{fontSize:11.5,color:T.ink3}}>Base standard validée — logo ABRANE intégré en miniature</div></div>
+        </div>
+        {TEAM_TEMPLATES.map(t=><button key={t.id} onClick={()=>setApplyModal(t)} style={{width:'100%',display:'grid',gridTemplateColumns:'180px 1fr auto',background:T.surface,border:`2px solid ${T.navy}`,borderRadius:12,overflow:'hidden',cursor:'pointer',textAlign:'left',padding:0,boxShadow:`0 0 0 4px ${T.navyTint}`}}>
+          <div style={{aspectRatio:'297/210',background:T.panel,position:'relative',overflow:'hidden',borderRight:`1px solid ${T.line}`}}>
+            <MiniCover palette={t.palette} client="ABRANE" subtitle="MODÈLE STANDARD"/>
+            <div style={{position:'absolute',top:8,left:8,background:T.navy,color:'#fff',fontSize:9,fontWeight:700,letterSpacing:'.1em',padding:'2px 7px',borderRadius:4}}>OFFICIEL</div>
           </div>
-        </div>;
-      })()}
+          <div style={{padding:'18px 22px',display:'flex',flexDirection:'column',justifyContent:'center',gap:6}}>
+            <div style={{fontSize:16,fontWeight:700,color:T.ink}}>{t.name}</div>
+            <div style={{fontSize:12.5,color:T.ink3,lineHeight:1.5}}>{t.desc}</div>
+            <div style={{fontSize:11,color:T.ink4}}>{t.uses} utilisations · {t.updated}</div>
+          </div>
+          <div style={{padding:'18px 20px',display:'flex',alignItems:'center',borderLeft:`1px solid ${T.line}`,background:T.navyTint}}>
+            <div style={{...btnSt('primary'),justifyContent:'center'}}><Icon name="plus" size={13} color="#fff"/>Utiliser</div>
+          </div>
+        </button>)}
+        <div style={{background:T.panel,border:`1px solid ${T.lineSoft}`,borderRadius:10,padding:'14px 18px',display:'flex',alignItems:'center',gap:14}}>
+          <div style={{width:32,height:32,borderRadius:8,background:T.successT,display:'grid',placeItems:'center',flexShrink:0}}><Icon name="folder" size={16} color={T.success}/></div>
+          <div style={{flex:1}}><div style={{fontSize:12.5,fontWeight:600,color:T.ink}}>Vos projets en cours</div><div style={{fontSize:11,color:T.ink3,marginTop:2}}>Les logos clients sont définis dans <strong style={{color:T.ink}}>Administration → Logos boutiques</strong>.</div></div>
+          <button onClick={()=>setTab('projects')} style={btnSt(undefined,true)}><Icon name="folder" size={12} color={T.ink}/>Mes projets</button>
+        </div>
+      </div>}
       {tab==='shared'&&<div style={{padding:'60px 40px',textAlign:'center',background:T.surface,border:`1px solid ${T.lineSoft}`,borderRadius:12}}>
         <Icon name="share" size={32} color={T.ink3} style={{margin:'0 auto 16px'}}/>
         <div style={{fontSize:15,fontWeight:600,color:T.ink,marginBottom:6}}>Aucun projet partagé</div>
@@ -2611,6 +2621,7 @@ export default function App() {
   const [brand,setBrand]=useState(()=>({
     officialLogo:localStorage.getItem('abrane_logo')||'',
     wmLogo:localStorage.getItem('abrane_wm')||'',
+    shopLogos:JSON.parse(localStorage.getItem('abrane_shop_logos')||'{}'),
   }));
   const brandCtxVal=useMemo(()=>({...brand,setBrand}),[brand]);
 
