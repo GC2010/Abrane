@@ -2661,6 +2661,8 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
   const [strokeW,setStrokeWState]=useState(2);
   const [textPrompt,setTextPrompt]=useState(null);
   const [textVal,setTextVal]=useState('');
+  const [quotaPrompt,setQuotaPrompt]=useState(null); // {x1,y1,x2,y2}
+  const [quotaVal,setQuotaVal]=useState('');
   const [canUndo,setCanUndo]=useState(false);
   const [canRedo,setCanRedo]=useState(false);
 
@@ -2796,6 +2798,9 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       } else if(t==='triangle'){
         shapeRef.current=new window.fabric.Triangle({left:p.x,top:p.y,width:1,height:1,fill:'transparent',stroke:col,strokeWidth:strokeWRef.current,selectable:false,evented:false});
         canvas.add(shapeRef.current);
+      } else if(t==='quota'){
+        shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:strokeWRef.current*2,strokeLineCap:'round',strokeDashArray:[6,4],selectable:false,evented:false,opacity:0.6});
+        canvas.add(shapeRef.current);
       }
       canvas.requestRenderAll();
     });
@@ -2803,7 +2808,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     canvas.on('mouse:move',opt=>{
       if(!isDrawingRef.current||!shapeRef.current)return;
       const p=canvas.getPointer(opt.e),o=originRef.current,t=toolRef.current;
-      if(t==='line') shapeRef.current.set({x2:p.x,y2:p.y});
+      if(t==='line'||t==='quota') shapeRef.current.set({x2:p.x,y2:p.y});
       else if(t==='underline') shapeRef.current.set({x2:p.x,y2:o.y});
       else if(t==='circle'){
         const rx=Math.max(1,Math.abs(p.x-o.x)/2),ry=Math.max(1,Math.abs(p.y-o.y)/2);
@@ -2831,6 +2836,13 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       if(!isDrawingRef.current||!shapeRef.current)return;
       isDrawingRef.current=false;
       const shape=shapeRef.current;shapeRef.current=null;
+      if(t==='quota'){
+        const {x1,y1,x2,y2}={x1:shape.x1,y1:shape.y1,x2:shape.x2,y2:shape.y2};
+        canvas.remove(shape);
+        if(Math.abs(x2-x1)+Math.abs(y2-y1)>=10){setQuotaPrompt({x1,y1,x2,y2});setQuotaVal('');}
+        canvas.requestRenderAll();
+        return;
+      }
       shape.set({selectable:true,evented:true});
       canvas.setActiveObject(shape);
       if(t==='rectText'){setTextPrompt(shape);setTextVal('');}
@@ -2912,6 +2924,56 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     setTextPrompt(null);setTextVal('');
   };
 
+  const commitQuota=()=>{
+    if(!quotaPrompt)return;
+    const {x1,y1,x2,y2}=quotaPrompt;
+    const text=quotaVal.trim()||'?';
+    const canvas=fc.current;
+    const col=colorRef.current,sw=strokeWRef.current;
+    const dx=x2-x1,dy=y2-y1;
+    const len=Math.sqrt(dx*dx+dy*dy);
+    if(len<10){setQuotaPrompt(null);return;}
+    const angle=Math.atan2(dy,dx);
+    const angleDeg=angle*180/Math.PI;
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    const arrowSize=Math.max(10,sw*4);
+    const bgH=Math.max(20,sw*6+10);
+    const bgRect=new window.fabric.Rect({
+      left:mx,top:my,width:len+arrowSize*2,height:bgH,
+      fill:'white',stroke:'rgba(0,0,0,.1)',strokeWidth:0.5,
+      angle:angleDeg,originX:'center',originY:'center',
+      selectable:false,evented:false,
+    });
+    const lineObj=new window.fabric.Line([x1,y1,x2,y2],{
+      stroke:col,strokeWidth:sw,strokeLineCap:'round',
+      selectable:false,evented:false,
+    });
+    const makeArrow=(tx,ty,dir)=>{
+      const c=Math.cos(dir),s=Math.sin(dir);
+      const pc=Math.cos(dir+Math.PI/2),ps=Math.sin(dir+Math.PI/2);
+      const hw=arrowSize*0.38;
+      const bx=tx-arrowSize*c,by=ty-arrowSize*s;
+      const path=`M ${tx.toFixed(1)} ${ty.toFixed(1)} L ${(bx+hw*pc).toFixed(1)} ${(by+hw*ps).toFixed(1)} L ${(bx-hw*pc).toFixed(1)} ${(by-hw*ps).toFixed(1)} Z`;
+      return new window.fabric.Path(path,{fill:col,stroke:'none',selectable:false,evented:false});
+    };
+    const leftArrow=makeArrow(x1,y1,angle+Math.PI);
+    const rightArrow=makeArrow(x2,y2,angle);
+    const fontSize=Math.max(10,sw*4+8);
+    const textObj=new window.fabric.Text(text,{
+      left:mx,top:my,angle:angleDeg,fontSize,
+      fill:col,fontFamily:'Arial',fontWeight:'bold',
+      originX:'center',originY:'center',
+      selectable:false,evented:false,
+    });
+    const grp=new window.fabric.Group([bgRect,lineObj,leftArrow,rightArrow,textObj],{selectable:true,evented:true});
+    canvas.add(grp);
+    canvas.setActiveObject(grp);
+    canvas.requestRenderAll();
+    pushHist(canvas);
+    setQuotaPrompt(null);
+    setQuotaVal('');
+  };
+
   const save=()=>{
     const canvas=fc.current;
     const objs=canvas.getObjects();
@@ -2938,6 +3000,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     {id:'circle',   label:'Cercle',      sym:'○'},
     {id:'triangle', label:'Triangle',    sym:'△'},
     {id:'pencil',   label:'Crayon libre',sym:'✏'},
+    {id:'quota',    label:'Cote (↔)',    sym:'↔'},
   ];
   const tbSt=act=>({display:'flex',alignItems:'center',gap:7,padding:'6px 10px',borderRadius:5,border:'none',cursor:'pointer',width:'100%',textAlign:'left',fontFamily:'inherit',fontSize:11.5,background:act?T.navy:'transparent',color:act?'#fff':'rgba(255,255,255,.7)',fontWeight:act?600:400});
   const aBtnSt=(danger,disabled)=>({...btnSt('ghost',true),color:danger?'#F87171':disabled?'rgba(255,255,255,.25)':'rgba(255,255,255,.82)',border:`1px solid ${danger?'rgba(248,113,113,.3)':disabled?'rgba(255,255,255,.08)':'rgba(255,255,255,.18)'}`,opacity:disabled?0.45:1,cursor:disabled?'not-allowed':'pointer'});
@@ -3005,6 +3068,21 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
                   <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
                     <button onClick={()=>setTextPrompt(null)} style={btnSt('ghost',true)}>Annuler</button>
                     <button onClick={commitRectText} style={btnSt('primary',true)}>Ajouter</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {quotaPrompt&&(
+              <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.5)',display:'grid',placeItems:'center',zIndex:20}}>
+                <div style={{background:'#fff',borderRadius:10,padding:20,minWidth:280,boxShadow:'0 12px 40px rgba(0,0,0,.5)'}}>
+                  <div style={{fontSize:13,fontWeight:600,color:T.ink,marginBottom:4}}>Valeur de la cote</div>
+                  <div style={{fontSize:11,color:'#888',marginBottom:10}}>Ex : 2400, 1.5m, REF A…</div>
+                  <input autoFocus value={quotaVal} onChange={e=>setQuotaVal(e.target.value)}
+                    onKeyDown={e=>{if(e.key==='Enter')commitQuota();if(e.key==='Escape')setQuotaPrompt(null);}}
+                    style={{...inputSt,marginBottom:12}} placeholder="Saisissez la valeur…"/>
+                  <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                    <button onClick={()=>setQuotaPrompt(null)} style={btnSt('ghost',true)}>Annuler</button>
+                    <button onClick={commitQuota} style={btnSt('primary',true)}>Placer</button>
                   </div>
                 </div>
               </div>
