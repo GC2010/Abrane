@@ -1126,7 +1126,7 @@ function CoverPage({state,isPortrait,isRing}) {
         {!state.bgImageUrl&&<div style={{width:'100%',height:'100%',background:`repeating-linear-gradient(135deg,${p.c1} 0 14px,${shade(p.c1,-6)} 14px 28px)`,opacity:.6}}/>}
       </div>
       <div style={{position:'relative',zIndex:2,marginTop:'auto'}}>
-        <div style={{fontSize:11,letterSpacing:'.28em',color:shade(p.c3,40),fontWeight:500,marginBottom:4,lineHeight:1.2}}>{state.year}</div>
+        <div style={{fontSize:11,letterSpacing:'.28em',color:shade(p.c3,40),fontWeight:500,marginBottom:0,lineHeight:1.2,paddingBottom:10}}>{state.year}</div>
         <div style={{fontSize:`clamp(18px,${Math.max(2.5,5.5-Math.max(0,state.mainTitle.length-10)*0.3)}cqw,72px)`,fontWeight:900,letterSpacing:'-.02em',lineHeight:.88,color:p.c3,wordBreak:'break-word'}}>{state.mainTitle}</div>
         <div style={{fontSize:11,color:shade(p.c3,40),marginTop:6}}>{state.subtitle}</div>
       </div>
@@ -2989,10 +2989,29 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       if(o.type==='i-text'||o.type==='text'){
         if(props.color!=null)o.set({fill:props.color});
       }else if(o.type==='group'){
-        (o._objects||[]).forEach(ch=>{
-          if(props.color!=null&&ch.type==='rect')ch.set({stroke:props.color});
-          if(props.color!=null&&(ch.type==='i-text'||ch.type==='text'))ch.set({fill:props.color});
-          if(props.sw!=null&&ch.type==='rect')ch.set({strokeWidth:props.sw});
+        const children=o._objects||[];
+        const isArrow=children.some(ch=>ch.type==='line'); // labeled-arrow groups have a line child
+        children.forEach(ch=>{
+          if(ch.type==='line'){
+            // Arrow shaft: apply color+strokeWidth
+            if(props.color!=null)ch.set({stroke:props.color});
+            if(props.sw!=null)ch.set({strokeWidth:props.sw});
+          }else if(ch.type==='path'){
+            // Arrowhead: fill-only, never allow stroke
+            if(props.color!=null)ch.set({fill:props.color});
+            ch.set({stroke:null,strokeWidth:0});
+          }else if(ch.type==='rect'){
+            if(isArrow){
+              // Background rect of labeled arrow — never touch stroke/strokeWidth
+              ch.set({stroke:null,strokeWidth:0});
+            }else{
+              // rectText rectangle — apply color+strokeWidth normally
+              if(props.color!=null)ch.set({stroke:props.color});
+              if(props.sw!=null)ch.set({strokeWidth:props.sw});
+            }
+          }else if(ch.type==='i-text'||ch.type==='text'){
+            if(props.color!=null)ch.set({fill:props.color});
+          }
         });
       }else{
         if(props.color!=null)o.set({stroke:props.color});
@@ -3266,7 +3285,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     const arrowPath=`M ${x2.toFixed(1)} ${y2.toFixed(1)} L ${(bx+hw*pc).toFixed(1)} ${(by+hw*ps).toFixed(1)} L ${(bx-hw*pc).toFixed(1)} ${(by-hw*ps).toFixed(1)} Z`;
     // Line ends at arrowhead BASE (bx,by) so it doesn't poke through the triangle tip
     const lineObj=new window.fabric.Line([x1,y1,bx,by],{stroke:col,strokeWidth:sw,strokeLineCap:'round',selectable:false,evented:false});
-    const arrowHead=new window.fabric.Path(arrowPath,{fill:col,stroke:'none',selectable:false,evented:false});
+    const arrowHead=new window.fabric.Path(arrowPath,{fill:col,stroke:null,strokeWidth:0,selectable:false,evented:false});
     const fontSize=11;
     const lines=label.split('\n');
     // Measure text via temporary canvas text object
@@ -3275,7 +3294,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     const th=tmpTxt.height||fontSize*lines.length*1.5;
     const bgRect=new window.fabric.Rect({
       left:x1,top:y1-th-6,width:tw+10,height:th+6,
-      fill:'white',stroke:'none',strokeWidth:0,
+      fill:'white',stroke:null,strokeWidth:0,
       selectable:false,evented:false,
     });
     const txtObj=new window.fabric.Text(label,{
@@ -3327,7 +3346,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       const hw=arrowSize*0.38;
       const bx=tx-arrowSize*c,by=ty-arrowSize*s;
       const path=`M ${tx.toFixed(1)} ${ty.toFixed(1)} L ${(bx+hw*pc).toFixed(1)} ${(by+hw*ps).toFixed(1)} L ${(bx-hw*pc).toFixed(1)} ${(by-hw*ps).toFixed(1)} Z`;
-      return new window.fabric.Path(path,{fill:col,stroke:'none',selectable:false,evented:false});
+      return new window.fabric.Path(path,{fill:col,stroke:null,strokeWidth:0,selectable:false,evented:false});
     };
     const leftArrow=makeArrow(x1,y1,angle+Math.PI);
     const rightArrow=makeArrow(x2,y2,angle);
