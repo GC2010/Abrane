@@ -2203,8 +2203,8 @@ function SymbolsPanel({state,update}) {
               return <button key={s.v} onClick={()=>update({advStatus:s.v})} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 8px',borderRadius:6,border:`1.5px solid ${active?s.color:T.line}`,background:active?s.color+'18':T.surface,cursor:'pointer',fontFamily:'inherit',transition:'border-color .15s'}}>
                 <span style={{fontSize:13}}>{s.emoji}</span>
                 <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start',minWidth:0}}>
-                  <span style={{fontSize:9.5,fontWeight:700,color:active?s.color:T.ink,letterSpacing:'.04em'}}>{s.v}</span>
-                  <span style={{fontSize:8,color:active?s.color:T.ink3,lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:70}}>{s.l}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:active?s.color:T.ink,letterSpacing:'.04em'}}>{s.v}</span>
+                  <span style={{fontSize:10,color:active?s.color:T.ink3,lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:70}}>{s.l}</span>
                 </div>
               </button>;
             })}
@@ -2216,8 +2216,8 @@ function SymbolsPanel({state,update}) {
               <div style={{background:s.color+'28',border:`2px solid ${s.color}`,borderRadius:8,padding:'8px 16px',display:'flex',alignItems:'center',gap:8}}>
                 <span style={{fontSize:20}}>{s.emoji}</span>
                 <div>
-                  <div style={{fontSize:11,fontWeight:900,color:s.color,letterSpacing:'.06em'}}>{s.v}</div>
-                  <div style={{fontSize:9,fontWeight:600,color:s.color}}>{s.l}</div>
+                  <div style={{fontSize:13,fontWeight:900,color:s.color,letterSpacing:'.06em'}}>{s.v}</div>
+                  <div style={{fontSize:11,fontWeight:600,color:s.color}}>{s.l}</div>
                 </div>
               </div>
             </div>
