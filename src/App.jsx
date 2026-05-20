@@ -2173,6 +2173,23 @@ function ContentPanel({state,update,onNavigate}) {
     update({contentOrder:[...state.contentOrder,{type:'cat',id,name:'Nouvelle catégorie'}]});
   };
 
+  const splitFile=ordId=>{
+    const item=state.contentOrder.find(x=>x.id===ordId);
+    if(!item||item.type!=='file')return;
+    const f=state.files.find(x=>x.id===item.fileId);
+    if(!f||!f.pageUrls||f.pageUrls.length<=1)return;
+    const idx=state.contentOrder.findIndex(x=>x.id===ordId);
+    const newFiles=f.pageUrls.map((url,i)=>({
+      id:'f'+Date.now()+'_s'+i,
+      name:f.name.replace(/\.[^.]+$/,'')+(f.pageUrls.length>1?` p.${i+1}`:''),
+      type:f.type,pages:1,size:f.size,pageUrls:[url],
+    }));
+    const newOrders=newFiles.map(nf=>({type:'file',id:'fi'+Date.now()+'_'+nf.id,fileId:nf.id,rotation:0,label:''}));
+    const newOrder=[...state.contentOrder];
+    newOrder.splice(idx,1,...newOrders);
+    update({files:[...state.files.filter(x=>x.id!==f.id),...newFiles],contentOrder:newOrder});
+  };
+
   const rotBtnSt=(active)=>({
     padding:'2px 5px',fontSize:9,fontWeight:600,lineHeight:1,
     border:`1px solid ${active?T.gold:T.lineSoft}`,borderRadius:3,cursor:'pointer',
@@ -2271,6 +2288,15 @@ function ContentPanel({state,update,onNavigate}) {
                   onDragStart={e=>{e.stopPropagation();e.preventDefault();}}
                   draggable={false}
                 >
+                  {f.pages>1&&f.type!=='merged'&&(
+                    <button
+                      onClick={e=>{e.stopPropagation();splitFile(item.id);}}
+                      title="Séparer chaque page en élément indépendant"
+                      style={{display:'flex',alignItems:'center',gap:4,background:'transparent',border:`1px solid ${T.gold}`,borderRadius:4,padding:'2px 7px',cursor:'pointer',color:T.gold,fontSize:9.5,fontWeight:600,marginBottom:5,width:'100%',justifyContent:'center'}}
+                    >
+                      ⊞ Séparer les pages ({f.pages})
+                    </button>
+                  )}
                   {Array.from({length:f.pages},(_,pi)=>{
                     const pKey='f-'+item.id+'-'+pi;
                     const pr=item.pageRotations?.[pi]??item.rotation??0;
