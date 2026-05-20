@@ -3014,8 +3014,13 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
           }
         });
       }else{
-        if(props.color!=null)o.set({stroke:props.color});
-        if(props.sw!=null)o.set({strokeWidth:props.sw});
+        // rectFill: stroke===null, color lives in fill
+        if(o.stroke===null&&o.fill!==undefined){
+          if(props.color!=null)o.set({fill:props.color});
+        }else{
+          if(props.color!=null)o.set({stroke:props.color});
+          if(props.sw!=null)o.set({strokeWidth:props.sw});
+        }
       }
     });
     canvas.requestRenderAll();
@@ -3108,6 +3113,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
         if(l?.stroke&&l.stroke!=='transparent'){c=l.stroke;sw=l.strokeWidth;}
         else{c=r?.stroke;sw=r?.strokeWidth;}
       }
+      else if(o.stroke===null&&o.fill!==undefined){c=o.fill;} // rectFill: color in fill
       else{c=o.stroke;sw=o.strokeWidth;}
       if(c&&c!=='transparent'){colorRef.current=c;setColorState(c);}
       if(sw>0){strokeWRef.current=sw;setStrokeWState(sw);}
@@ -3123,24 +3129,27 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       isDrawingRef.current=true;
       const p=canvas.getPointer(opt.e);
       originRef.current={x:p.x,y:p.y};
-      const col=colorRef.current,sw=strokeWRef.current*2;
+      const col=colorRef.current,sw=strokeWRef.current;
       if(t==='line'||t==='underline'){
         shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:sw,strokeLineCap:'round',selectable:false,evented:false});
         canvas.add(shapeRef.current);
+      } else if(t==='rectFill'){
+        shapeRef.current=new window.fabric.Rect({left:p.x,top:p.y,width:1,height:1,fill:col,stroke:null,strokeWidth:0,opacity:0.45,selectable:false,evented:false});
+        canvas.add(shapeRef.current);
       } else if(t==='rect'||t==='rectText'){
-        shapeRef.current=new window.fabric.Rect({left:p.x,top:p.y,width:1,height:1,fill:'white',stroke:col,strokeWidth:strokeWRef.current,rx:2,ry:2,selectable:false,evented:false});
+        shapeRef.current=new window.fabric.Rect({left:p.x,top:p.y,width:1,height:1,fill:'white',stroke:col,strokeWidth:sw,rx:2,ry:2,selectable:false,evented:false});
         canvas.add(shapeRef.current);
       } else if(t==='circle'){
-        shapeRef.current=new window.fabric.Ellipse({left:p.x,top:p.y,rx:1,ry:1,fill:'transparent',stroke:col,strokeWidth:strokeWRef.current,selectable:false,evented:false});
+        shapeRef.current=new window.fabric.Ellipse({left:p.x,top:p.y,rx:1,ry:1,fill:'transparent',stroke:col,strokeWidth:sw,selectable:false,evented:false});
         canvas.add(shapeRef.current);
       } else if(t==='triangle'){
-        shapeRef.current=new window.fabric.Triangle({left:p.x,top:p.y,width:1,height:1,fill:'transparent',stroke:col,strokeWidth:strokeWRef.current,selectable:false,evented:false});
+        shapeRef.current=new window.fabric.Triangle({left:p.x,top:p.y,width:1,height:1,fill:'transparent',stroke:col,strokeWidth:sw,selectable:false,evented:false});
         canvas.add(shapeRef.current);
       } else if(t==='quota'){
-        shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:strokeWRef.current*2,strokeLineCap:'round',strokeDashArray:[6,4],selectable:false,evented:false,opacity:0.6});
+        shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:sw,strokeLineCap:'round',strokeDashArray:[6,4],selectable:false,evented:false,opacity:0.6});
         canvas.add(shapeRef.current);
       } else if(t.startsWith('arrow')){
-        shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:strokeWRef.current*2,strokeLineCap:'round',strokeDashArray:[8,4],selectable:false,evented:false,opacity:0.7});
+        shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:sw,strokeLineCap:'round',strokeDashArray:[8,4],selectable:false,evented:false,opacity:0.7});
         canvas.add(shapeRef.current);
       }
       canvas.requestRenderAll();
@@ -3402,6 +3411,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     {id:'underline',     label:'Souligner',              sym:'U̲'},
     {id:'line',          label:'Ligne',                  sym:'╱'},
     {id:'rect',          label:'Cache blanc',            sym:'□'},
+    {id:'rectFill',      label:'Zone colorée',           sym:'▪'},
     {id:'rectText',      label:'Zone + texte',           sym:'▣'},
     {id:'circle',        label:'Cercle',                 sym:'○'},
     {id:'triangle',      label:'Triangle',               sym:'△'},
