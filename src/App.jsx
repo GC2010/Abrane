@@ -675,25 +675,17 @@ function LoginScreen({onLogin}) {
 
   // ── Cloud login (USE_CLOUD = true) ────────────────────────────
   const [authMode,setAuthMode]=useState('login'); // 'login' | 'register'
-  const [selectedUser,setSelectedUser]=useState(null); // user picked from list
   const [manualName,setManualName]=useState('');       // typed name (login)
   const [fullName,setFullName]=useState('');           // new user name (register)
   const [pwd,setPwd]=useState('');
   const [confirmPwd,setConfirmPwd]=useState('');
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState('');
-  const [userList,setUserList]=useState([]);           // [{id, name}]
-  const [listLoaded,setListLoaded]=useState(false);
 
-  useEffect(()=>{
-    if(!USE_CLOUD) return;
-    listUsers().then(list=>{setUserList(list);setListLoaded(true);}).catch(()=>setListLoaded(true));
-  },[]);
-
-  const resetForm=()=>{setPwd('');setConfirmPwd('');setErr('');setSelectedUser(null);setManualName('');setFullName('');};
+  const resetForm=()=>{setPwd('');setConfirmPwd('');setErr('');setManualName('');setFullName('');};
 
   const doLogin=async()=>{
-    const name=(selectedUser?.name||manualName).trim();
+    const name=manualName.trim();
     if(!name||!pwd){setErr('Renseignez votre nom et votre mot de passe.');return;}
     setLoading(true);setErr('');
     try{
@@ -736,28 +728,15 @@ function LoginScreen({onLogin}) {
         </div>
 
         {authMode==='login'&&<>
-          {/* User list from Supabase */}
-          {listLoaded&&userList.length>0&&<>
-            <div style={{fontSize:12.5,fontFamily:'inherit',color:T.ink4,marginBottom:7,fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase'}}>Sélectionnez votre profil</div>
-            <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:14,maxHeight:180,overflowY:'auto'}}>
-              {userList.map(u=><button key={u.id} onClick={()=>{setSelectedUser(u);setManualName('');setErr('');}} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',borderRadius:8,border:`1.5px solid ${selectedUser?.id===u.id?T.navy:T.lineSoft}`,background:selectedUser?.id===u.id?T.navyTint:T.surface,cursor:'pointer',width:'100%',textAlign:'left',fontFamily:'inherit'}}>
-                <div style={{width:28,height:28,borderRadius:'50%',background:selectedUser?.id===u.id?T.navy:T.panel2,color:selectedUser?.id===u.id?'#fff':T.ink3,display:'grid',placeItems:'center',fontWeight:700,fontSize:10,flexShrink:0,fontFamily:'inherit'}}>
-                  {(u.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
-                </div>
-                <span style={{fontSize:12.5,fontFamily:'inherit',fontWeight:selectedUser?.id===u.id?600:400,color:T.ink}}>{u.name}</span>
-              </button>)}
-            </div>
-            <div style={{fontSize:12.5,fontFamily:'inherit',color:T.ink4,marginBottom:6,textAlign:'center'}}>— ou saisir manuellement —</div>
-          </>}
           <div style={{display:'flex',flexDirection:'column',gap:9}}>
-            <input autoFocus={!selectedUser} style={inputSt}
-              placeholder={selectedUser?`Connecté en tant que : ${selectedUser.name}`:'Votre nom ou e-mail admin'}
-              value={selectedUser?selectedUser.name:manualName}
-              onChange={e=>{setSelectedUser(null);setManualName(e.target.value);setErr('');}}
+            <input autoFocus style={inputSt}
+              placeholder="Votre nom ou e-mail admin"
+              value={manualName}
+              onChange={e=>{setManualName(e.target.value);setErr('');}}
               onKeyDown={e=>e.key==='Enter'&&document.getElementById('login-pwd')?.focus()}/>
             <input id="login-pwd" type="password" style={inputSt} placeholder="Mot de passe"
               value={pwd} onChange={e=>{setPwd(e.target.value);setErr('');}}
-              onKeyDown={e=>e.key==='Enter'&&doLogin()} autoFocus={!!selectedUser}/>
+              onKeyDown={e=>e.key==='Enter'&&doLogin()}/>
             {err&&<div style={{fontSize:12.5,fontFamily:'inherit',color:'#C53030',textAlign:'center'}}>{err}</div>}
             <button style={{...btnSt('primary'),justifyContent:'center',opacity:loading?.7:1}} onClick={doLogin} disabled={loading}>
               {loading?'Connexion…':'Se connecter'}
