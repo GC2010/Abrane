@@ -154,6 +154,35 @@ const shade = (hex,amt) => { try { const n=parseInt(hex.replace('#',''),16); let
 
 const readFileAsDataUrl = file => new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
 
+const loadImage = url => new Promise((res,rej)=>{const img=new Image();img.onload=()=>res(img);img.onerror=rej;img.src=url;});
+
+const pairPdfPages = async (pageUrls, isLandscape) => {
+  const out=[];
+  for(let i=0;i<pageUrls.length;i+=2){
+    const url2=pageUrls[i+1];
+    if(!url2){out.push(pageUrls[i]);break;}
+    const [img1,img2]=await Promise.all([loadImage(pageUrls[i]),loadImage(url2)]);
+    const cv=document.createElement('canvas');
+    const ctx=cv.getContext('2d');
+    ctx.fillStyle='#fff';
+    if(isLandscape){
+      // landscape template → 2 pages side by side
+      cv.width=img1.width+img2.width; cv.height=Math.max(img1.height,img2.height);
+      ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.drawImage(img1,0,(cv.height-img1.height)/2);
+      ctx.drawImage(img2,img1.width,(cv.height-img2.height)/2);
+    }else{
+      // portrait template → 2 pages stacked
+      cv.width=Math.max(img1.width,img2.width); cv.height=img1.height+img2.height;
+      ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.drawImage(img1,(cv.width-img1.width)/2,0);
+      ctx.drawImage(img2,(cv.width-img2.width)/2,img1.height);
+    }
+    out.push(cv.toDataURL('image/jpeg',0.85));
+  }
+  return out;
+};
+
 const renderPdfToDataUrls = async file => {
   const pdfjsLib = window.pdfjsLib;
   if(!pdfjsLib) return {pageCount:1,pageUrls:[]};
@@ -2035,6 +2064,7 @@ function ContentPanel({state,update,onNavigate}) {
   const [renaming,setRenaming]=useState(null);
   const [importing,setImporting]=useState(false);
   const [expandedZoom,setExpandedZoom]=useState({});
+  const [pdfTwoPerSheet,setPdfTwoPerSheet]=useState(false);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
   const handleImport=async e=>{
@@ -2049,6 +2079,10 @@ function ContentPanel({state,update,onNavigate}) {
         if(ext==='pdf'){
           const result=await renderPdfToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
+          if(pdfTwoPerSheet&&pageUrls.length>1){
+            pageUrls=await pairPdfPages(pageUrls,state.pageFormat.startsWith('h'));
+            pageCount=pageUrls.length;
+          }
         } else if(ext==='docx'||ext==='doc'){
           const result=await renderDocxToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
@@ -2141,6 +2175,13 @@ function ContentPanel({state,update,onNavigate}) {
         <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
         <span style={{fontSize:12,color:T.ink3}}>{importing?'Conversion en cours…':'JPG · PNG · SVG · PDF · Word · Excel'}</span>
       </div>
+      <button onClick={()=>setPdfTwoPerSheet(v=>!v)} style={{marginTop:7,display:'flex',alignItems:'center',gap:6,background:'transparent',border:`1px solid ${pdfTwoPerSheet?T.gold:T.lineSoft}`,borderRadius:5,padding:'4px 10px',cursor:'pointer',color:pdfTwoPerSheet?T.gold:T.ink3,fontSize:10.5,fontWeight:600,width:'100%',justifyContent:'center'}}>
+        <span style={{width:12,height:12,border:`1.5px solid ${pdfTwoPerSheet?T.gold:T.ink4}`,borderRadius:2,background:pdfTwoPerSheet?T.gold:'transparent',display:'grid',placeItems:'center',flexShrink:0}}>
+          {pdfTwoPerSheet&&<span style={{width:7,height:7,background:'#fff',borderRadius:1}}/>}
+        </span>
+        2 pages par feuille (PDF)
+        <span style={{fontSize:9,fontWeight:400,color:T.ink4,marginLeft:2}}>{state.pageFormat.startsWith('h')?'· côte à côte':'· empilées'}</span>
+      </button>
     </Sect>
     <Sect title={`Ordre · ${state.contentOrder.length} entrées`}>
       <button onClick={addCategory} style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',marginBottom:6}}>
