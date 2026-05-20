@@ -2081,7 +2081,6 @@ function ContentPanel({state,update,onNavigate}) {
   const [renaming,setRenaming]=useState(null);
   const [importing,setImporting]=useState(false);
   const [expandedZoom,setExpandedZoom]=useState({});
-  const [pdfTwoPerSheet,setPdfTwoPerSheet]=useState(false);
   const pdfTwoPerSheetRef=useRef(false);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
@@ -2187,17 +2186,20 @@ function ContentPanel({state,update,onNavigate}) {
   return <>
     <Sect title="Importer">
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImport}/>
-      <div onClick={()=>!importing&&fileInputRef.current?.click()} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
+      <div onClick={()=>{if(importing)return;pdfTwoPerSheetRef.current=false;fileInputRef.current?.click();}} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
         <Icon name="upload" size={22} color={importing?T.navy:T.gold}/>
         <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
         <span style={{fontSize:12,color:T.ink3}}>{importing?'Conversion en cours…':'JPG · PNG · SVG · PDF · Word · Excel'}</span>
       </div>
-      <button onClick={()=>{const n=!pdfTwoPerSheetRef.current;pdfTwoPerSheetRef.current=n;setPdfTwoPerSheet(n);}} style={{marginTop:7,display:'flex',alignItems:'center',gap:6,background:'transparent',border:`1px solid ${pdfTwoPerSheet?T.gold:T.lineSoft}`,borderRadius:5,padding:'4px 10px',cursor:'pointer',color:pdfTwoPerSheet?T.gold:T.ink3,fontSize:10.5,fontWeight:600,width:'100%',justifyContent:'center'}}>
-        <span style={{width:12,height:12,border:`1.5px solid ${pdfTwoPerSheet?T.gold:T.ink4}`,borderRadius:2,background:pdfTwoPerSheet?T.gold:'transparent',display:'grid',placeItems:'center',flexShrink:0}}>
-          {pdfTwoPerSheet&&<span style={{width:7,height:7,background:'#fff',borderRadius:1}}/>}
-        </span>
-        2 pages par feuille (PDF)
-        <span style={{fontSize:9,fontWeight:400,color:T.ink4,marginLeft:2}}>{state.pageFormat.startsWith('h')?'· côte à côte':'· empilées'}</span>
+      <button
+        disabled={importing}
+        onClick={()=>{pdfTwoPerSheetRef.current=true;fileInputRef.current?.click();}}
+        title={state.pageFormat.startsWith('h')?'2 pages PDF côte à côte':'2 pages PDF empilées'}
+        style={{marginTop:6,display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:'transparent',border:`1px solid ${T.gold}`,borderRadius:6,padding:'5px 10px',cursor:importing?'wait':'pointer',color:T.gold,fontSize:10.5,fontWeight:700,width:'100%',opacity:importing?0.5:1}}
+      >
+        <Icon name="upload" size={12} color={T.gold}/>
+        PDF — 2 pages / feuille
+        <span style={{fontSize:9,fontWeight:400,opacity:.75}}>{state.pageFormat.startsWith('h')?'(côte à côte)':'(empilées)'}</span>
       </button>
     </Sect>
     <Sect title={`Ordre · ${state.contentOrder.length} entrées`}>
