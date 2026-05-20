@@ -172,6 +172,40 @@ const renderPdfToDataUrls = async file => {
   return {pageCount,pageUrls};
 };
 
+const htmlToPageDataUrl = (htmlContent, w=794, h=1123) => new Promise((res,rej)=>{
+  const canvas=document.createElement('canvas');
+  canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,w,h);
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="padding:36px;font-family:Arial,sans-serif;font-size:11px;box-sizing:border-box;width:${w}px;height:${h}px;overflow:hidden;line-height:1.5;color:#1a1a1a;">${htmlContent}</div></foreignObject></svg>`;
+  const img=new Image();
+  img.onload=()=>{ctx.drawImage(img,0,0);res(canvas.toDataURL('image/jpeg',0.85));};
+  img.onerror=rej;
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+});
+
+const renderDocxToDataUrls = async file => {
+  if(!window.mammoth) return {pageCount:1,pageUrls:[]};
+  const ab=await file.arrayBuffer();
+  const result=await window.mammoth.convertToHtml({arrayBuffer:ab});
+  const dataUrl=await htmlToPageDataUrl(result.value);
+  return {pageCount:1,pageUrls:[dataUrl]};
+};
+
+const renderXlsxToDataUrls = async file => {
+  if(!window.XLSX) return {pageCount:1,pageUrls:[]};
+  const ab=await file.arrayBuffer();
+  const wb=window.XLSX.read(ab,{type:'array'});
+  const pageUrls=[];
+  for(const sheetName of wb.SheetNames){
+    const ws=wb.Sheets[sheetName];
+    const tbl=window.XLSX.utils.sheet_to_html(ws,{id:'tbl'});
+    const html=`<style>table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:3px 6px;font-size:10px}th{background:#f0f0f0;font-weight:600}</style><div style="font-size:11px;font-weight:600;margin-bottom:8px;color:#555">${sheetName}</div>${tbl}`;
+    pageUrls.push(await htmlToPageDataUrl(html));
+  }
+  return {pageCount:pageUrls.length||1,pageUrls};
+};
+
 const initialState = project => {
   // Supabase template opened to create a new project
   if(project?._isTemplate && project.data){
@@ -1990,13 +2024,17 @@ function ContentPanel({state,update,onNavigate}) {
     const newFiles=[],newOrders=[];
     for(const file of list){
       const ext=file.name.split('.').pop().toLowerCase();
-      const isPdf=ext==='pdf';
       let pageCount=1,pageUrls=[];
       try{
-        if(isPdf){
+        if(ext==='pdf'){
           const result=await renderPdfToDataUrls(file);
-          pageCount=result.pageCount;
-          pageUrls=result.pageUrls;
+          pageCount=result.pageCount; pageUrls=result.pageUrls;
+        } else if(ext==='docx'||ext==='doc'){
+          const result=await renderDocxToDataUrls(file);
+          pageCount=result.pageCount; pageUrls=result.pageUrls;
+        } else if(ext==='xlsx'||ext==='xls'){
+          const result=await renderXlsxToDataUrls(file);
+          pageCount=result.pageCount; pageUrls=result.pageUrls;
         } else {
           const dataUrl=await readFileAsDataUrl(file);
           pageUrls=[dataUrl];
@@ -2077,11 +2115,11 @@ function ContentPanel({state,update,onNavigate}) {
 
   return <>
     <Sect title="Importer">
-      <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf" style={{display:'none'}} onChange={handleImport}/>
+      <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImport}/>
       <div onClick={()=>!importing&&fileInputRef.current?.click()} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
         <Icon name="upload" size={22} color={importing?T.navy:T.gold}/>
         <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
-        <span style={{fontSize:12,color:T.ink3}}>{importing?'Chaque page PDF sera convertie en image…':'JPG, PNG — PDF multi-pages (1 page par feuille)'}</span>
+        <span style={{fontSize:12,color:T.ink3}}>{importing?'Conversion en cours…':'JPG · PNG · SVG · PDF · Word · Excel'}</span>
       </div>
     </Sect>
     <Sect title={`Ordre · ${state.contentOrder.length} entrées`}>
