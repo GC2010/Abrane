@@ -107,6 +107,33 @@ export async function findTemplateByName(name) {
   return data || null;
 }
 
+// ── Admin: stockage par utilisateur ───────────────────────────
+
+export async function getAdminStorageStats() {
+  if (!USE_CLOUD) return null;
+  const [{ data: projects, error }, { data: templates }] = await Promise.all([
+    supabase.from('projects').select('user_id, data'),
+    supabase.from('templates').select('data'),
+  ]);
+  if (error) return { error: error.message };
+
+  const userStats = {};
+  let totalBytes = 0;
+  for (const p of (projects || [])) {
+    const size = new Blob([JSON.stringify(p.data ?? {})]).size;
+    if (!userStats[p.user_id]) userStats[p.user_id] = { count: 0, bytes: 0 };
+    userStats[p.user_id].count++;
+    userStats[p.user_id].bytes += size;
+    totalBytes += size;
+  }
+  let templateBytes = 0;
+  for (const t of (templates || [])) {
+    templateBytes += new Blob([JSON.stringify(t.data ?? {})]).size;
+  }
+  totalBytes += templateBytes;
+  return { userStats, totalBytes, templateBytes, projectCount: (projects || []).length };
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 
 export function projectToDisplay(row) {

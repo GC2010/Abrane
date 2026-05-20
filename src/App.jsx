@@ -4,7 +4,7 @@ import { USE_CLOUD } from './lib/supabase.js';
 import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, toAppUser, listUsers, deleteUser } from './lib/auth.js';
 import { loadProjects, upsertProject, deleteProject, projectToDisplay,
          loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay,
-         findTemplateByName } from './lib/db.js';
+         findTemplateByName, getAdminStorageStats } from './lib/db.js';
 
 const PDF_QUALITY = [
   {id:'web',      label:'Web',      sub:'72 dpi · partage en ligne',     scale:1.5, q:0.72},
@@ -264,11 +264,22 @@ function AdminPanel({onClose, currentUserId}) {
   const [userList,setUserList]=useState([]);
   const [usersLoaded,setUsersLoaded]=useState(false);
   const [deletingId,setDeletingId]=useState(null);
-  const [confirmDelete,setConfirmDelete]=useState(null); // {id, name}
+  const [confirmDelete,setConfirmDelete]=useState(null);
+  const [storageStats,setStorageStats]=useState(null);
+  const [storageLoading,setStorageLoading]=useState(false);
 
   React.useEffect(()=>{
     listUsers().then(list=>{setUserList(list);setUsersLoaded(true);}).catch(()=>setUsersLoaded(true));
   },[]);
+
+  const loadStorage=async()=>{
+    setStorageLoading(true);
+    const stats=await getAdminStorageStats();
+    setStorageStats(stats);
+    setStorageLoading(false);
+  };
+
+  const fmtBytes=b=>b<1024?`${b} o`:b<1048576?`${(b/1024).toFixed(1)} Ko`:b<1073741824?`${(b/1048576).toFixed(1)} Mo`:`${(b/1073741824).toFixed(2)} Go`;
 
   const doDelete=async()=>{
     if(!confirmDelete) return;
@@ -437,6 +448,75 @@ function AdminPanel({onClose, currentUserId}) {
             </div>
           </div>
         )}
+
+        {/* Stockage Supabase */}
+        <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+            <div style={{fontSize:12,fontWeight:700,color:T.ink}}>Stockage Supabase (plan Free · 500 Mo)</div>
+            <button onClick={loadStorage} disabled={storageLoading} style={{...btnSt(undefined,true),fontSize:10,flexShrink:0}}>
+              {storageLoading?'Chargement…':'🔄 Actualiser'}
+            </button>
+          </div>
+          {!storageStats&&!storageLoading&&(
+            <div style={{fontSize:11,color:T.ink3}}>Cliquez sur Actualiser pour analyser l'espace utilisé.</div>
+          )}
+          {storageLoading&&(
+            <div style={{fontSize:11,color:T.ink3}}>Analyse en cours…</div>
+          )}
+          {storageStats&&!storageLoading&&(()=>{
+            if(storageStats.error) return <div style={{fontSize:11,color:'#C53030'}}>Erreur : {storageStats.error}<br/><span style={{color:T.ink3}}>Il faut peut-être une politique RLS permettant à l'admin de lire tous les projets.</span></div>;
+            const FREE_LIMIT=500*1024*1024;
+            const pct=Math.min(100,(storageStats.totalBytes/FREE_LIMIT)*100);
+            const barColor=pct>85?'#C53030':pct>65?'#F97316':'#16A34A';
+            return <>
+              {/* Barre globale */}
+              <div style={{marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:T.ink2,marginBottom:4}}>
+                  <span><strong>{fmtBytes(storageStats.totalBytes)}</strong> utilisés</span>
+                  <span style={{color:barColor,fontWeight:700}}>{pct.toFixed(1)}%</span>
+                </div>
+                <div style={{height:8,borderRadius:4,background:T.line,overflow:'hidden'}}>
+                  <div style={{width:`${pct}%`,height:'100%',background:barColor,borderRadius:4,transition:'width .4s'}}/>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:T.ink4,marginTop:3}}>
+                  <span>0</span><span>500 Mo (limite free)</span>
+                </div>
+              </div>
+              {/* Détail modèles */}
+              <div style={{fontSize:11,color:T.ink3,marginBottom:8}}>
+                Modèles : <strong style={{color:T.ink2}}>{fmtBytes(storageStats.templateBytes)}</strong>
+                &nbsp;·&nbsp; Projets total : <strong style={{color:T.ink2}}>{storageStats.projectCount}</strong>
+              </div>
+              {/* Par utilisateur */}
+              {Object.keys(storageStats.userStats).length>0&&(
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {Object.entries(storageStats.userStats)
+                    .sort((a,b)=>b[1].bytes-a[1].bytes)
+                    .map(([uid,s])=>{
+                      const u=userList.find(x=>x.id===uid);
+                      const name=u?.name||uid.slice(0,8)+'…';
+                      const initials=(u?.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+                      const userPct=Math.min(100,(s.bytes/FREE_LIMIT)*100);
+                      return <div key={uid} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 8px',background:T.panel,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
+                        <div style={{width:26,height:26,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontSize:10,fontWeight:700,flexShrink:0}}>{initials}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                            <span style={{fontSize:11,fontWeight:600,color:T.ink,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</span>
+                            <span style={{fontSize:10,color:T.ink3,flexShrink:0,marginLeft:8}}>{s.count} projet{s.count>1?'s':''} · {fmtBytes(s.bytes)}</span>
+                          </div>
+                          <div style={{height:4,borderRadius:2,background:T.line,overflow:'hidden'}}>
+                            <div style={{width:`${userPct}%`,height:'100%',background:userPct>85?'#C53030':userPct>65?'#F97316':T.navy,borderRadius:2}}/>
+                          </div>
+                        </div>
+                      </div>;
+                    })
+                  }
+                </div>
+              )}
+              <div style={{marginTop:8,fontSize:10,color:T.ink4,fontStyle:'italic'}}>* Tailles estimées (données JSON brutes). La taille réelle en base inclut les index et métadonnées système.</div>
+            </>;
+          })()}
+        </div>
 
         <div style={{padding:'10px 12px',background:'#FFF8E6',border:`1px solid #F6D860`,borderRadius:8,fontSize:11,color:'#7A5C00',lineHeight:1.5}}>
           <strong>⚠ Logo en stockage local</strong> — visible uniquement sur cet appareil. Pour l'intégrer définitivement dans le code (visible par tous) : copiez la chaîne base64 ci-dessous et envoyez-la au développeur (ou dans le chat IA) pour l'incorporer comme constante dans <code style={{background:'rgba(0,0,0,.06)',padding:'0 3px',borderRadius:2}}>App.jsx</code>.
