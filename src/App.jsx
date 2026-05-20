@@ -847,13 +847,33 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
   const handleImportJson=e=>{
     const file=e.target.files?.[0];if(!file)return;
     const r=new FileReader();
-    r.onload=ev=>{
+    r.onload=async ev=>{
       try{
         const parsed=JSON.parse(ev.target.result);
-        const data=parsed.data||parsed;
-        if(typeof data!=='object'||!data.client&&!data.name) throw new Error('Format invalide');
-        onImportProject({name:parsed.name||data.name||'Projet importé',data});
-      }catch{alert('Fichier .abrane.json invalide ou corrompu');}
+        const isBatch=Array.isArray(parsed);
+        const list=isBatch?parsed:[parsed];
+        if(!list.length) throw new Error('Fichier vide');
+        if(isBatch){
+          // Multi-project export: save each directly to DB then refresh list
+          let count=0;
+          for(const item of list){
+            const data=item.data||item;
+            if(typeof data!=='object') continue;
+            const {sigUrl:_s,_dirty:_d,...dataToSave}=data;
+            await upsertProject(user.id,null,item.name||data.name||'Projet importé',dataToSave);
+            count++;
+          }
+          if(!count) throw new Error('Aucun projet valide');
+          refreshProjects();
+          alert(`${count} projet${count>1?'s':''} importé${count>1?'s':''} avec succès.`);
+        } else {
+          // Single project: open directly in configurator
+          const item=list[0];
+          const data=item.data||item;
+          if(typeof data!=='object') throw new Error('Format invalide');
+          onImportProject({name:item.name||data.name||'Projet importé',data});
+        }
+      }catch(err){alert('Fichier .abrane.json invalide ou corrompu\n'+err.message);}
     };
     r.readAsText(file);
     e.target.value='';
