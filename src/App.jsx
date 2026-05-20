@@ -408,24 +408,31 @@ function AdminPanel({onClose, currentUserId}) {
     const f=e.target.files?.[0];if(!f)return;
     const r=new FileReader();
     r.onload=ev=>{
-      localStorage.setItem(key,ev.target.result);
-      cb(ev.target.result);
-      setBrand(b=>{
-        const next={...b,[key==='abrane_logo'?'officialLogo':key==='abrane_wm'?'wmLogo':'stampLogo']:ev.target.result};
-        saveBrandSettings({officialLogo:next.officialLogo,wmLogo:next.wmLogo,shopLogos:next.shopLogos,stampLogo:next.stampLogo}).catch(()=>{});
-        return next;
-      });
+      const url=ev.target.result;
+      const field=key==='abrane_logo'?'officialLogo':key==='abrane_wm'?'wmLogo':'stampLogo';
+      localStorage.setItem(key,url);
+      cb(url);
+      const payload={
+        officialLogo:field==='officialLogo'?url:officialLogo,
+        wmLogo:field==='wmLogo'?url:wmLogo,
+        shopLogos,
+        stampLogo:field==='stampLogo'?url:stampLogo,
+      };
+      saveBrandSettings(payload).catch(err=>console.warn('Brand save error:',err));
     };
     r.readAsDataURL(f);
   };
   const remove=key=>{
     localStorage.removeItem(key);
     const field=key==='abrane_logo'?'officialLogo':key==='abrane_wm'?'wmLogo':'stampLogo';
-    setBrand(b=>{
-      const next={...b,[field]:''};
-      saveBrandSettings({officialLogo:next.officialLogo,wmLogo:next.wmLogo,shopLogos:next.shopLogos,stampLogo:next.stampLogo}).catch(()=>{});
-      return next;
-    });
+    setBrand(b=>({...b,[field]:''}));
+    const payload={
+      officialLogo:field==='officialLogo'?'':officialLogo,
+      wmLogo:field==='wmLogo'?'':wmLogo,
+      shopLogos,
+      stampLogo:field==='stampLogo'?'':stampLogo,
+    };
+    saveBrandSettings(payload).catch(err=>console.warn('Brand save error:',err));
   };
   const uploadShop=e=>{
     const f=e.target.files?.[0];if(!f||!newShopName.trim())return;
@@ -434,11 +441,8 @@ function AdminPanel({onClose, currentUserId}) {
     r.onload=ev=>{
       const updated={...(shopLogos||{}), [name]:ev.target.result};
       localStorage.setItem('abrane_shop_logos',JSON.stringify(updated));
-      setBrand(b=>{
-        const next={...b,shopLogos:updated};
-        saveBrandSettings({officialLogo:next.officialLogo,wmLogo:next.wmLogo,shopLogos:updated,stampLogo:next.stampLogo}).catch(()=>{});
-        return next;
-      });
+      setBrand(b=>({...b,shopLogos:updated}));
+      saveBrandSettings({officialLogo,wmLogo,shopLogos:updated,stampLogo}).catch(err=>console.warn('Brand save error:',err));
       setNewShopName('');
     };
     r.readAsDataURL(f);
@@ -448,11 +452,8 @@ function AdminPanel({onClose, currentUserId}) {
     const updated={...(shopLogos||{})};
     delete updated[name];
     localStorage.setItem('abrane_shop_logos',JSON.stringify(updated));
-    setBrand(b=>{
-      const next={...b,shopLogos:updated};
-      saveBrandSettings({officialLogo:next.officialLogo,wmLogo:next.wmLogo,shopLogos:updated,stampLogo:next.stampLogo}).catch(()=>{});
-      return next;
-    });
+    setBrand(b=>({...b,shopLogos:updated}));
+    saveBrandSettings({officialLogo,wmLogo,shopLogos:updated,stampLogo}).catch(err=>console.warn('Brand save error:',err));
   };
 
   return <div style={{position:'fixed',inset:0,background:'rgba(15,20,40,.55)',zIndex:200,display:'grid',placeItems:'center',padding:'16px 0'}}>
@@ -3972,15 +3973,7 @@ export default function App() {
   }));
   const brandCtxVal=useMemo(()=>({...brand,setBrand}),[brand]);
 
-  // Ripristina sessione Supabase esistente al caricamento
-  useEffect(()=>{
-    if(!USE_CLOUD) return;
-    getSession().then(async sbUser=>{
-      if(!sbUser) return;
-      const profile=await getProfile(sbUser.id);
-      setUser(toAppUser(sbUser,profile));
-      setScreen('dashboard');
-    });
+  const applyCloudBrand = () => {
     loadBrandSettings().then(remote=>{
       if(!remote||!Object.keys(remote).length) return;
       setBrand(local=>{
@@ -3997,7 +3990,19 @@ export default function App() {
         return merged;
       });
     }).catch(()=>{});
-  },[]);
+  };
+
+  // Ripristina sessione Supabase esistente al caricamento
+  useEffect(()=>{
+    if(!USE_CLOUD) return;
+    getSession().then(async sbUser=>{
+      if(!sbUser) return;
+      const profile=await getProfile(sbUser.id);
+      setUser(toAppUser(sbUser,profile));
+      setScreen('dashboard');
+      applyCloudBrand(); // brand caricato DOPO che l'auth è confermata
+    });
+  },[]);// eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout=async()=>{
     if(USE_CLOUD) await signOut();
@@ -4008,7 +4013,7 @@ export default function App() {
 
   if(!user||screen==='login') return (
     <BrandCtx.Provider value={brandCtxVal}>
-      <LoginScreen onLogin={u=>{setUser(u);setScreen('dashboard');}}/>
+      <LoginScreen onLogin={u=>{setUser(u);setScreen('dashboard');applyCloudBrand();}}/>
     </BrandCtx.Provider>
   );
 
