@@ -2151,7 +2151,8 @@ function ContentPanel({state,update,onNavigate}) {
       }
     }
     const mid='f'+Date.now()+'_m';
-    const mFile={id:mid,name:(a.label||fa.name.replace(/\.[^.]+$/,''))+' + '+(b.label||fb.name.replace(/\.[^.]+$/,'')),type:'merged',pages:mergedUrls.length,size:'',pageUrls:mergedUrls};
+    const mFile={id:mid,name:(a.label||fa.name.replace(/\.[^.]+$/,''))+' + '+(b.label||fb.name.replace(/\.[^.]+$/,'')),type:'merged',pages:mergedUrls.length,size:'',pageUrls:mergedUrls,
+      sourcePages:[fa.pageUrls||[],fb.pageUrls||[]],sourceNames:[fa.name,fb.name],sourceTypes:[fa.type,fb.type]};
     const insertAt=Math.min(fromIdx,toIdx);
     const newOrder=state.contentOrder.filter((_,i)=>i!==fromIdx&&i!==toIdx);
     newOrder.splice(insertAt,0,{type:'file',id:'fi'+Date.now(),fileId:mid,rotation:0,label:''});
@@ -2226,6 +2227,24 @@ function ContentPanel({state,update,onNavigate}) {
       id:'f'+Date.now()+'_s'+i,
       name:f.name.replace(/\.[^.]+$/,'')+(f.pageUrls.length>1?` p.${i+1}`:''),
       type:f.type,pages:1,size:f.size,pageUrls:[url],
+    }));
+    const newOrders=newFiles.map(nf=>({type:'file',id:'fi'+Date.now()+'_'+nf.id,fileId:nf.id,rotation:0,label:''}));
+    const newOrder=[...state.contentOrder];
+    newOrder.splice(idx,1,...newOrders);
+    update({files:[...state.files.filter(x=>x.id!==f.id),...newFiles],contentOrder:newOrder});
+  };
+
+  const splitMerged=ordId=>{
+    const item=state.contentOrder.find(x=>x.id===ordId);
+    if(!item||item.type!=='file')return;
+    const f=state.files.find(x=>x.id===item.fileId);
+    if(!f||f.type!=='merged'||!f.sourcePages)return;
+    const idx=state.contentOrder.findIndex(x=>x.id===ordId);
+    const newFiles=f.sourcePages.map((urls,i)=>({
+      id:'f'+Date.now()+'_u'+i,
+      name:f.sourceNames?.[i]||`Partie ${i+1}`,
+      type:f.sourceTypes?.[i]||'image',
+      pages:urls.length,size:'',pageUrls:urls,
     }));
     const newOrders=newFiles.map(nf=>({type:'file',id:'fi'+Date.now()+'_'+nf.id,fileId:nf.id,rotation:0,label:''}));
     const newOrder=[...state.contentOrder];
@@ -2331,7 +2350,16 @@ function ContentPanel({state,update,onNavigate}) {
                   onDragStart={e=>{e.stopPropagation();e.preventDefault();}}
                   draggable={false}
                 >
-                  {f.pages>1&&(
+                  {f.type==='merged'&&f.sourcePages&&(
+                    <button
+                      onClick={e=>{e.stopPropagation();splitMerged(item.id);}}
+                      title="Restaurer les fichiers originaux"
+                      style={{display:'flex',alignItems:'center',gap:4,background:'transparent',border:`1px solid ${T.gold}`,borderRadius:4,padding:'2px 7px',cursor:'pointer',color:T.gold,fontSize:9.5,fontWeight:600,marginBottom:5,width:'100%',justifyContent:'center'}}
+                    >
+                      ⊟ Séparer les fichiers
+                    </button>
+                  )}
+                  {f.type!=='merged'&&f.pages>1&&(
                     <button
                       onClick={e=>{e.stopPropagation();splitFile(item.id);}}
                       title="Séparer chaque page en élément indépendant"
