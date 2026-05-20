@@ -4,7 +4,8 @@ import { USE_CLOUD } from './lib/supabase.js';
 import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, toAppUser, listUsers, deleteUser } from './lib/auth.js';
 import { loadProjects, upsertProject, deleteProject, projectToDisplay,
          loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay,
-         findTemplateByName, getAdminStorageStats } from './lib/db.js';
+         findTemplateByName, getAdminStorageStats,
+         adminExportUserProjects, adminImportProjects, adminDeleteUserProjects } from './lib/db.js';
 
 const PDF_QUALITY = [
   {id:'web',      label:'Web',      sub:'72 dpi · partage en ligne',     scale:1.5, q:0.72},
@@ -267,6 +268,7 @@ function AdminPanel({onClose, currentUserId}) {
   const [confirmDelete,setConfirmDelete]=useState(null);
   const [storageStats,setStorageStats]=useState(null);
   const [storageLoading,setStorageLoading]=useState(false);
+  const [userOps,setUserOps]=useState({}); // {userId: {exporting,importing,deleting}}
 
   React.useEffect(()=>{
     listUsers().then(list=>{setUserList(list);setUsersLoaded(true);}).catch(()=>setUsersLoaded(true));
@@ -280,6 +282,53 @@ function AdminPanel({onClose, currentUserId}) {
   };
 
   const fmtBytes=b=>b<1024?`${b} o`:b<1048576?`${(b/1024).toFixed(1)} Ko`:b<1073741824?`${(b/1048576).toFixed(1)} Mo`:`${(b/1073741824).toFixed(2)} Go`;
+
+  const setOp=(uid,key,val)=>setUserOps(prev=>({...prev,[uid]:{...(prev[uid]||{}), [key]:val}}));
+
+  const exportUser=async(u)=>{
+    setOp(u.id,'exporting',true);
+    try{
+      const projects=await adminExportUserProjects(u.id);
+      if(!projects.length){alert('Aucun projet trouvé pour cet utilisateur.\n(Vérifiez la politique RLS Supabase.)');return;}
+      const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),user:{id:u.id,name:u.name},projects},null,2)],{type:'application/json'});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`abrane_projets_${(u.name||u.id).replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();URL.revokeObjectURL(a.href);
+    }catch(e){alert('Erreur export : '+e.message);}
+    finally{setOp(u.id,'exporting',false);}
+  };
+
+  const importUser=(u)=>{
+    const input=document.createElement('input');
+    input.type='file';input.accept='.json,application/json';
+    input.onchange=async e=>{
+      const file=e.target.files?.[0];if(!file)return;
+      setOp(u.id,'importing',true);
+      try{
+        const text=await file.text();
+        const json=JSON.parse(text);
+        const projects=Array.isArray(json)?json:(json.projects||[]);
+        if(!projects.length){alert('Aucun projet trouvé dans le fichier.');return;}
+        await adminImportProjects(u.id,projects);
+        alert(`${projects.length} projet(s) importé(s) pour ${u.name}.`);
+        loadStorage();
+      }catch(e){alert('Erreur import : '+e.message);}
+      finally{setOp(u.id,'importing',false);}
+    };
+    input.click();
+  };
+
+  const deleteUserProjects=async(u)=>{
+    if(!window.confirm(`Supprimer TOUS les projets de ${u.name} de Supabase ?\n\nAssurez-vous d'avoir exporté une sauvegarde avant de continuer.`))return;
+    setOp(u.id,'deleting',true);
+    try{
+      await adminDeleteUserProjects(u.id);
+      alert(`Projets de ${u.name} supprimés.`);
+      loadStorage();
+    }catch(e){alert('Erreur suppression : '+e.message);}
+    finally{setOp(u.id,'deleting',false);}
+  };
 
   const doDelete=async()=>{
     if(!confirmDelete) return;
@@ -412,21 +461,40 @@ function AdminPanel({onClose, currentUserId}) {
             ?<div style={{fontSize:11,color:T.ink4}}>Chargement…</div>
             :userList.length===0
               ?<div style={{fontSize:11,color:T.ink4}}>Aucun utilisateur trouvé.</div>
-              :<div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {userList.map(u=>(
-                  <div key={u.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 8px',background:T.panel,borderRadius:6,border:`1px solid ${T.lineSoft}`}}>
-                    <div style={{width:26,height:26,borderRadius:'50%',background:T.panel2,color:T.ink3,display:'grid',placeItems:'center',fontWeight:700,fontSize:10,flexShrink:0}}>
-                      {(u.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+              :<div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {userList.map(u=>{
+                  const ops=userOps[u.id]||{};
+                  return <div key={u.id} style={{background:T.panel,borderRadius:8,border:`1px solid ${T.lineSoft}`,overflow:'hidden'}}>
+                    {/* Ligne identité + supprimer compte */}
+                    <div style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px'}}>
+                      <div style={{width:26,height:26,borderRadius:'50%',background:T.navy,color:'#fff',display:'grid',placeItems:'center',fontWeight:700,fontSize:10,flexShrink:0}}>
+                        {(u.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+                      </div>
+                      <span style={{flex:1,fontSize:12,fontWeight:600,color:T.ink,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.name}</span>
+                      {u.id!==currentUserId&&(
+                        <button onClick={()=>setConfirmDelete(u)} disabled={!!deletingId}
+                          style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA',padding:'3px 8px',flexShrink:0}}>
+                          <Icon name="trash" size={11} color="#C53030"/>
+                        </button>
+                      )}
                     </div>
-                    <span style={{flex:1,fontSize:12,fontWeight:500,color:T.ink,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.name}</span>
-                    {u.id!==currentUserId&&(
-                      <button onClick={()=>setConfirmDelete(u)} disabled={!!deletingId}
-                        style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA',padding:'3px 8px',flexShrink:0}}>
-                        <Icon name="trash" size={12} color="#C53030"/>
+                    {/* Ligne actions projets */}
+                    <div style={{display:'flex',gap:6,padding:'6px 10px',borderTop:`1px solid ${T.lineSoft}`,background:'rgba(0,0,0,.02)',flexWrap:'wrap'}}>
+                      <button onClick={()=>exportUser(u)} disabled={ops.exporting||ops.importing||ops.deleting}
+                        style={{...btnSt(undefined,true),fontSize:10,gap:4,flexShrink:0}}>
+                        {ops.exporting?'Export…':'⬇ Exporter projets'}
                       </button>
-                    )}
-                  </div>
-                ))}
+                      <button onClick={()=>importUser(u)} disabled={ops.exporting||ops.importing||ops.deleting}
+                        style={{...btnSt(undefined,true),fontSize:10,gap:4,flexShrink:0}}>
+                        {ops.importing?'Import…':'⬆ Importer projets'}
+                      </button>
+                      <button onClick={()=>deleteUserProjects(u)} disabled={ops.exporting||ops.importing||ops.deleting}
+                        style={{...btnSt(undefined,true),fontSize:10,gap:4,color:'#C53030',borderColor:'#FECACA',flexShrink:0}}>
+                        {ops.deleting?'Suppression…':'🗑 Vider Supabase'}
+                      </button>
+                    </div>
+                  </div>;
+                })}
               </div>
           }
         </div>

@@ -107,6 +107,40 @@ export async function findTemplateByName(name) {
   return data || null;
 }
 
+// ── Admin: export / import projets par utilisateur ────────────
+
+export async function adminExportUserProjects(userId) {
+  if (!USE_CLOUD) return [];
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name, created_at, data')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function adminImportProjects(userId, projects) {
+  if (!USE_CLOUD) return;
+  for (const p of projects) {
+    const { sigUrl: _s, _dirty: _d, ...dataToSave } = p.data || {};
+    await supabase.from('projects').insert({
+      user_id: userId,
+      name: p.name || 'Projet importé',
+      data: dataToSave,
+    });
+  }
+}
+
+export async function adminDeleteUserProjects(userId) {
+  if (!USE_CLOUD) return;
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
 // ── Admin: stockage par utilisateur ───────────────────────────
 
 export async function getAdminStorageStats() {
