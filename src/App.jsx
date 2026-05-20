@@ -3542,19 +3542,32 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const updatePageNotes=useCallback((pageKey,html)=>{setState(s=>({...s,pageNotes:{...(s.pageNotes||{}),[pageKey]:html},_dirty:true}));setDirtySteps(d=>({...d,content:true}));},[]);
   const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2800);};
 
-  const save=useCallback(async()=>{
+  const [saveModal,setSaveModal]=useState(false);
+  const [saveAsName,setSaveAsName]=useState('');
+
+  const doSave=useCallback(async(overwriteId,name)=>{
     if(!USE_CLOUD){setState(s=>({...s,_dirty:false}));showToast('Projet enregistré (local)');return;}
     setSaving(true);
     try{
-      const id=await upsertProject(user.id,projectId,state.name,state);
+      const id=await upsertProject(user.id,overwriteId,name||state.name,state);
       setProjectId(id);
       setLastSaved('cloud');
-      setState(s=>({...s,_dirty:false}));
+      setState(s=>({...s,_dirty:false,name:name||s.name}));
       showToast('Projet sauvegardé');
       if(onProjectSaved) onProjectSaved(id);
     }catch(e){showToast('Erreur : '+e.message);}
     finally{setSaving(false);}
-  },[user,projectId,state,onProjectSaved]);
+  },[user,state,onProjectSaved]);
+
+  const save=useCallback(()=>{
+    if(projectId&&USE_CLOUD){
+      // Existing project — ask: overwrite or save as new
+      setSaveAsName(state.name||'');
+      setSaveModal(true);
+      return;
+    }
+    doSave(null,state.name);
+  },[projectId,state.name,doSave]);
 
   const [savingTpl,setSavingTpl]=useState(false);
   const [tplModal,setTplModal]=useState(false);
@@ -3622,6 +3635,30 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       <button onClick={save} style={{background:T.surface,border:'none',color:T.ink,padding:'5px 12px',fontSize:12,borderRadius:999,display:'inline-flex',alignItems:'center',gap:5,fontWeight:600,cursor:'pointer'}}><Icon name="save" size={13} color={T.ink}/>Enregistrer</button>
     </div>}
     {toast&&<div style={{position:'fixed',bottom:paletteH+16,right:16,background:T.ink,color:'#fff',padding:'9px 14px',borderRadius:8,fontSize:12,zIndex:9999}}>{toast}</div>}
+    {saveModal&&<Scrim onClose={()=>setSaveModal(false)}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:12,padding:28,width:400,boxShadow:'0 24px 60px rgba(0,0,0,.18)'}}>
+        <div style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:6}}>Enregistrer le projet</div>
+        <div style={{fontSize:12,color:T.ink3,marginBottom:20}}>Ce projet existe déjà. Souhaitez-vous l'écraser ou en créer une copie sous un nouveau nom ?</div>
+        <div style={{background:T.panel,borderRadius:8,padding:'12px 14px',marginBottom:20,display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={()=>{setSaveModal(false);doSave(projectId,state.name);}} disabled={saving}
+            style={{...btnSt('primary'),flex:1,justifyContent:'center',opacity:saving?.7:1}}>
+            <Icon name="save" size={13} color="#fff"/>{saving?'Sauvegarde…':'Écraser'}
+          </button>
+        </div>
+        <div style={{fontSize:12,fontWeight:600,color:T.ink,marginBottom:8}}>Ou enregistrer sous un nouveau nom :</div>
+        <input value={saveAsName} onChange={e=>setSaveAsName(e.target.value)}
+          onKeyDown={e=>{if(e.key==='Enter'&&saveAsName.trim()){setSaveModal(false);doSave(null,saveAsName.trim());}}}
+          placeholder="Nouveau nom du projet…" style={{...inputSt,marginBottom:12}}/>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button onClick={()=>setSaveModal(false)} style={btnSt()}>Annuler</button>
+          <button onClick={()=>{if(!saveAsName.trim())return;setSaveModal(false);doSave(null,saveAsName.trim());}}
+            disabled={!saveAsName.trim()||saving}
+            style={{...btnSt('gold'),opacity:(!saveAsName.trim()||saving)?.7:1}}>
+            <Icon name="plus" size={13} color={T.navy}/>Créer une copie
+          </button>
+        </div>
+      </div>
+    </Scrim>}
     {tplModal&&<Scrim onClose={()=>setTplModal(false)}>
       <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:12,padding:28,width:360,boxShadow:'0 24px 60px rgba(0,0,0,.18)'}}>
         <div style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:6}}>Sauvegarder comme modèle</div>
