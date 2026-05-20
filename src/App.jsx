@@ -791,6 +791,25 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
     else refreshTemplates();
   };
 
+  const exportProject=p=>{
+    const raw=p._raw||p;
+    const payload={name:raw.name||p.name,exportedAt:new Date().toISOString(),data:raw.data||{}};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`${(raw.name||p.name||'projet').replace(/[^a-z0-9_\-]/gi,'_')}.abrane.json`;
+    a.click();URL.revokeObjectURL(a.href);
+  };
+
+  const exportAll=()=>{
+    const payload=allProjects.map(p=>({name:p.name,exportedAt:new Date().toISOString(),data:(p._raw||p).data||{}}));
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`abrane_tous_projets_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();URL.revokeObjectURL(a.href);
+  };
+
   const handleImportJson=e=>{
     const file=e.target.files?.[0];if(!file)return;
     const r=new FileReader();
@@ -818,6 +837,9 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
           <p style={{fontSize:13.5,color:T.ink3,marginTop:4,marginBottom:0}}>Reprenez un projet ou démarrez depuis un modèle client.</p>
         </div>
         <div style={{display:'flex',gap:8}}>
+          {allProjects.length>0&&<button style={{...btnSt(undefined),padding:'8px 14px'}} title="Télécharger tous les projets en JSON" onClick={exportAll}>
+            <Icon name="download" size={14} color={T.ink}/>Tout exporter
+          </button>}
           <label style={{...btnSt(undefined),padding:'8px 14px',cursor:'pointer'}} title="Importer un fichier .abrane.json">
             <Icon name="upload" size={14} color={T.ink}/>Importer JSON
             <input ref={importRef} type="file" accept=".json" hidden onChange={handleImportJson}/>
@@ -860,6 +882,9 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
           <button onClick={e=>{e.stopPropagation();setDeleteConfirm({type:'project',id:p.id,name:p.name});}} title="Supprimer" style={{position:'absolute',top:8,right:8,zIndex:3,width:22,height:22,borderRadius:'50%',background:'rgba(20,20,30,.55)',backdropFilter:'blur(4px)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
             <Icon name="close" size={11} color="#fff"/>
           </button>
+          <button onClick={e=>{e.stopPropagation();exportProject(p);}} title="Télécharger ce projet (JSON)" style={{position:'absolute',top:8,right:36,zIndex:3,width:22,height:22,borderRadius:'50%',background:'rgba(20,20,30,.55)',backdropFilter:'blur(4px)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
+            <Icon name="download" size={11} color="#fff"/>
+          </button>
           <div style={{aspectRatio:'297/210',background:T.panel,borderBottom:`1px solid ${T.lineSoft}`,position:'relative',overflow:'hidden'}}>
             <MiniCover palette={p.palette} client={p.client} subtitle={p.subtitle} clientLogoUrl={p.clientLogoUrl}/>
           </div>
@@ -878,7 +903,7 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
         <div style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px',gap:12,padding:'8px 14px',background:T.panel,borderBottom:`1px solid ${T.line}`,fontSize:10.5,fontWeight:600,color:T.ink4,textTransform:'uppercase',letterSpacing:'.06em'}}>
           <div/><div>Nom</div><div>Client</div><div>Révision</div><div>Pages</div><div>Modifié</div>
         </div>
-        {projects.map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px 32px',gap:12,padding:'10px 14px',borderBottom:i<projects.length-1?`1px solid ${T.lineSoft}`:'none',cursor:'pointer',alignItems:'center',background:T.surface}} onMouseEnter={e=>e.currentTarget.style.background=T.tint} onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
+        {projects.map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'40px 1fr 120px 80px 80px 100px 64px',gap:12,padding:'10px 14px',borderBottom:i<projects.length-1?`1px solid ${T.lineSoft}`:'none',cursor:'pointer',alignItems:'center',background:T.surface}} onMouseEnter={e=>e.currentTarget.style.background=T.tint} onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
           <div style={{width:32,height:32,borderRadius:6,overflow:'hidden',border:`1px solid ${T.line}`,position:'relative',flexShrink:0}} onClick={()=>onOpenProject(p._raw||p)}>
             <MiniCover palette={p.palette} client={p.client} subtitle="" clientLogoUrl={p.clientLogoUrl}/>
           </div>
@@ -887,9 +912,14 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
           <span style={{...pillSt('navy'),fontSize:10}} onClick={()=>onOpenProject(p._raw||p)}>{p.rev}</span>
           <div style={{fontSize:12,color:T.ink2}} onClick={()=>onOpenProject(p._raw||p)}>{p.pages} p.</div>
           <div style={{fontSize:11.5,color:T.ink3}} onClick={()=>onOpenProject(p._raw||p)}>{p.updated}</div>
-          <button onClick={e=>{e.stopPropagation();setDeleteConfirm({type:'project',id:p.id,name:p.name});}} style={{width:28,height:28,borderRadius:6,background:'transparent',border:`1px solid ${T.line}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}} title="Supprimer">
-            <Icon name="trash" size={13} color={T.ink3}/>
-          </button>
+          <div style={{display:'flex',gap:4,alignItems:'center'}}>
+            <button onClick={e=>{e.stopPropagation();exportProject(p);}} style={{width:28,height:28,borderRadius:6,background:'transparent',border:`1px solid ${T.line}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}} title="Télécharger ce projet (JSON)">
+              <Icon name="download" size={13} color={T.ink3}/>
+            </button>
+            <button onClick={e=>{e.stopPropagation();setDeleteConfirm({type:'project',id:p.id,name:p.name});}} style={{width:28,height:28,borderRadius:6,background:'transparent',border:`1px solid ${T.line}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}} title="Supprimer">
+              <Icon name="trash" size={13} color={T.ink3}/>
+            </button>
+          </div>
         </div>)}
       </div>}
       {tab==='templates'&&<div style={{display:'flex',flexDirection:'column',gap:16}}>
