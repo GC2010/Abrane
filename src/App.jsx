@@ -1112,7 +1112,7 @@ function CoverPage({state,isPortrait,isRing}) {
   if(state.showSendDate&&state.sendDate) bits.push({k:'Envoi',v:state.sendDate});
   if(state.showProjectType&&state.projectType) bits.push({k:'Type',v:state.projectType});
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',display:'grid',gridTemplateColumns:'1fr 8%',position:'relative',overflow:'hidden'}}>
-    <div style={{padding:'6% 5% 5% '+(isRing?'12%':'5%'),display:'flex',flexDirection:'column',justifyContent:'space-between',position:'relative'}}>
+    <div style={{padding:'6% 5% 5% '+(isRing?'12%':'5%'),display:'flex',flexDirection:'column',justifyContent:'space-between',position:'relative',containerType:'inline-size'}}>
       <div style={{position:'relative',zIndex:3,height:'20%',flexShrink:0,overflow:'hidden'}}>
         <AbraneLogoBox size="lg"/>
         {state.clientLogoUrl&&
@@ -1126,15 +1126,15 @@ function CoverPage({state,isPortrait,isRing}) {
         {!state.bgImageUrl&&<div style={{width:'100%',height:'100%',background:`repeating-linear-gradient(135deg,${p.c1} 0 14px,${shade(p.c1,-6)} 14px 28px)`,opacity:.6}}/>}
       </div>
       <div style={{position:'relative',zIndex:2,marginTop:'auto'}}>
-        <div style={{fontSize:11,letterSpacing:'.28em',color:shade(p.c3,40),fontWeight:500,marginBottom:4}}>{state.year}</div>
-        <div style={{fontSize:`clamp(18px,${Math.max(2.5,5.5-Math.max(0,state.mainTitle.length-10)*0.3)}vw,72px)`,fontWeight:900,letterSpacing:'-.02em',lineHeight:.88,color:p.c3,wordBreak:'break-word'}}>{state.mainTitle}</div>
+        <div style={{fontSize:11,letterSpacing:'.28em',color:shade(p.c3,40),fontWeight:500,marginBottom:4,lineHeight:1.2}}>{state.year}</div>
+        <div style={{fontSize:`clamp(18px,${Math.max(2.5,5.5-Math.max(0,state.mainTitle.length-10)*0.3)}cqw,72px)`,fontWeight:900,letterSpacing:'-.02em',lineHeight:.88,color:p.c3,wordBreak:'break-word'}}>{state.mainTitle}</div>
         <div style={{fontSize:11,color:shade(p.c3,40),marginTop:6}}>{state.subtitle}</div>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',position:'relative',zIndex:2,marginTop:8}}>
         <div style={{fontSize:9,color:T.ink3,letterSpacing:'.12em',textTransform:'uppercase'}}>{state.rev} · {state.projectDate}</div>
         <div style={{textAlign:'right'}}>
           {bits.length>0&&<div style={{display:'flex',flexDirection:'column',gap:1,alignItems:'flex-end',marginBottom:3}}>
-            {bits.map((b,i)=><div key={i} style={{fontSize:'clamp(5px,.6vw,8px)',color:shade(p.c3,50),letterSpacing:'.08em',textTransform:'uppercase'}}>
+            {bits.map((b,i)=><div key={i} style={{fontSize:'clamp(5px,.6cqw,8px)',color:shade(p.c3,50),letterSpacing:'.08em',textTransform:'uppercase'}}>
               <span style={{opacity:.5}}>{b.k} </span><strong style={{fontWeight:600,opacity:.8}}>{b.v}</strong>
             </div>)}
           </div>}
@@ -1179,11 +1179,11 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
 
 function CatPage({state,catName,isPortrait,isRing}) {
   const p=state.palette;
-  return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',display:'grid',placeItems:'center',position:'relative',padding:isRing?'8% 8% 8% 14%':'8%',overflow:'hidden',boxSizing:'border-box'}}>
+  return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',display:'grid',placeItems:'center',position:'relative',padding:isRing?'8% 8% 8% 14%':'8%',overflow:'hidden',boxSizing:'border-box',containerType:'inline-size'}}>
     <div style={{position:'absolute',top:0,left:0,right:0,height:'16%',background:p.c1,borderBottom:`1px solid ${p.c2}`}}/>
     <div style={{position:'absolute',bottom:0,left:0,right:0,height:'16%',background:p.c1,borderTop:`1px solid ${p.c2}`}}/>
     <div style={{textAlign:'center',position:'relative',zIndex:2}}>
-      <div style={{fontSize:'clamp(28px,4vw,52px)',fontWeight:800,letterSpacing:'.08em',color:p.c3}}>{catName}</div>
+      <div style={{fontSize:'clamp(28px,4cqw,52px)',fontWeight:800,letterSpacing:'.08em',color:p.c3}}>{catName}</div>
       <div style={{width:60,height:1.5,background:p.c2,margin:'12px auto'}}/>
       <div style={{fontSize:10,letterSpacing:'.25em',textTransform:'uppercase',color:p.c2}}>SECTION</div>
     </div>
@@ -1324,8 +1324,8 @@ function NotesPage({state,isPortrait,isRing}) {
 
 function BackPage({state,isPortrait,isRing}) {
   const p=state.palette;
-  return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:isRing?'6% 5% 6% 12%':'6% 5%',position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
-    <div style={{position:'absolute',top:'15%',left:isRing?'13%':'4%',fontSize:'clamp(48px,8vw,110px)',fontWeight:900,color:shade(p.c1,-8),lineHeight:1}}>{state.backDecor}</div>
+  return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:isRing?'6% 5% 6% 12%':'6% 5%',position:'relative',overflow:'hidden',boxSizing:'border-box',containerType:'inline-size'}}>
+    <div style={{position:'absolute',top:'15%',left:isRing?'13%':'4%',fontSize:'clamp(48px,8cqw,110px)',fontWeight:900,color:shade(p.c1,-8),lineHeight:1}}>{state.backDecor}</div>
     <div style={{position:'absolute',top:'6%',right:'5%',textAlign:'right',fontSize:10,color:shade(p.c3,40),lineHeight:1.7}}>
       <div style={{marginLeft:'auto',marginBottom:8,display:'inline-block'}}><AbraneLogoBox size="sm"/></div>
       {state.backLines.map((l,i)=><div key={i}>{l}</div>)}
