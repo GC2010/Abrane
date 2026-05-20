@@ -2091,11 +2091,12 @@ function ContentPanel({state,update,onNavigate}) {
     const newFiles=[],newOrders=[];
     for(const file of list){
       const ext=file.name.split('.').pop().toLowerCase();
-      let pageCount=1,pageUrls=[];
+      let pageCount=1,pageUrls=[],paired=false;
       try{
         if(ext==='pdf'){
           const isLandscape=state.pageFormat.startsWith('h');
-          const result=pdfTwoPerSheetRef.current
+          paired=pdfTwoPerSheetRef.current;
+          const result=paired
             ?await renderPdfToPairedUrls(file,isLandscape)
             :await renderPdfToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
@@ -2112,7 +2113,7 @@ function ContentPanel({state,update,onNavigate}) {
       }catch(err){ console.warn('Import error:',err); }
       const sz=file.size>1024*1024?(file.size/1024/1024).toFixed(1)+' Mo':Math.round(file.size/1024)+' Ko';
       const id='f'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-      newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls});
+      newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls,paired});
       const ordId='fi'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
       newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:''});
     }
@@ -2243,8 +2244,9 @@ function ContentPanel({state,update,onNavigate}) {
                   ):(
                     <div style={{fontSize:11.5,fontWeight:isCat?600:400,color:T.ink,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}} title="Double-clic pour renommer">{displayName}</div>
                   )}
-                  <div style={{fontSize:10,color:T.ink4}}>
+                  <div style={{fontSize:10,color:T.ink4,display:'flex',alignItems:'center',gap:4}}>
                     {isCat?'Catégorie':`${f.pages}p · ${f.size}`}
+                    {!isCat&&f.paired&&<span style={{fontSize:8,fontWeight:700,background:T.gold,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>2p/f</span>}
                   </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:2}}>
