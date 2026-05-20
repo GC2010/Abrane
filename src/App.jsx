@@ -1329,7 +1329,7 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
               const pl=state.stampPlacement||'all';
               const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content');
               return show?(
-                <div style={{position:'absolute',left:`${state.stampX??50}%`,top:`${state.stampY??50}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.stampScale??25}%`,maxWidth:'50%'}}>
+                <div style={{position:'absolute',left:`${state.stampX??50}%`,top:`${state.stampY??50}%`,transform:'translate(-50%,-50%)',zIndex:7,pointerEvents:'none',width:`${state.stampScale??25}%`,maxWidth:'50%'}}>
                   <img src={stampLogo} alt="" style={{width:'100%',objectFit:'contain',opacity:(state.stampOpacity??70)/100}}/>
                 </div>
               ):null;
@@ -1338,12 +1338,12 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
               const pl=state.symPlacement||'all';
               const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content')||(pl==='specific'&&i===(state.symPageNum??1)-1);
               return show?(
-                <div style={{position:'absolute',left:`${state.symX??50}%`,top:`${state.symY??50}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.symScale??20}%`,maxWidth:'35%',display:'flex',flexDirection:'column',alignItems:'center',gap:'4%'}}>
-                  <svg viewBox="0 0 100 90" style={{width:'100%',display:'block',overflow:'visible',filter:'drop-shadow(0 2px 4px rgba(0,0,0,.25))'}}>
+                <div style={{position:'absolute',left:`${state.symX??50}%`,top:`${state.symY??50}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.symScale??20}%`,maxWidth:'35%',display:'flex',flexDirection:'column',alignItems:'center',gap:'6%'}}>
+                  <svg viewBox="0 0 100 90" style={{width:'68%',display:'block',overflow:'visible',filter:'drop-shadow(0 2px 4px rgba(0,0,0,.25))'}}>
                     <polygon points="50,4 96,86 4,86" fill="#DC2626" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
                     <text x="50" y="74" textAnchor="middle" fontWeight="900" fontSize="54" fill="#fff" fontFamily="Arial,Helvetica,sans-serif">!</text>
                   </svg>
-                  {state.symText&&<div style={{fontSize:'clamp(4px,1.4vw,11px)',fontWeight:700,color:'#DC2626',textAlign:'center',lineHeight:1.2,wordBreak:'break-word',width:'180%'}}>{state.symText}</div>}
+                  {state.symText&&<div style={{fontSize:'clamp(6px,2vw,16px)',fontWeight:700,color:'#DC2626',textAlign:'center',lineHeight:1.2,wordBreak:'break-word',width:'160%'}}>{state.symText}</div>}
                 </div>
               ):null;
             })()}
@@ -2219,11 +2219,11 @@ function SymbolsPanel({state,update}) {
         <Fld label="Aperçu">
           <div style={{display:'flex',justifyContent:'center',padding:'12px 0'}}>
             <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
-              <svg viewBox="0 0 100 90" width={56} height={50} style={{display:'block',overflow:'visible',filter:'drop-shadow(0 2px 4px rgba(0,0,0,.2))'}}>
+              <svg viewBox="0 0 100 90" width={42} height={38} style={{display:'block',overflow:'visible',filter:'drop-shadow(0 2px 4px rgba(0,0,0,.2))'}}>
                 <polygon points="50,4 96,86 4,86" fill="#DC2626" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
                 <text x="50" y="74" textAnchor="middle" fontWeight="900" fontSize="54" fill="#fff" fontFamily="Arial,Helvetica,sans-serif">!</text>
               </svg>
-              {state.symText&&<span style={{fontSize:10,fontWeight:700,color:'#DC2626',textAlign:'center'}}>{state.symText}</span>}
+              {state.symText&&<span style={{fontSize:13,fontWeight:700,color:'#DC2626',textAlign:'center'}}>{state.symText}</span>}
             </div>
           </div>
         </Fld>
