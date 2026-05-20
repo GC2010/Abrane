@@ -154,35 +154,50 @@ const shade = (hex,amt) => { try { const n=parseInt(hex.replace('#',''),16); let
 
 const readFileAsDataUrl = file => new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
 
-const loadImage = url => new Promise((res,rej)=>{const img=new Image();img.onload=()=>res(img);img.onerror=rej;img.src=url;});
-
-const pairPdfPages = async (pageUrls, isLandscape) => {
-  const out=[];
-  for(let i=0;i<pageUrls.length;i+=2){
-    const url2=pageUrls[i+1];
-    if(!url2){out.push(pageUrls[i]);break;}
-    const [img1,img2]=await Promise.all([loadImage(pageUrls[i]),loadImage(url2)]);
-    const w1=img1.naturalWidth||img1.width, h1=img1.naturalHeight||img1.height;
-    const w2=img2.naturalWidth||img2.width, h2=img2.naturalHeight||img2.height;
-    const cv=document.createElement('canvas');
-    if(isLandscape){
-      cv.width=w1+w2; cv.height=Math.max(h1,h2);
-    }else{
-      cv.width=Math.max(w1,w2); cv.height=h1+h2;
+// Renders a PDF with 2 pages combined per output image (canvas→canvas, no Image loading)
+const renderPdfToPairedUrls = async (file, isLandscape) => {
+  const pdfjsLib=window.pdfjsLib;
+  if(!pdfjsLib) return {pageCount:0,pageUrls:[]};
+  const ab=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  const total=pdf.numPages;
+  const pageUrls=[];
+  for(let i=1;i<=total;i+=2){
+    const p1=await pdf.getPage(i);
+    const p2=i+1<=total?await pdf.getPage(i+1):null;
+    const vp1=p1.getViewport({scale:1.5});
+    const cv1=document.createElement('canvas');
+    cv1.width=vp1.width; cv1.height=vp1.height;
+    await p1.render({canvasContext:cv1.getContext('2d'),viewport:vp1}).promise;
+    if(!p2){
+      pageUrls.push(cv1.toDataURL('image/jpeg',0.85));
+      break;
     }
-    const ctx=cv.getContext('2d');
+    const vp2=p2.getViewport({scale:1.5});
+    const cv2=document.createElement('canvas');
+    cv2.width=vp2.width; cv2.height=vp2.height;
+    await p2.render({canvasContext:cv2.getContext('2d'),viewport:vp2}).promise;
+    const combined=document.createElement('canvas');
+    if(isLandscape){
+      combined.width=cv1.width+cv2.width;
+      combined.height=Math.max(cv1.height,cv2.height);
+    }else{
+      combined.width=Math.max(cv1.width,cv2.width);
+      combined.height=cv1.height+cv2.height;
+    }
+    const ctx=combined.getContext('2d');
     ctx.fillStyle='#ffffff';
-    ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.fillRect(0,0,combined.width,combined.height);
     if(isLandscape){
-      ctx.drawImage(img1,0,Math.round((cv.height-h1)/2),w1,h1);
-      ctx.drawImage(img2,w1,Math.round((cv.height-h2)/2),w2,h2);
+      ctx.drawImage(cv1,0,Math.round((combined.height-cv1.height)/2));
+      ctx.drawImage(cv2,cv1.width,Math.round((combined.height-cv2.height)/2));
     }else{
-      ctx.drawImage(img1,Math.round((cv.width-w1)/2),0,w1,h1);
-      ctx.drawImage(img2,Math.round((cv.width-w2)/2),h1,w2,h2);
+      ctx.drawImage(cv1,Math.round((combined.width-cv1.width)/2),0);
+      ctx.drawImage(cv2,Math.round((combined.width-cv2.width)/2),cv1.height);
     }
-    out.push(cv.toDataURL('image/jpeg',0.85));
+    pageUrls.push(combined.toDataURL('image/jpeg',0.85));
   }
-  return out;
+  return {pageCount:pageUrls.length,pageUrls};
 };
 
 const renderPdfToDataUrls = async file => {
@@ -2080,16 +2095,11 @@ function ContentPanel({state,update,onNavigate}) {
       let pageCount=1,pageUrls=[];
       try{
         if(ext==='pdf'){
-          const result=await renderPdfToDataUrls(file);
+          const isLandscape=state.pageFormat.startsWith('h');
+          const result=pdfTwoPerSheetRef.current
+            ?await renderPdfToPairedUrls(file,isLandscape)
+            :await renderPdfToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
-          if(pdfTwoPerSheetRef.current&&pageUrls.length>1){
-            try{
-              pageUrls=await pairPdfPages(pageUrls,state.pageFormat.startsWith('h'));
-              pageCount=pageUrls.length;
-            }catch(pairErr){
-              alert('Erreur lors de la combinaison des pages PDF : '+pairErr.message);
-            }
-          }
         } else if(ext==='docx'||ext==='doc'){
           const result=await renderDocxToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
