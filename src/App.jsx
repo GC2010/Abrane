@@ -404,6 +404,30 @@ function AdminPanel({onClose, currentUserId}) {
     }catch(e){ alert(e.message); }
     finally{ setDeletingId(null); setConfirmDelete(null); }
   };
+  const saveBrand=async(payload)=>{
+    try{
+      await saveBrandSettings(currentUserId,payload);
+    }catch(err){
+      alert('Erreur synchronisation logo/tampon :\n'+err.message+'\n\nVérifiez les permissions Supabase (table templates, RLS).');
+    }
+  };
+  const testBrandSync=async()=>{
+    try{
+      const remote=await loadBrandSettings();
+      const keys=remote?Object.keys(remote):[];
+      const hasLogo=!!(remote?.officialLogo);
+      const hasWm=!!(remote?.wmLogo);
+      const hasStamp=!!(remote?.stampLogo);
+      const shopCount=Object.keys(remote?.shopLogos||{}).length;
+      if(!keys.length){
+        alert('⚠️ Aucune donnée de marque trouvée dans Supabase.\n\nLe logo et le tampon ne sont pas encore enregistrés dans le cloud.\nImportez-les depuis ce panneau pour les synchroniser.');
+      }else{
+        alert(`✅ Données de marque trouvées dans Supabase :\n\n• Logo officiel : ${hasLogo?'✓ présent':'✗ manquant'}\n• Filigrane : ${hasWm?'✓ présent':'✗ manquant'}\n• Tampon : ${hasStamp?'✓ présent':'✗ manquant'}\n• Logos boutiques : ${shopCount} entrée(s)\n\nCes données sont disponibles pour tous les appareils connectés.`);
+      }
+    }catch(e){
+      alert('Erreur lors du test :\n'+e.message);
+    }
+  };
   const upload=(key,cb)=>e=>{
     const f=e.target.files?.[0];if(!f)return;
     const r=new FileReader();
@@ -412,13 +436,12 @@ function AdminPanel({onClose, currentUserId}) {
       const field=key==='abrane_logo'?'officialLogo':key==='abrane_wm'?'wmLogo':'stampLogo';
       localStorage.setItem(key,url);
       cb(url);
-      const payload={
+      saveBrand({
         officialLogo:field==='officialLogo'?url:officialLogo,
         wmLogo:field==='wmLogo'?url:wmLogo,
         shopLogos,
         stampLogo:field==='stampLogo'?url:stampLogo,
-      };
-      saveBrandSettings(payload).catch(err=>console.warn('Brand save error:',err));
+      });
     };
     r.readAsDataURL(f);
   };
@@ -426,23 +449,22 @@ function AdminPanel({onClose, currentUserId}) {
     localStorage.removeItem(key);
     const field=key==='abrane_logo'?'officialLogo':key==='abrane_wm'?'wmLogo':'stampLogo';
     setBrand(b=>({...b,[field]:''}));
-    const payload={
+    saveBrand({
       officialLogo:field==='officialLogo'?'':officialLogo,
       wmLogo:field==='wmLogo'?'':wmLogo,
       shopLogos,
       stampLogo:field==='stampLogo'?'':stampLogo,
-    };
-    saveBrandSettings(payload).catch(err=>console.warn('Brand save error:',err));
+    });
   };
   const uploadShop=e=>{
     const f=e.target.files?.[0];if(!f||!newShopName.trim())return;
     const name=newShopName.trim();
     const r=new FileReader();
     r.onload=ev=>{
-      const updated={...(shopLogos||{}), [name]:ev.target.result};
+      const updated={...(shopLogos||{}),[name]:ev.target.result};
       localStorage.setItem('abrane_shop_logos',JSON.stringify(updated));
       setBrand(b=>({...b,shopLogos:updated}));
-      saveBrandSettings({officialLogo,wmLogo,shopLogos:updated,stampLogo}).catch(err=>console.warn('Brand save error:',err));
+      saveBrand({officialLogo,wmLogo,shopLogos:updated,stampLogo});
       setNewShopName('');
     };
     r.readAsDataURL(f);
@@ -453,7 +475,7 @@ function AdminPanel({onClose, currentUserId}) {
     delete updated[name];
     localStorage.setItem('abrane_shop_logos',JSON.stringify(updated));
     setBrand(b=>({...b,shopLogos:updated}));
-    saveBrandSettings({officialLogo,wmLogo,shopLogos:updated,stampLogo}).catch(err=>console.warn('Brand save error:',err));
+    saveBrand({officialLogo,wmLogo,shopLogos:updated,stampLogo});
   };
 
   return <div style={{position:'fixed',inset:0,background:'rgba(15,20,40,.55)',zIndex:200,display:'grid',placeItems:'center',padding:'16px 0'}}>
@@ -513,6 +535,15 @@ function AdminPanel({onClose, currentUserId}) {
                 <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={upload('abrane_stamp',v=>setBrand(b=>({...b,stampLogo:v})))}/>
               </label>
           }
+        </div>
+
+        {/* Vérification synchronisation cloud */}
+        <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16,background:T.tint}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:6}}>Synchronisation cloud</div>
+          <div style={{fontSize:11,color:T.ink3,marginBottom:10}}>Vérifiez que le logo et le tampon sont bien enregistrés dans Supabase et accessibles depuis tous les appareils.</div>
+          <button onClick={testBrandSync} style={{...btnSt(undefined,false),display:'inline-flex',gap:6}}>
+            <Icon name="cloud" size={13} color={T.ink}/>Tester la synchronisation
+          </button>
         </div>
 
         {/* Logos boutiques */}
@@ -3975,21 +4006,20 @@ export default function App() {
 
   const applyCloudBrand = () => {
     loadBrandSettings().then(remote=>{
+      console.log('[brand] loadBrandSettings remote:', remote ? Object.keys(remote) : 'empty');
       if(!remote||!Object.keys(remote).length) return;
-      setBrand(local=>{
-        const merged={
-          officialLogo: remote.officialLogo||local.officialLogo||'',
-          wmLogo:       remote.wmLogo||local.wmLogo||'',
-          shopLogos:    remote.shopLogos||local.shopLogos||{},
-          stampLogo:    remote.stampLogo||local.stampLogo||'',
-        };
-        if(merged.officialLogo) localStorage.setItem('abrane_logo',merged.officialLogo);
-        if(merged.wmLogo)       localStorage.setItem('abrane_wm',merged.wmLogo);
-        if(merged.stampLogo)    localStorage.setItem('abrane_stamp',merged.stampLogo);
-        localStorage.setItem('abrane_shop_logos',JSON.stringify(merged.shopLogos));
-        return merged;
-      });
-    }).catch(()=>{});
+      const merged={
+        officialLogo: remote.officialLogo||'',
+        wmLogo:       remote.wmLogo||'',
+        shopLogos:    remote.shopLogos||{},
+        stampLogo:    remote.stampLogo||'',
+      };
+      if(merged.officialLogo) localStorage.setItem('abrane_logo',merged.officialLogo);
+      if(merged.wmLogo)       localStorage.setItem('abrane_wm',merged.wmLogo);
+      if(merged.stampLogo)    localStorage.setItem('abrane_stamp',merged.stampLogo);
+      localStorage.setItem('abrane_shop_logos',JSON.stringify(merged.shopLogos));
+      setBrand(merged);
+    }).catch(e=>console.warn('[brand] applyCloudBrand error:', e));
   };
 
   // Ripristina sessione Supabase esistente al caricamento

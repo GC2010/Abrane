@@ -147,25 +147,59 @@ const BRAND_TEMPLATE_NAME = '__brand_settings__';
 
 export async function loadBrandSettings() {
   if (!USE_CLOUD) return {};
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('templates')
     .select('id, data')
     .eq('name', BRAND_TEMPLATE_NAME)
-    .maybeSingle();
-  return data?.data || {};
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) console.warn('[brand] loadBrandSettings error:', error);
+  return data?.[0]?.data || {};
 }
 
-export async function saveBrandSettings(brandData) {
+export async function saveBrandSettings(userId, brandData) {
   if (!USE_CLOUD) return;
-  const { data: existing } = await supabase
+
+  // Fetch ALL existing records (duplicates can accumulate from failed delete+insert cycles)
+  const { data: existing, error: selErr } = await supabase
     .from('templates')
-    .select('id')
-    .eq('name', BRAND_TEMPLATE_NAME)
-    .maybeSingle();
-  if (existing?.id) {
-    await supabase.from('templates').update({ data: brandData }).eq('id', existing.id);
+    .select('id, created_by')
+    .eq('name', BRAND_TEMPLATE_NAME);
+  if (selErr) throw selErr;
+
+  if (existing?.length > 0) {
+    // Prefer a record we own; otherwise target the first one
+    const owned = existing.find(r => r.created_by === userId);
+    const target = owned || existing[0];
+
+    const { data: updated, error: upErr } = await supabase
+      .from('templates')
+      .update({ data: brandData })
+      .eq('id', target.id)
+      .select('id');
+    if (upErr) throw upErr;
+
+    if (!updated?.length) {
+      // RLS blocked the update — delete all and reinsert with our userId
+      for (const r of existing) {
+        await supabase.from('templates').delete().eq('id', r.id);
+      }
+      const { error: insErr } = await supabase
+        .from('templates')
+        .insert({ name: BRAND_TEMPLATE_NAME, data: brandData, created_by: userId });
+      if (insErr) throw insErr;
+    } else {
+      // Clean up any duplicate records that may have accumulated
+      const extras = existing.filter(r => r.id !== target.id);
+      if (extras.length > 0) {
+        await supabase.from('templates').delete().in('id', extras.map(r => r.id));
+      }
+    }
   } else {
-    await supabase.from('templates').insert({ name: BRAND_TEMPLATE_NAME, data: brandData, created_by: null });
+    const { error: insErr } = await supabase
+      .from('templates')
+      .insert({ name: BRAND_TEMPLATE_NAME, data: brandData, created_by: userId });
+    if (insErr) throw insErr;
   }
 }
 
