@@ -1322,8 +1322,8 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
                 <div style={{position:'absolute',left:`${state.advX??85}%`,top:`${state.advY??8}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.advScale??15}%`,maxWidth:'28%'}}>
                   <div style={{background:st.color+'28',border:`2px solid ${st.color}`,borderRadius:8,padding:'8% 12%',display:'flex',flexDirection:'column',alignItems:'center',gap:'5%',boxShadow:'0 2px 8px rgba(0,0,0,.18)'}}>
                     <span style={{fontSize:'clamp(7px,2vw,18px)',lineHeight:1}}>{st.emoji}</span>
-                    <span style={{fontSize:'clamp(4px,1.1vw,9px)',fontWeight:900,color:st.color,letterSpacing:'.08em',lineHeight:1}}>{st.v}</span>
-                    <span style={{fontSize:'clamp(3px,.75vw,6px)',fontWeight:600,color:st.color,textAlign:'center',lineHeight:1.25}}>{st.l}</span>
+                    <span style={{fontSize:'clamp(12px,3.3vw,27px)',fontWeight:900,color:st.color,letterSpacing:'.08em',lineHeight:1}}>{st.v}</span>
+                    <span style={{fontSize:'clamp(9px,2.25vw,18px)',fontWeight:600,color:st.color,textAlign:'center',lineHeight:1.25}}>{st.l}</span>
                   </div>
                 </div>
               ):null;
