@@ -107,6 +107,34 @@ export async function findTemplateByName(name) {
   return data || null;
 }
 
+// ── Brand settings (logo, tampon) ─────────────────────────────
+
+const BRAND_TEMPLATE_NAME = '__brand_settings__';
+
+export async function loadBrandSettings() {
+  if (!USE_CLOUD) return {};
+  const { data } = await supabase
+    .from('templates')
+    .select('id, data')
+    .eq('name', BRAND_TEMPLATE_NAME)
+    .maybeSingle();
+  return data?.data || {};
+}
+
+export async function saveBrandSettings(brandData) {
+  if (!USE_CLOUD) return;
+  const { data: existing } = await supabase
+    .from('templates')
+    .select('id')
+    .eq('name', BRAND_TEMPLATE_NAME)
+    .maybeSingle();
+  if (existing?.id) {
+    await supabase.from('templates').update({ data: brandData }).eq('id', existing.id);
+  } else {
+    await supabase.from('templates').insert({ name: BRAND_TEMPLATE_NAME, data: brandData, created_by: null });
+  }
+}
+
 // ── Admin: export / import projets par utilisateur ────────────
 
 export async function adminExportUserProjects(userId) {

@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { createRoot } from 'react-dom/client';
 import { USE_CLOUD } from './lib/supabase.js';
-import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, toAppUser, listUsers, deleteUser } from './lib/auth.js';
+import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, updateProfile, toAppUser, listUsers, deleteUser } from './lib/auth.js';
 import { loadProjects, upsertProject, deleteProject, projectToDisplay,
          loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay,
          findTemplateByName, getAdminStorageStats,
-         adminExportUserProjects, adminImportProjects, adminDeleteUserProjects } from './lib/db.js';
+         adminExportUserProjects, adminImportProjects, adminDeleteUserProjects,
+         loadBrandSettings, saveBrandSettings } from './lib/db.js';
 
 const PDF_QUALITY = [
   {id:'web',      label:'Web',      sub:'72 dpi · partage en ligne',     scale:1.5, q:0.72},
@@ -377,13 +378,25 @@ function AdminPanel({onClose, currentUserId}) {
   const upload=(key,cb)=>e=>{
     const f=e.target.files?.[0];if(!f)return;
     const r=new FileReader();
-    r.onload=ev=>{localStorage.setItem(key,ev.target.result);cb(ev.target.result);};
+    r.onload=ev=>{
+      localStorage.setItem(key,ev.target.result);
+      cb(ev.target.result);
+      setBrand(b=>{
+        const next={...b,[key==='abrane_logo'?'officialLogo':key==='abrane_wm'?'wmLogo':'stampLogo']:ev.target.result};
+        saveBrandSettings({officialLogo:next.officialLogo,wmLogo:next.wmLogo,shopLogos:next.shopLogos,stampLogo:next.stampLogo}).catch(()=>{});
+        return next;
+      });
+    };
     r.readAsDataURL(f);
   };
   const remove=key=>{
     localStorage.removeItem(key);
     const field=key==='abrane_logo'?'officialLogo':key==='abrane_wm'?'wmLogo':'stampLogo';
-    setBrand(b=>({...b,[field]:''}));
+    setBrand(b=>{
+      const next={...b,[field]:''};
+      saveBrandSettings({officialLogo:next.officialLogo,wmLogo:next.wmLogo,shopLogos:next.shopLogos,stampLogo:next.stampLogo}).catch(()=>{});
+      return next;
+    });
   };
   const uploadShop=e=>{
     const f=e.target.files?.[0];if(!f||!newShopName.trim())return;
@@ -392,7 +405,11 @@ function AdminPanel({onClose, currentUserId}) {
     r.onload=ev=>{
       const updated={...(shopLogos||{}), [name]:ev.target.result};
       localStorage.setItem('abrane_shop_logos',JSON.stringify(updated));
-      setBrand(b=>({...b,shopLogos:updated}));
+      setBrand(b=>{
+        const next={...b,shopLogos:updated};
+        saveBrandSettings({officialLogo:next.officialLogo,wmLogo:next.wmLogo,shopLogos:updated,stampLogo:next.stampLogo}).catch(()=>{});
+        return next;
+      });
       setNewShopName('');
     };
     r.readAsDataURL(f);
@@ -402,7 +419,11 @@ function AdminPanel({onClose, currentUserId}) {
     const updated={...(shopLogos||{})};
     delete updated[name];
     localStorage.setItem('abrane_shop_logos',JSON.stringify(updated));
-    setBrand(b=>({...b,shopLogos:updated}));
+    setBrand(b=>{
+      const next={...b,shopLogos:updated};
+      saveBrandSettings({officialLogo:next.officialLogo,wmLogo:next.wmLogo,shopLogos:updated,stampLogo:next.stampLogo}).catch(()=>{});
+      return next;
+    });
   };
 
   return <div style={{position:'fixed',inset:0,background:'rgba(15,20,40,.55)',zIndex:200,display:'grid',placeItems:'center',padding:'16px 0'}}>
@@ -2365,7 +2386,9 @@ function SignPanel({state,update,user}) {
   const [mode,setMode]=useState('draw');
 
   const sigKey=user?'abrane_sig_'+user.id:null;
-  const savedSig=sigKey?localStorage.getItem(sigKey)||'':'';
+  const cloudSig=user?.sigUrl||'';
+  const localSig=sigKey?localStorage.getItem(sigKey)||'':'';
+  const savedSig=cloudSig||localSig;
   const [sigImg,setSigImg]=useState(savedSig);
 
   // Sync saved signature into state on mount so it appears on pages
@@ -2404,11 +2427,13 @@ function SignPanel({state,update,user}) {
     if(sigKey) localStorage.setItem(sigKey,url);
     setSigImg(url);
     update({sigUrl:url,sigEnabled:true});
+    if(user?.id) updateProfile(user.id,{firma_url:url}).catch(()=>{});
   };
   const deleteSig=()=>{
     if(sigKey) localStorage.removeItem(sigKey);
     setSigImg('');
     update({sigUrl:'',sigEnabled:false});
+    if(user?.id) updateProfile(user.id,{firma_url:''}).catch(()=>{});
   };
   const uploadSig=e=>{
     const f=e.target.files?.[0];if(!f)return;
@@ -2418,6 +2443,7 @@ function SignPanel({state,update,user}) {
       if(sigKey) localStorage.setItem(sigKey,url);
       setSigImg(url);
       update({sigUrl:url,sigEnabled:true});
+      if(user?.id) updateProfile(user.id,{firma_url:url}).catch(()=>{});
     };
     r.readAsDataURL(f);
   };
@@ -3886,6 +3912,22 @@ export default function App() {
       setUser(toAppUser(sbUser,profile));
       setScreen('dashboard');
     });
+    loadBrandSettings().then(remote=>{
+      if(!remote||!Object.keys(remote).length) return;
+      setBrand(local=>{
+        const merged={
+          officialLogo: remote.officialLogo||local.officialLogo||'',
+          wmLogo:       remote.wmLogo||local.wmLogo||'',
+          shopLogos:    remote.shopLogos||local.shopLogos||{},
+          stampLogo:    remote.stampLogo||local.stampLogo||'',
+        };
+        if(merged.officialLogo) localStorage.setItem('abrane_logo',merged.officialLogo);
+        if(merged.wmLogo)       localStorage.setItem('abrane_wm',merged.wmLogo);
+        if(merged.stampLogo)    localStorage.setItem('abrane_stamp',merged.stampLogo);
+        localStorage.setItem('abrane_shop_logos',JSON.stringify(merged.shopLogos));
+        return merged;
+      });
+    }).catch(()=>{});
   },[]);
 
   const handleLogout=async()=>{
