@@ -1132,14 +1132,14 @@ function CoverPage({state,isPortrait,isRing}) {
         <div style={{fontSize:11,color:shade(p.c3,40),marginTop:6}}>{state.subtitle}</div>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',position:'relative',zIndex:2,marginTop:8}}>
-        <div style={{fontSize:9,color:T.ink3,letterSpacing:'.12em',textTransform:'uppercase'}}>{state.rev} · {state.projectDate}</div>
+        <div style={{fontSize:'clamp(8px,1cqw,12px)',color:T.ink3,letterSpacing:'.12em',textTransform:'uppercase'}}>{state.rev} · {state.projectDate}</div>
         <div style={{textAlign:'right'}}>
-          {bits.length>0&&<div style={{display:'flex',flexDirection:'column',gap:1,alignItems:'flex-end',marginBottom:3}}>
-            {bits.map((b,i)=><div key={i} style={{fontSize:'clamp(5px,.6cqw,8px)',color:shade(p.c3,50),letterSpacing:'.08em',textTransform:'uppercase'}}>
-              <span style={{opacity:.5}}>{b.k} </span><strong style={{fontWeight:600,opacity:.8}}>{b.v}</strong>
+          {bits.length>0&&<div style={{display:'flex',flexDirection:'column',gap:2,alignItems:'flex-end',marginBottom:4}}>
+            {bits.map((b,i)=><div key={i} style={{fontSize:'clamp(8px,1.1cqw,13px)',color:shade(p.c3,50),letterSpacing:'.06em',textTransform:'uppercase'}}>
+              <span style={{opacity:.5}}>{b.k} </span><strong style={{fontWeight:600,opacity:.9}}>{b.v}</strong>
             </div>)}
           </div>}
-          <div style={{fontSize:9,color:T.ink3,letterSpacing:'.08em'}}>{state.client}</div>
+          <div style={{fontSize:'clamp(8px,1cqw,12px)',color:T.ink3,letterSpacing:'.08em'}}>{state.client}</div>
         </div>
       </div>
     </div>
