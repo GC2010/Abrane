@@ -91,7 +91,7 @@ function Icon({name, size=18, color, stroke=1.5, style={}}) {
 // ── Modifica qui la password admin ────────────────────────────
 const ADMIN_PASS = 'ABRANE2026';
 
-const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},setBrand:()=>{}});
+const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},stampLogo:'',setBrand:()=>{}});
 
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
@@ -207,6 +207,7 @@ const initialState = project => {
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, sigPlacement:'all', wmEnabled:false, wmOpacity:10, sigUrl:'',
     sigScale:30, sigX:78, sigY:88,
+    stampEnabled:false, stampOpacity:70, stampScale:25, stampX:50, stampY:50, stampPlacement:'all',
     symEnabled:false, symPlacement:'all', symText:'', symScale:20, symX:50, symY:50, symPageNum:1,
     advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advX:85, advY:8, advPageNum:1,
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
@@ -258,7 +259,7 @@ function StripeAbraneLogo() {
 }
 
 function AdminPanel({onClose, currentUserId}) {
-  const {officialLogo,wmLogo,shopLogos,setBrand}=React.useContext(BrandCtx);
+  const {officialLogo,wmLogo,shopLogos,stampLogo,setBrand}=React.useContext(BrandCtx);
   const [newShopName,setNewShopName]=useState('');
   const [userList,setUserList]=useState([]);
   const [usersLoaded,setUsersLoaded]=useState(false);
@@ -284,7 +285,11 @@ function AdminPanel({onClose, currentUserId}) {
     r.onload=ev=>{localStorage.setItem(key,ev.target.result);cb(ev.target.result);};
     r.readAsDataURL(f);
   };
-  const remove=key=>{localStorage.removeItem(key);setBrand(b=>({...b,[key==='abrane_logo'?'officialLogo':'wmLogo']:''}));};
+  const remove=key=>{
+    localStorage.removeItem(key);
+    const field=key==='abrane_logo'?'officialLogo':key==='abrane_wm'?'wmLogo':'stampLogo';
+    setBrand(b=>({...b,[field]:''}));
+  };
   const uploadShop=e=>{
     const f=e.target.files?.[0];if(!f||!newShopName.trim())return;
     const name=newShopName.trim();
@@ -344,6 +349,22 @@ function AdminPanel({onClose, currentUserId}) {
             :<label style={{...btnSt(undefined,false),cursor:'pointer',display:'inline-flex'}}>
                 <Icon name="upload" size={14} color={T.ink}/>Importer logo filigrane (PNG transparent / SVG)
                 <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={upload('abrane_wm',v=>setBrand(b=>({...b,wmLogo:v})))}/>
+              </label>
+          }
+        </div>
+
+        {/* Timbro */}
+        <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:8}}>Timbro</div>
+          <div style={{fontSize:11,color:T.ink3,marginBottom:10}}>Timbro sovrapposto sulle pagine. Preferire PNG trasparente o SVG.</div>
+          {stampLogo
+            ?<div style={{display:'flex',alignItems:'center',gap:10}}>
+                <img src={stampLogo} alt="Timbro" style={{height:40,maxWidth:180,objectFit:'contain',border:`1px solid ${T.lineSoft}`,borderRadius:6,padding:4}}/>
+                <button onClick={()=>remove('abrane_stamp')} style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA'}}>Supprimer</button>
+              </div>
+            :<label style={{...btnSt(undefined,false),cursor:'pointer',display:'inline-flex'}}>
+                <Icon name="upload" size={14} color={T.ink}/>Importer le timbro (PNG transparent / SVG)
+                <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={upload('abrane_stamp',v=>setBrand(b=>({...b,stampLogo:v})))}/>
               </label>
           }
         </div>
@@ -424,6 +445,9 @@ function AdminPanel({onClose, currentUserId}) {
           </div>}
           {wmLogo&&<div style={{marginTop:6,display:'flex',gap:6}}>
             <button onClick={()=>navigator.clipboard.writeText(wmLogo).then(()=>alert('Base64 copié !'))} style={{...btnSt(undefined,true),fontSize:10}}>📋 Copier base64 filigrane</button>
+          </div>}
+          {stampLogo&&<div style={{marginTop:6,display:'flex',gap:6}}>
+            <button onClick={()=>navigator.clipboard.writeText(stampLogo).then(()=>alert('Base64 copié !'))} style={{...btnSt(undefined,true),fontSize:10}}>📋 Copier base64 timbro</button>
           </div>}
         </div>
       </div>
@@ -1233,7 +1257,7 @@ function PdfExportModal({state,onClose}) {
 }
 
 function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageNotes}) {
-  const {wmLogo}=React.useContext(BrandCtx);
+  const {wmLogo,stampLogo}=React.useContext(BrandCtx);
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isP=state.pageFormat.startsWith('v');
   const canvasRef=useRef(null);
@@ -1298,6 +1322,15 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
               return show?(
                 <div style={{position:'absolute',left:`${state.sigX??78}%`,top:`${state.sigY??88}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.sigScale??30}%`,maxWidth:'40%'}}>
                   <img src={state.sigUrl} alt="" style={{width:'100%',objectFit:'contain',opacity:0.9}}/>
+                </div>
+              ):null;
+            })()}
+            {state.stampEnabled&&stampLogo&&(()=>{
+              const pl=state.stampPlacement||'all';
+              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content');
+              return show?(
+                <div style={{position:'absolute',left:`${state.stampX??50}%`,top:`${state.stampY??50}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.stampScale??25}%`,maxWidth:'50%'}}>
+                  <img src={stampLogo} alt="" style={{width:'100%',objectFit:'contain',opacity:(state.stampOpacity??70)/100}}/>
                 </div>
               ):null;
             })()}
@@ -2117,6 +2150,35 @@ function SignPanel({state,update,user}) {
       {state.wmEnabled&&<Fld label={`Opacité ${state.wmOpacity}%`}>
         <input type="range" min="3" max="80" value={state.wmOpacity} onChange={e=>update({wmOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
       </Fld>}
+    </Sect>
+    <Sect title="Timbro">
+      <RowItem label="Activer le timbro" sub="Image chargée par l'administrateur">
+        <Toggle checked={state.stampEnabled} onChange={v=>update({stampEnabled:v})}/>
+      </RowItem>
+      {state.stampEnabled&&<>
+        <Fld label="Appliquer sur">
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {PLACEMENTS.map(pl=>(
+              <label key={pl.v} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:12,color:T.ink}}>
+                <input type="radio" name="stampPlacement" value={pl.v} checked={(state.stampPlacement||'all')===pl.v} onChange={()=>update({stampPlacement:pl.v})} style={{accentColor:T.navy}}/>
+                {pl.l}
+              </label>
+            ))}
+          </div>
+        </Fld>
+        <Fld label={`Opacité · ${state.stampOpacity??70}%`}>
+          <input type="range" min="5" max="100" value={state.stampOpacity??70} onChange={e=>update({stampOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Taille · ${state.stampScale??25}%`}>
+          <input type="range" min="5" max="70" value={state.stampScale??25} onChange={e=>update({stampScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position horizontale · ${state.stampX??50}%`}>
+          <input type="range" min="0" max="100" value={state.stampX??50} onChange={e=>update({stampX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Position verticale · ${state.stampY??50}%`}>
+          <input type="range" min="0" max="100" value={state.stampY??50} onChange={e=>update({stampY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+      </>}
     </Sect>
   </>;
 }
@@ -3306,6 +3368,7 @@ export default function App() {
     officialLogo:localStorage.getItem('abrane_logo')||'',
     wmLogo:localStorage.getItem('abrane_wm')||'',
     shopLogos:JSON.parse(localStorage.getItem('abrane_shop_logos')||'{}'),
+    stampLogo:localStorage.getItem('abrane_stamp')||'',
   }));
   const brandCtxVal=useMemo(()=>({...brand,setBrand}),[brand]);
 
