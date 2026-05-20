@@ -2975,6 +2975,8 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
   const [textVal,setTextVal]=useState('');
   const [quotaPrompt,setQuotaPrompt]=useState(null); // {x1,y1,x2,y2}
   const [quotaVal,setQuotaVal]=useState('');
+  const [arrowPrompt,setArrowPrompt]=useState(null); // {x1,y1,x2,y2} for custom labeled arrow
+  const [arrowPromptVal,setArrowPromptVal]=useState('');
   const [canUndo,setCanUndo]=useState(false);
   const [canRedo,setCanRedo]=useState(false);
 
@@ -3118,6 +3120,9 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       } else if(t==='quota'){
         shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:strokeWRef.current*2,strokeLineCap:'round',strokeDashArray:[6,4],selectable:false,evented:false,opacity:0.6});
         canvas.add(shapeRef.current);
+      } else if(t.startsWith('arrow')){
+        shapeRef.current=new window.fabric.Line([p.x,p.y,p.x,p.y],{stroke:col,strokeWidth:strokeWRef.current*2,strokeLineCap:'round',strokeDashArray:[8,4],selectable:false,evented:false,opacity:0.7});
+        canvas.add(shapeRef.current);
       }
       canvas.requestRenderAll();
     });
@@ -3125,7 +3130,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     canvas.on('mouse:move',opt=>{
       if(!isDrawingRef.current||!shapeRef.current)return;
       const p=canvas.getPointer(opt.e),o=originRef.current,t=toolRef.current;
-      if(t==='line'||t==='quota') shapeRef.current.set({x2:p.x,y2:p.y});
+      if(t==='line'||t==='quota'||t.startsWith('arrow')) shapeRef.current.set({x2:p.x,y2:p.y});
       else if(t==='underline') shapeRef.current.set({x2:p.x,y2:o.y});
       else if(t==='circle'){
         const rx=Math.max(1,Math.abs(p.x-o.x)/2),ry=Math.max(1,Math.abs(p.y-o.y)/2);
@@ -3157,6 +3162,16 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
         const {x1,y1,x2,y2}={x1:shape.x1,y1:shape.y1,x2:shape.x2,y2:shape.y2};
         canvas.remove(shape);
         if(Math.abs(x2-x1)+Math.abs(y2-y1)>=10){setQuotaPrompt({x1,y1,x2,y2});setQuotaVal('');}
+        canvas.requestRenderAll();
+        return;
+      }
+      if(t.startsWith('arrow')){
+        const {x1,y1,x2,y2}={x1:shape.x1,y1:shape.y1,x2:shape.x2,y2:shape.y2};
+        canvas.remove(shape);
+        if(Math.abs(x2-x1)+Math.abs(y2-y1)>=8){
+          if(t==='arrowCustom'){setArrowPrompt({x1,y1,x2,y2});setArrowPromptVal('');}
+          else commitLabeledArrow(x1,y1,x2,y2,ARROW_LABELS[t]||t);
+        }
         canvas.requestRenderAll();
         return;
       }
@@ -3225,6 +3240,54 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
 
   const bringFwd=()=>{const o=fc.current?.getActiveObject();if(o){fc.current.bringForward(o);fc.current.requestRenderAll();}};
   const sendBwd=()=>{const o=fc.current?.getActiveObject();if(o){fc.current.sendBackwards(o);fc.current.requestRenderAll();}};
+
+  const ARROW_LABELS={
+    arrowColler:     'Coller\nGlue',
+    arrowSouder:     'Souder\nWeld',
+    arrowMeuler:     'Meuler\nGrind',
+    arrowTourillons: 'Tourillons\nDowels',
+    arrowMinifix:    'Minifix',
+    arrowLivree:     'Livrée assemblée\nDelivered assembled',
+  };
+
+  const commitLabeledArrow=(x1,y1,x2,y2,label)=>{
+    const canvas=fc.current;
+    const col=colorRef.current;
+    const sw=Math.max(1.5,strokeWRef.current*1.5);
+    const dx=x2-x1,dy=y2-y1;
+    const len=Math.sqrt(dx*dx+dy*dy);
+    if(len<8)return;
+    const angle=Math.atan2(dy,dx);
+    const arrowSize=Math.max(12,sw*5);
+    const c=Math.cos(angle),s=Math.sin(angle);
+    const pc=Math.cos(angle+Math.PI/2),ps=Math.sin(angle+Math.PI/2);
+    const hw=arrowSize*0.38;
+    const bx=x2-arrowSize*c,by=y2-arrowSize*s;
+    const arrowPath=`M ${x2.toFixed(1)} ${y2.toFixed(1)} L ${(bx+hw*pc).toFixed(1)} ${(by+hw*ps).toFixed(1)} L ${(bx-hw*pc).toFixed(1)} ${(by-hw*ps).toFixed(1)} Z`;
+    const lineObj=new window.fabric.Line([x1,y1,x2,y2],{stroke:col,strokeWidth:sw,strokeLineCap:'round',selectable:false,evented:false});
+    const arrowHead=new window.fabric.Path(arrowPath,{fill:col,stroke:'none',selectable:false,evented:false});
+    const arrowGrp=new window.fabric.Group([lineObj,arrowHead],{selectable:true,evented:true});
+    canvas.add(arrowGrp);
+    // Text: separate object — always horizontal regardless of arrow angle
+    const fontSize=11;
+    const txtObj=new window.fabric.Text(label,{
+      left:x1,top:y1,fontSize,fill:col,fontFamily:'Arial',fontWeight:'700',
+      textAlign:'left',lineHeight:1.25,originX:'left',originY:'bottom',
+      selectable:true,evented:true,angle:0,
+    });
+    const tw=txtObj.width||fontSize*label.length*0.6;
+    const th=txtObj.height||fontSize*label.split('\n').length*1.4;
+    const bgRect=new window.fabric.Rect({
+      left:x1,top:y1,width:tw+10,height:th+6,
+      fill:'white',stroke:'none',strokeWidth:0,
+      originX:'left',originY:'bottom',
+      selectable:false,evented:false,angle:0,
+    });
+    canvas.add(bgRect);
+    canvas.add(txtObj);
+    canvas.setActiveObject(arrowGrp);
+    canvas.requestRenderAll();
+  };
 
   const commitRectText=()=>{
     if(!textPrompt||!textVal.trim()){setTextPrompt(null);return;}
@@ -3315,16 +3378,24 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
 
   const COLORS=['#E53E3E','#F6AD55','#48BB78','#4299E1','#9F7AEA','#1A1F2E','#FFFFFF'];
   const TOOLS=[
-    {id:'select',   label:'Sélectionner',sym:'↖'},
-    {id:'text',     label:'Texte',       sym:'T'},
-    {id:'underline',label:'Souligner',   sym:'U̲'},
-    {id:'line',     label:'Ligne',       sym:'╱'},
-    {id:'rect',     label:'Cache blanc', sym:'□'},
-    {id:'rectText', label:'Zone + texte',sym:'▣'},
-    {id:'circle',   label:'Cercle',      sym:'○'},
-    {id:'triangle', label:'Triangle',    sym:'△'},
-    {id:'pencil',   label:'Crayon libre',sym:'✏'},
-    {id:'quota',    label:'Cote (↔)',    sym:'↔'},
+    {id:'select',        label:'Sélectionner',           sym:'↖'},
+    {id:'text',          label:'Texte',                  sym:'T'},
+    {id:'underline',     label:'Souligner',              sym:'U̲'},
+    {id:'line',          label:'Ligne',                  sym:'╱'},
+    {id:'rect',          label:'Cache blanc',            sym:'□'},
+    {id:'rectText',      label:'Zone + texte',           sym:'▣'},
+    {id:'circle',        label:'Cercle',                 sym:'○'},
+    {id:'triangle',      label:'Triangle',               sym:'△'},
+    {id:'pencil',        label:'Crayon libre',           sym:'✏'},
+    {id:'quota',         label:'Cote (↔)',               sym:'↔'},
+    {id:'__sep__',       label:'── Flèches ──',          sym:''},
+    {id:'arrowColler',   label:'→ Coller / Glue',        sym:'→C'},
+    {id:'arrowSouder',   label:'→ Souder / Weld',        sym:'→S'},
+    {id:'arrowMeuler',   label:'→ Meuler / Grind',       sym:'→M'},
+    {id:'arrowTourillons',label:'→ Tourillons / Dowels', sym:'→T'},
+    {id:'arrowMinifix',  label:'→ Minifix',              sym:'→F'},
+    {id:'arrowLivree',   label:'→ Livrée assemblée',     sym:'→L'},
+    {id:'arrowCustom',   label:'→ Texte libre…',         sym:'→?'},
   ];
   const tbSt=act=>({display:'flex',alignItems:'center',gap:7,padding:'6px 10px',borderRadius:5,border:'none',cursor:'pointer',width:'100%',textAlign:'left',fontFamily:'inherit',fontSize:11.5,background:act?T.navy:'transparent',color:act?'#fff':'rgba(255,255,255,.7)',fontWeight:act?600:400});
   const aBtnSt=(danger,disabled)=>({...btnSt('ghost',true),color:danger?'#F87171':disabled?'rgba(255,255,255,.25)':'rgba(255,255,255,.82)',border:`1px solid ${danger?'rgba(248,113,113,.3)':disabled?'rgba(255,255,255,.08)':'rgba(255,255,255,.18)'}`,opacity:disabled?0.45:1,cursor:disabled?'not-allowed':'pointer'});
@@ -3350,12 +3421,13 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
         {/* Left sidebar */}
         <div style={{width:150,background:'#0F1825',borderRight:'1px solid rgba(255,255,255,.07)',padding:'12px 8px',display:'flex',flexDirection:'column',gap:3,overflowY:'auto',flexShrink:0}}>
           <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginBottom:4}}>Outil</div>
-          {TOOLS.map(t=>(
-            <button key={t.id} onClick={()=>setTool(t.id)} style={tbSt(tool===t.id)}>
-              <span style={{width:18,textAlign:'center',fontSize:13,flexShrink:0}}>{t.sym}</span>
+          {TOOLS.map(t=>t.id==='__sep__'
+            ?<div key="sep" style={{fontSize:8.5,color:'rgba(255,255,255,.25)',letterSpacing:'.1em',padding:'6px 6px 2px',textTransform:'uppercase'}}>{t.label}</div>
+            :<button key={t.id} onClick={()=>setTool(t.id)} style={tbSt(tool===t.id)}>
+              <span style={{width:18,textAlign:'center',fontSize:t.id.startsWith('arrow')?10:13,flexShrink:0}}>{t.sym}</span>
               <span>{t.label}</span>
             </button>
-          ))}
+          )}
           <div style={{borderTop:'1px solid rgba(255,255,255,.08)',margin:'8px 0',paddingTop:8}}>
             <div style={{fontSize:9,color:'rgba(255,255,255,.28)',letterSpacing:'.12em',textTransform:'uppercase',padding:'0 6px',marginBottom:8}}>Couleur</div>
             <div style={{display:'flex',flexWrap:'wrap',gap:5,padding:'0 4px'}}>
@@ -3407,6 +3479,33 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
                   <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
                     <button onClick={()=>setQuotaPrompt(null)} style={btnSt('ghost',true)}>Annuler</button>
                     <button onClick={commitQuota} style={btnSt('primary',true)}>Placer</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {arrowPrompt&&(
+              <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.5)',display:'grid',placeItems:'center',zIndex:20}}>
+                <div style={{background:'#fff',borderRadius:10,padding:20,minWidth:300,boxShadow:'0 12px 40px rgba(0,0,0,.5)'}}>
+                  <div style={{fontSize:13,fontWeight:600,color:T.ink,marginBottom:4}}>Texte de la flèche</div>
+                  <div style={{fontSize:11,color:'#888',marginBottom:10}}>Le texte apparaîtra horizontal au début de la flèche.</div>
+                  <input autoFocus value={arrowPromptVal} onChange={e=>setArrowPromptVal(e.target.value)}
+                    onKeyDown={e=>{
+                      if(e.key==='Enter'&&arrowPromptVal.trim()){
+                        const {x1,y1,x2,y2}=arrowPrompt;
+                        commitLabeledArrow(x1,y1,x2,y2,arrowPromptVal.trim());
+                        setArrowPrompt(null);setArrowPromptVal('');
+                      }
+                      if(e.key==='Escape'){setArrowPrompt(null);setArrowPromptVal('');}
+                    }}
+                    style={{...inputSt,marginBottom:12}} placeholder="Ex : Ajuster, Vérifier…"/>
+                  <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+                    <button onClick={()=>{setArrowPrompt(null);setArrowPromptVal('');}} style={btnSt('ghost',true)}>Annuler</button>
+                    <button onClick={()=>{
+                      if(!arrowPromptVal.trim())return;
+                      const {x1,y1,x2,y2}=arrowPrompt;
+                      commitLabeledArrow(x1,y1,x2,y2,arrowPromptVal.trim());
+                      setArrowPrompt(null);setArrowPromptVal('');
+                    }} style={btnSt('primary',true)}>Placer</button>
                   </div>
                 </div>
               </div>
