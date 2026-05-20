@@ -3231,7 +3231,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     const rect=textPrompt;
     const rw=Math.max(rect.width||1,40),rh=Math.max(rect.height||1,24);
     fc.current.remove(rect);
-    const newRect=new window.fabric.Rect({width:rw,height:rh,fill:'white',stroke:colorRef.current,strokeWidth:rect.strokeWidth||1,rx:2,ry:2});
+    const newRect=new window.fabric.Rect({width:rw,height:rh,fill:'white',stroke:'none',strokeWidth:0,rx:2,ry:2});
     const txt=new window.fabric.IText(textVal.trim(),{
       fontSize:Math.max(10,Math.min(18,rh*0.45)),fill:'#1A1F2E',fontFamily:'Arial',
       textAlign:'center',originX:'center',originY:'center',left:rw/2,top:rh/2,width:rw-4,
