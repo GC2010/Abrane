@@ -2288,7 +2288,7 @@ function ContentPanel({state,update,onNavigate}) {
                   onDragStart={e=>{e.stopPropagation();e.preventDefault();}}
                   draggable={false}
                 >
-                  {f.pages>1&&f.type!=='merged'&&(
+                  {f.pages>1&&(
                     <button
                       onClick={e=>{e.stopPropagation();splitFile(item.id);}}
                       title="Séparer chaque page en élément indépendant"
