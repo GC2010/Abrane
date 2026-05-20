@@ -55,10 +55,9 @@ export async function loadTemplates() {
   const { data, error } = await supabase
     .from('templates')
     .select('id, name, created_at, created_by, data')
-    .not('name', 'like', '__%')
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return data || [];
+  return (data || []).filter(t => !t.name.startsWith('__'));
 }
 
 export async function upsertTemplate(userId, templateId, name, stateData) {
