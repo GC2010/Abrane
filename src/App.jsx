@@ -2769,7 +2769,12 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       if(!o)return;
       let c=null,sw=null;
       if(o.type==='i-text'||o.type==='text'){c=o.fill;}
-      else if(o.type==='group'){const r=(o._objects||[]).find(ch=>ch.type==='rect');c=r?.stroke;sw=r?.strokeWidth;}
+      else if(o.type==='group'){
+        const l=(o._objects||[]).find(ch=>ch.type==='line');
+        const r=(o._objects||[]).find(ch=>ch.type==='rect');
+        if(l?.stroke&&l.stroke!=='transparent'){c=l.stroke;sw=l.strokeWidth;}
+        else{c=r?.stroke;sw=r?.strokeWidth;}
+      }
       else{c=o.stroke;sw=o.strokeWidth;}
       if(c&&c!=='transparent'){colorRef.current=c;setColorState(c);}
       if(sw>0){strokeWRef.current=sw;setStrokeWState(sw);}
@@ -2937,13 +2942,6 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     const angleDeg=angle*180/Math.PI;
     const mx=(x1+x2)/2,my=(y1+y2)/2;
     const arrowSize=Math.max(10,sw*4);
-    const bgH=Math.max(20,sw*6+10);
-    const bgRect=new window.fabric.Rect({
-      left:mx,top:my,width:len+arrowSize*2,height:bgH,
-      fill:'white',stroke:'rgba(0,0,0,.1)',strokeWidth:0.5,
-      angle:angleDeg,originX:'center',originY:'center',
-      selectable:false,evented:false,
-    });
     const lineObj=new window.fabric.Line([x1,y1,x2,y2],{
       stroke:col,strokeWidth:sw,strokeLineCap:'round',
       selectable:false,evented:false,
@@ -2965,7 +2963,21 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
       originX:'center',originY:'center',
       selectable:false,evented:false,
     });
-    const grp=new window.fabric.Group([bgRect,lineObj,leftArrow,rightArrow,textObj],{selectable:true,evented:true});
+    // Offset text above the line (perpendicular direction)
+    const textW=textObj.width||fontSize*text.length*0.6;
+    const textH=textObj.height||fontSize*1.4;
+    const perpUpX=Math.sin(angle);
+    const perpUpY=-Math.cos(angle);
+    const textLift=textH/2+10;
+    textObj.set({left:mx+perpUpX*textLift,top:my+perpUpY*textLift});
+    const bgRect=new window.fabric.Rect({
+      left:mx+perpUpX*textLift,top:my+perpUpY*textLift,
+      width:textW+20,height:textH+10,
+      fill:'white',stroke:'none',strokeWidth:0,
+      angle:angleDeg,originX:'center',originY:'center',
+      selectable:false,evented:false,
+    });
+    const grp=new window.fabric.Group([lineObj,leftArrow,rightArrow,bgRect,textObj],{selectable:true,evented:true});
     canvas.add(grp);
     canvas.setActiveObject(grp);
     canvas.requestRenderAll();
