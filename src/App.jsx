@@ -144,11 +144,11 @@ const STEPS = [
   {id:'mat',label:'Matériaux',sub:'Grille de vignettes',icon:'swatch',group:'Mise en page'},
   {id:'notes',label:'Notes',sub:'Pages annotables',icon:'notes',group:'Mise en page'},
   {id:'content',label:'Contenu',sub:'PDF, images',icon:'doc',group:'Contenu'},
-  {id:'back',label:'Page finale',sub:'Coordonnées',icon:'fileText',group:'Contenu'},
   {id:'sign',label:'Signature',sub:'Filigrane',icon:'signature',group:'Finition'},
   {id:'sym',label:'Symboles',sub:'Icônes flottantes',icon:'sparkle',group:'Finition'},
+  {id:'back',label:'Page finale',sub:'Coordonnées',icon:'fileText',group:'Page finale'},
 ];
-const STEP_GROUPS = ['Configurateur','Mise en page','Contenu','Finition'];
+const STEP_GROUPS = ['Configurateur','Mise en page','Contenu','Finition','Page finale'];
 
 const initialsFrom = n => !n?'?':n.trim().split(/\s+/).map(w=>w[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
 const paletteHash = n => { let h=0; for(let i=0;i<(n||'').length;i++) h=(h*31+n.charCodeAt(i))|0; return `hsl(${Math.abs(h)%360},35%,30%)`; };
@@ -2797,7 +2797,7 @@ function Rail({steps,active,state,compl,onPick}) {
   return <aside style={{width:210,flexShrink:0,background:'#F7F4EE',borderRight:`1px solid ${T.line}`,overflowY:'auto',padding:'16px 0 24px',display:'flex',flexDirection:'column'}}>
     {STEP_GROUPS.map(g=>{
       const isActiveGroup=g===activeGroup;
-      return <div key={g} style={{marginBottom:4,opacity:hasActive&&!isActiveGroup?(g==='Contenu'?0.7:0.3):1,transition:'opacity .25s'}}>
+      return <div key={g} style={{marginBottom:4,opacity:hasActive&&!isActiveGroup?(g==='Contenu'?0.72:0.3):1,transition:'opacity .25s'}}>
         <div style={{fontSize:9,letterSpacing:'.18em',fontWeight:700,textTransform:'uppercase',color:isActiveGroup?T.navy:T.ink4,padding:'10px 16px 5px',transition:'color .2s'}}>{g}</div>
         {isActiveGroup&&<div style={{margin:'0 10px 4px',height:2,borderRadius:999,background:`linear-gradient(90deg,${T.navy},transparent)`}}/>}
         {steps.filter(s=>s.group===g).map(s=>{
