@@ -3253,7 +3253,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
   const commitLabeledArrow=(x1,y1,x2,y2,label)=>{
     const canvas=fc.current;
     const col=colorRef.current;
-    const sw=Math.max(1.5,strokeWRef.current*1.5);
+    const sw=strokeWRef.current; // use raw value — no multiplier to avoid syncSel feedback loop
     const dx=x2-x1,dy=y2-y1;
     const len=Math.sqrt(dx*dx+dy*dy);
     if(len<8)return;
@@ -3262,9 +3262,10 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     const c=Math.cos(angle),s=Math.sin(angle);
     const pc=Math.cos(angle+Math.PI/2),ps=Math.sin(angle+Math.PI/2);
     const hw=arrowSize*0.38;
-    const bx=x2-arrowSize*c,by=y2-arrowSize*s;
+    const bx=x2-arrowSize*c,by=y2-arrowSize*s; // arrowhead base
     const arrowPath=`M ${x2.toFixed(1)} ${y2.toFixed(1)} L ${(bx+hw*pc).toFixed(1)} ${(by+hw*ps).toFixed(1)} L ${(bx-hw*pc).toFixed(1)} ${(by-hw*ps).toFixed(1)} Z`;
-    const lineObj=new window.fabric.Line([x1,y1,x2,y2],{stroke:col,strokeWidth:sw,strokeLineCap:'round',selectable:false,evented:false});
+    // Line ends at arrowhead BASE (bx,by) so it doesn't poke through the triangle tip
+    const lineObj=new window.fabric.Line([x1,y1,bx,by],{stroke:col,strokeWidth:sw,strokeLineCap:'round',selectable:false,evented:false});
     const arrowHead=new window.fabric.Path(arrowPath,{fill:col,stroke:'none',selectable:false,evented:false});
     const fontSize=11;
     const lines=label.split('\n');
