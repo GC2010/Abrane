@@ -3266,26 +3266,25 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
     const arrowPath=`M ${x2.toFixed(1)} ${y2.toFixed(1)} L ${(bx+hw*pc).toFixed(1)} ${(by+hw*ps).toFixed(1)} L ${(bx-hw*pc).toFixed(1)} ${(by-hw*ps).toFixed(1)} Z`;
     const lineObj=new window.fabric.Line([x1,y1,x2,y2],{stroke:col,strokeWidth:sw,strokeLineCap:'round',selectable:false,evented:false});
     const arrowHead=new window.fabric.Path(arrowPath,{fill:col,stroke:'none',selectable:false,evented:false});
-    const arrowGrp=new window.fabric.Group([lineObj,arrowHead],{selectable:true,evented:true});
-    canvas.add(arrowGrp);
-    // Text: separate object — always horizontal regardless of arrow angle
     const fontSize=11;
-    const txtObj=new window.fabric.Text(label,{
-      left:x1,top:y1,fontSize,fill:col,fontFamily:'Arial',fontWeight:'700',
-      textAlign:'left',lineHeight:1.25,originX:'left',originY:'bottom',
-      selectable:true,evented:true,angle:0,
-    });
-    const tw=txtObj.width||fontSize*label.length*0.6;
-    const th=txtObj.height||fontSize*label.split('\n').length*1.4;
+    const lines=label.split('\n');
+    // Measure text via temporary canvas text object
+    const tmpTxt=new window.fabric.Text(label,{fontSize,fontFamily:'Arial',fontWeight:'700',lineHeight:1.25});
+    const tw=tmpTxt.width||fontSize*Math.max(...lines.map(l=>l.length))*0.6;
+    const th=tmpTxt.height||fontSize*lines.length*1.5;
     const bgRect=new window.fabric.Rect({
-      left:x1,top:y1,width:tw+10,height:th+6,
+      left:x1,top:y1-th-6,width:tw+10,height:th+6,
       fill:'white',stroke:'none',strokeWidth:0,
-      originX:'left',originY:'bottom',
-      selectable:false,evented:false,angle:0,
+      selectable:false,evented:false,
     });
-    canvas.add(bgRect);
-    canvas.add(txtObj);
-    canvas.setActiveObject(arrowGrp);
+    const txtObj=new window.fabric.Text(label,{
+      left:x1+5,top:y1-th-3,fontSize,fill:col,fontFamily:'Arial',fontWeight:'700',
+      textAlign:'left',lineHeight:1.25,selectable:false,evented:false,
+    });
+    // Single group — select/move/delete as one unit
+    const grp=new window.fabric.Group([lineObj,arrowHead,bgRect,txtObj],{selectable:true,evented:true});
+    canvas.add(grp);
+    canvas.setActiveObject(grp);
     canvas.requestRenderAll();
   };
 
