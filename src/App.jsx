@@ -2099,10 +2099,17 @@ function ContentPanel({state,update,onNavigate}) {
                     {isCat?'Catégorie':`${f.pages}p · ${f.size}`}
                   </div>
                 </div>
-                <button onClick={e=>{e.stopPropagation();handleDelete(item.id);}}
-                  style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
-                  <Icon name="trash" size={12} color={T.ink4}/>
-                </button>
+                <div style={{display:'flex',alignItems:'center',gap:2}}>
+                  {onNavigate&&<button onClick={e=>{e.stopPropagation();goToItem(item);}}
+                    title="Aller à cette page"
+                    style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
+                    <Icon name="eye" size={12} color={T.navy}/>
+                  </button>}
+                  <button onClick={e=>{e.stopPropagation();handleDelete(item.id);}}
+                    style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
+                    <Icon name="trash" size={12} color={T.ink4}/>
+                  </button>
+                </div>
               </div>
               {/* Controls — only for files */}
               {!isCat&&(
