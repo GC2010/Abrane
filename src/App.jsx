@@ -2095,15 +2095,9 @@ function ContentPanel({state,update,onNavigate}) {
       try{
         if(ext==='pdf'){
           const isLandscape=state.pageFormat.startsWith('h');
-          const mode2=pdfTwoPerSheetRef.current;
-          alert(`DEBUG import PDF\nmode 2p/f = ${mode2}\nisLandscape = ${isLandscape}\nfichier = ${file.name}`);
-          let result;
-          if(mode2){
-            result=await renderPdfToPairedUrls(file,isLandscape).catch(err=>{alert('ERREUR renderPdfToPairedUrls:\n'+err);return {pageCount:0,pageUrls:[]};});
-          }else{
-            result=await renderPdfToDataUrls(file);
-          }
-          alert(`DEBUG résultat: pageCount=${result.pageCount}, pageUrls.length=${result.pageUrls?.length}`);
+          const result=pdfTwoPerSheetRef.current
+            ?await renderPdfToPairedUrls(file,isLandscape)
+            :await renderPdfToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
         } else if(ext==='docx'||ext==='doc'){
           const result=await renderDocxToDataUrls(file);
