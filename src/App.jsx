@@ -1944,7 +1944,7 @@ function NotesPanel({state,update}) {
     </Sect>}
   </>;
 }
-function ContentPanel({state,update}) {
+function ContentPanel({state,update,onNavigate}) {
   const fileInputRef=useRef(null);
   const [dragIdx,setDragIdx]=useState(null);
   const [overIdx,setOverIdx]=useState(null);
@@ -2001,6 +2001,15 @@ function ContentPanel({state,update}) {
   };
   const setContentZoom=(ordId,val)=>update({contentZoom:{...(state.contentZoom||{}),[ordId]:val}});
   const setContentPos=(ordId,x,y)=>update({contentPos:{...(state.contentPos||{}),[ordId]:{x,y}}});
+
+  const goToItem=item=>{
+    if(!onNavigate)return;
+    const pages=buildPageList(state);
+    const idx=item.type==='cat'
+      ?pages.findIndex(p=>p.key==='cat-'+item.id)
+      :pages.findIndex(p=>p.ordId===item.id);
+    if(idx>=0) onNavigate(idx);
+  };
 
   const startRename=item=>{
     const f=item.type==='file'?state.files.find(x=>x.id===item.fileId):null;
@@ -2504,7 +2513,7 @@ function SymbolsPanel({state,update}) {
   </>;
 }
 
-function StepPanel({step,state,update,updateNested,user}) {
+function StepPanel({step,state,update,updateNested,user,onNavigate}) {
   switch(step){
     case 'project': return <ProjectPanel  state={state} update={update}/>;
     case 'palette': return <PalettePanel  state={state} update={update} updateNested={updateNested}/>;
@@ -2513,7 +2522,7 @@ function StepPanel({step,state,update,updateNested,user}) {
     case 'index':   return <IndexPanel    state={state} update={update}/>;
     case 'mat':     return <MaterialsPanel state={state} update={update}/>;
     case 'notes':   return <NotesPanel    state={state} update={update}/>;
-    case 'content': return <ContentPanel  state={state} update={update}/>;
+    case 'content': return <ContentPanel  state={state} update={update} onNavigate={onNavigate}/>;
     case 'back':    return <BackPanel     state={state} update={update}/>;
     case 'sign':    return <SignPanel     state={state} update={update} user={user}/>;
     case 'sym':     return <SymbolsPanel  state={state} update={update}/>;
@@ -2564,7 +2573,7 @@ const STEP_DESC={
   back:"La 4ᵉ de couverture : coordonnées entreprise.",sign:"Signature et filigrane optionnel.",sym:"Bibliothèque de pictogrammes.",
 };
 
-function Inspector({step,state,update,updateNested,user}) {
+function Inspector({step,state,update,updateNested,user,onNavigate}) {
   const meta=STEPS.find(s=>s.id===step)||STEPS[0];
   const stepIndex=STEPS.findIndex(s=>s.id===step)+1;
   return <section style={{width:340,flexShrink:0,background:T.surface,borderRight:`1px solid ${T.line}`,overflowY:'auto',display:'flex',flexDirection:'column'}}>
@@ -2577,7 +2586,7 @@ function Inspector({step,state,update,updateNested,user}) {
       <p style={{fontSize:12,color:T.ink3,lineHeight:1.5,margin:'6px 0 0'}}>{STEP_DESC[step]}</p>
     </div>
     <div style={{padding:'16px 22px 60px',display:'flex',flexDirection:'column',gap:18}}>
-      <StepPanel step={step} state={state} update={update} updateNested={updateNested} user={user}/>
+      <StepPanel step={step} state={state} update={update} updateNested={updateNested} user={user} onNavigate={onNavigate}/>
     </div>
   </section>;
 }
@@ -3403,7 +3412,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const paletteH=paletteCollapsed?32:PALETTE_H[thumbSize];
   return <div style={{display:'flex',flex:1,overflow:'hidden',minHeight:0}}>
     <Rail steps={STEPS} active={activeStep} state={state} compl={compl} onPick={id=>{activeStepRef.current=id;setActiveStep(id);}}/>
-    {activeStep&&<Inspector step={activeStep} state={state} update={update} updateNested={updateNested} user={user}/>}
+    {activeStep&&<Inspector step={activeStep} state={state} update={update} updateNested={updateNested} user={user} onNavigate={setActivePage}/>}
     <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <Canvas state={state} zoom={zoom} setZoom={setZoom} activePage={activePage}
         paletteH={paletteH}
