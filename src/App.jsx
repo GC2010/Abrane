@@ -154,51 +154,6 @@ const shade = (hex,amt) => { try { const n=parseInt(hex.replace('#',''),16); let
 
 const readFileAsDataUrl = file => new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});
 
-// Renders a PDF with 2 pages combined per output image (canvas→canvas, no Image loading)
-const renderPdfToPairedUrls = async (file, isLandscape) => {
-  const pdfjsLib=window.pdfjsLib;
-  if(!pdfjsLib) return {pageCount:0,pageUrls:[]};
-  const ab=await file.arrayBuffer();
-  const pdf=await pdfjsLib.getDocument({data:ab}).promise;
-  const total=pdf.numPages;
-  const pageUrls=[];
-  for(let i=1;i<=total;i+=2){
-    const p1=await pdf.getPage(i);
-    const p2=i+1<=total?await pdf.getPage(i+1):null;
-    const vp1=p1.getViewport({scale:1.5});
-    const cv1=document.createElement('canvas');
-    cv1.width=vp1.width; cv1.height=vp1.height;
-    await p1.render({canvasContext:cv1.getContext('2d'),viewport:vp1}).promise;
-    if(!p2){
-      pageUrls.push(cv1.toDataURL('image/jpeg',0.85));
-      break;
-    }
-    const vp2=p2.getViewport({scale:1.5});
-    const cv2=document.createElement('canvas');
-    cv2.width=vp2.width; cv2.height=vp2.height;
-    await p2.render({canvasContext:cv2.getContext('2d'),viewport:vp2}).promise;
-    const combined=document.createElement('canvas');
-    if(isLandscape){
-      combined.width=cv1.width+cv2.width;
-      combined.height=Math.max(cv1.height,cv2.height);
-    }else{
-      combined.width=Math.max(cv1.width,cv2.width);
-      combined.height=cv1.height+cv2.height;
-    }
-    const ctx=combined.getContext('2d');
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(0,0,combined.width,combined.height);
-    if(isLandscape){
-      ctx.drawImage(cv1,0,Math.round((combined.height-cv1.height)/2));
-      ctx.drawImage(cv2,cv1.width,Math.round((combined.height-cv2.height)/2));
-    }else{
-      ctx.drawImage(cv1,Math.round((combined.width-cv1.width)/2),0);
-      ctx.drawImage(cv2,Math.round((combined.width-cv2.width)/2),cv1.height);
-    }
-    pageUrls.push(combined.toDataURL('image/jpeg',0.85));
-  }
-  return {pageCount:pageUrls.length,pageUrls};
-};
 
 const renderPdfToDataUrls = async file => {
   const pdfjsLib = window.pdfjsLib;
@@ -2076,31 +2031,26 @@ function NotesPanel({state,update}) {
 }
 function ContentPanel({state,update,onNavigate}) {
   const fileInputRef=useRef(null);
-  const fileInput2Ref=useRef(null);
   const [dragIdx,setDragIdx]=useState(null);
   const [overIdx,setOverIdx]=useState(null);
+  const [mergeIdx,setMergeIdx]=useState(null);
   const [renaming,setRenaming]=useState(null);
   const [importing,setImporting]=useState(false);
   const [expandedZoom,setExpandedZoom]=useState({});
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
-  const _importFiles=async(list,pairedMode)=>{
+  const handleImport=async e=>{
+    const list=Array.from(e.target.files);
     if(!list.length)return;
     setImporting(true);
     const newFiles=[],newOrders=[];
-    const isLandscape=state.pageFormat.startsWith('h');
     for(const file of list){
       const ext=file.name.split('.').pop().toLowerCase();
-      let pageCount=1,pageUrls=[],paired=false;
+      let pageCount=1,pageUrls=[];
       try{
         if(ext==='pdf'){
-          if(pairedMode){
-            const result=await renderPdfToPairedUrls(file,isLandscape);
-            pageCount=result.pageCount; pageUrls=result.pageUrls; paired=true;
-          }else{
-            const result=await renderPdfToDataUrls(file);
-            pageCount=result.pageCount; pageUrls=result.pageUrls;
-          }
+          const result=await renderPdfToDataUrls(file);
+          pageCount=result.pageCount; pageUrls=result.pageUrls;
         } else if(ext==='docx'||ext==='doc'){
           const result=await renderDocxToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
@@ -2114,24 +2064,57 @@ function ContentPanel({state,update,onNavigate}) {
       }catch(err){ console.warn('Import error:',err); }
       const sz=file.size>1024*1024?(file.size/1024/1024).toFixed(1)+' Mo':Math.round(file.size/1024)+' Ko';
       const id='f'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-      newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls,paired});
+      newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls});
       const ordId='fi'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
       newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:''});
     }
     update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
+    e.target.value='';
     setImporting(false);
   };
 
-  const handleImport=async e=>{
-    const list=Array.from(e.target.files||[]);
-    e.target.value='';
-    await _importFiles(list,false);
-  };
-
-  const handleImport2=async e=>{
-    const list=Array.from(e.target.files||[]);
-    e.target.value='';
-    await _importFiles(list,true);
+  const mergeItems=async(fromIdx,toIdx)=>{
+    const a=state.contentOrder[fromIdx],b=state.contentOrder[toIdx];
+    if(!a||!b||a.type!=='file'||b.type!=='file'||a.fileId===b.fileId)return;
+    const fa=state.files.find(f=>f.id===a.fileId),fb=state.files.find(f=>f.id===b.fileId);
+    if(!fa||!fb)return;
+    const isLandscape=state.pageFormat.startsWith('h');
+    const count=Math.max((fa.pageUrls||[]).length,(fb.pageUrls||[]).length);
+    const mergedUrls=[];
+    for(let i=0;i<count;i++){
+      const u1=(fa.pageUrls||[])[i],u2=(fb.pageUrls||[])[i];
+      if(u1&&u2){
+        const [img1,img2]=await Promise.all([
+          new Promise((res,rej)=>{const m=new Image();m.onload=()=>res(m);m.onerror=rej;m.src=u1;}),
+          new Promise((res,rej)=>{const m=new Image();m.onload=()=>res(m);m.onerror=rej;m.src=u2;}),
+        ]);
+        const w1=img1.naturalWidth||img1.width,h1=img1.naturalHeight||img1.height;
+        const w2=img2.naturalWidth||img2.width,h2=img2.naturalHeight||img2.height;
+        const cv=document.createElement('canvas');
+        if(isLandscape){cv.width=w1+w2;cv.height=Math.max(h1,h2);}
+        else{cv.width=Math.max(w1,w2);cv.height=h1+h2;}
+        const ctx=cv.getContext('2d');
+        ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);
+        if(isLandscape){
+          ctx.drawImage(img1,0,Math.round((cv.height-h1)/2),w1,h1);
+          ctx.drawImage(img2,w1,Math.round((cv.height-h2)/2),w2,h2);
+        }else{
+          ctx.drawImage(img1,Math.round((cv.width-w1)/2),0,w1,h1);
+          ctx.drawImage(img2,Math.round((cv.width-w2)/2),h1,w2,h2);
+        }
+        mergedUrls.push(cv.toDataURL('image/jpeg',0.85));
+      }else{
+        mergedUrls.push(u1||u2||null);
+      }
+    }
+    const mid='f'+Date.now()+'_m';
+    const mFile={id:mid,name:(a.label||fa.name.replace(/\.[^.]+$/,''))+' + '+(b.label||fb.name.replace(/\.[^.]+$/,'')),type:'merged',pages:mergedUrls.length,size:'',pageUrls:mergedUrls};
+    const insertAt=Math.min(fromIdx,toIdx);
+    const newOrder=state.contentOrder.filter((_,i)=>i!==fromIdx&&i!==toIdx);
+    newOrder.splice(insertAt,0,{type:'file',id:'fi'+Date.now(),fileId:mid,rotation:0,label:''});
+    const usedIds=new Set(newOrder.filter(o=>o.type==='file').map(o=>o.fileId));
+    const newFiles=[...state.files.filter(f=>usedIds.has(f.id)),mFile];
+    update({files:newFiles,contentOrder:newOrder});
   };
 
   const handleDelete=ordId=>{
@@ -2199,22 +2182,12 @@ function ContentPanel({state,update,onNavigate}) {
   return <>
     <Sect title="Importer">
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImport}/>
-      <input ref={fileInput2Ref} type="file" multiple accept=".pdf" style={{display:'none'}} onChange={handleImport2}/>
       <div onClick={()=>!importing&&fileInputRef.current?.click()} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
         <Icon name="upload" size={22} color={importing?T.navy:T.gold}/>
         <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
         <span style={{fontSize:12,color:T.ink3}}>{importing?'Conversion en cours…':'JPG · PNG · SVG · PDF · Word · Excel'}</span>
       </div>
-      <button
-        disabled={importing}
-        onClick={()=>fileInput2Ref.current?.click()}
-        title={state.pageFormat.startsWith('h')?'2 pages PDF côte à côte':'2 pages PDF empilées'}
-        style={{marginTop:6,display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:'transparent',border:`1px solid ${T.gold}`,borderRadius:6,padding:'5px 10px',cursor:importing?'wait':'pointer',color:T.gold,fontSize:10.5,fontWeight:700,width:'100%',opacity:importing?0.5:1}}
-      >
-        <Icon name="upload" size={12} color={T.gold}/>
-        PDF — 2 pages / feuille
-        <span style={{fontSize:9,fontWeight:400,opacity:.75}}>{state.pageFormat.startsWith('h')?'(côte à côte)':'(empilées)'}</span>
-      </button>
+      <div style={{fontSize:10,color:T.ink4,textAlign:'center',marginTop:4}}>Glissez un fichier <em>sur</em> un autre pour les afficher côte à côte</div>
     </Sect>
     <Sect title={`Ordre · ${state.contentOrder.length} entrées`}>
       <button onClick={addCategory} style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',marginBottom:6}}>
@@ -2227,23 +2200,39 @@ function ContentPanel({state,update,onNavigate}) {
           if(!isCat&&!f)return null;
           const displayName=isCat?item.name:(item.label||f.name.replace(/\.[^.]+$/,''));
           const isOver=overIdx===idx;
+          const isMergeTarget=mergeIdx===idx;
           const isRenaming=renaming?.id===item.id;
           const rot=item.rotation||0;
           return(
             <div key={item.id}
               draggable={!isRenaming}
               onDragStart={e=>{if(isRenaming){e.preventDefault();return;}setDragIdx(idx);}}
-              onDragEnd={()=>{setDragIdx(null);setOverIdx(null);}}
-              onDragOver={e=>{if(isRenaming)return;e.preventDefault();setOverIdx(idx);}}
-              onDrop={e=>{if(isRenaming)return;e.preventDefault();reorder(dragIdx,idx);setDragIdx(null);setOverIdx(null);}}
+              onDragEnd={()=>{setDragIdx(null);setOverIdx(null);setMergeIdx(null);}}
+              onDragOver={e=>{
+                if(isRenaming)return;
+                e.preventDefault();
+                if(!isCat&&dragIdx!==null&&dragIdx!==idx&&state.contentOrder[dragIdx]?.type==='file'){
+                  const r=e.currentTarget.getBoundingClientRect();
+                  const rel=(e.clientY-r.top)/r.height;
+                  if(rel>0.25&&rel<0.75){setMergeIdx(idx);setOverIdx(null);return;}
+                }
+                setMergeIdx(null);setOverIdx(idx);
+              }}
+              onDrop={e=>{
+                if(isRenaming)return;
+                e.preventDefault();
+                if(isMergeTarget&&dragIdx!==null&&dragIdx!==idx){mergeItems(dragIdx,idx);}
+                else{reorder(dragIdx,idx);}
+                setDragIdx(null);setOverIdx(null);setMergeIdx(null);
+              }}
               onDoubleClick={()=>startRename(item)}
-              style={{padding:'6px 8px',background:isCat?T.goldTint:T.surface,border:`1px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderLeft:`3px solid ${isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderRadius:6,cursor:isRenaming?'default':'grab',userSelect:isRenaming?'text':'none'}}
+              style={{padding:'6px 8px',background:isMergeTarget?T.navyTint:isCat?T.goldTint:T.surface,border:`1px solid ${isMergeTarget?T.navy:isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderLeft:`3px solid ${isMergeTarget?T.navy:isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderRadius:6,cursor:isRenaming?'default':'grab',userSelect:isRenaming?'text':'none',outline:isMergeTarget?`2px solid ${T.navy}`:undefined,transition:'background .1s,border .1s'}}
             >
               {/* Main row */}
               <div style={{display:'grid',gridTemplateColumns:'14px 26px 1fr auto',alignItems:'center',gap:7}}>
                 <Icon name="move" size={10} color={T.ink5}/>
                 <div style={{width:26,height:26,borderRadius:3,background:isCat?'#fff':T.panel2,display:'grid',placeItems:'center',flexShrink:0}}>
-                  <Icon name={isCat?'bookmark':f.type==='pdf'?'pdf':'image'} size={13} color={isCat?T.gold:T.ink3}/>
+                  <Icon name={isCat?'bookmark':f.type==='pdf'||f.type==='merged'?'pdf':'image'} size={13} color={isCat?T.gold:f.type==='merged'?T.navy:T.ink3}/>
                 </div>
                 <div style={{minWidth:0}}>
                   {isRenaming?(
@@ -2259,7 +2248,7 @@ function ContentPanel({state,update,onNavigate}) {
                   )}
                   <div style={{fontSize:10,color:T.ink4,display:'flex',alignItems:'center',gap:4}}>
                     {isCat?'Catégorie':`${f.pages}p · ${f.size}`}
-                    {!isCat&&f.paired&&<span style={{fontSize:8,fontWeight:700,background:T.gold,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>2p/f</span>}
+                    {!isCat&&f.type==='merged'&&<span style={{fontSize:8,fontWeight:700,background:T.navy,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>combiné</span>}
                   </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:2}}>
