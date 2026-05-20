@@ -353,17 +353,17 @@ function AdminPanel({onClose, currentUserId}) {
           }
         </div>
 
-        {/* Timbro */}
+        {/* Tampon d'entreprise */}
         <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16}}>
-          <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:8}}>Timbro</div>
-          <div style={{fontSize:11,color:T.ink3,marginBottom:10}}>Timbro sovrapposto sulle pagine. Preferire PNG trasparente o SVG.</div>
+          <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:8}}>Tampon d'entreprise</div>
+          <div style={{fontSize:11,color:T.ink3,marginBottom:10}}>Tampon d'entreprise sovrapposto sulle pagine. Preferire PNG trasparente o SVG.</div>
           {stampLogo
             ?<div style={{display:'flex',alignItems:'center',gap:10}}>
-                <img src={stampLogo} alt="Timbro" style={{height:40,maxWidth:180,objectFit:'contain',border:`1px solid ${T.lineSoft}`,borderRadius:6,padding:4}}/>
+                <img src={stampLogo} alt="Tampon d'entreprise" style={{height:40,maxWidth:180,objectFit:'contain',border:`1px solid ${T.lineSoft}`,borderRadius:6,padding:4}}/>
                 <button onClick={()=>remove('abrane_stamp')} style={{...btnSt(undefined,true),color:'#C53030',borderColor:'#FECACA'}}>Supprimer</button>
               </div>
             :<label style={{...btnSt(undefined,false),cursor:'pointer',display:'inline-flex'}}>
-                <Icon name="upload" size={14} color={T.ink}/>Importer le timbro (PNG transparent / SVG)
+                <Icon name="upload" size={14} color={T.ink}/>Importer le tampon d'entreprise (PNG transparent / SVG)
                 <input type="file" accept="image/*,.svg" style={{display:'none'}} onChange={upload('abrane_stamp',v=>setBrand(b=>({...b,stampLogo:v})))}/>
               </label>
           }
@@ -447,7 +447,7 @@ function AdminPanel({onClose, currentUserId}) {
             <button onClick={()=>navigator.clipboard.writeText(wmLogo).then(()=>alert('Base64 copié !'))} style={{...btnSt(undefined,true),fontSize:10}}>📋 Copier base64 filigrane</button>
           </div>}
           {stampLogo&&<div style={{marginTop:6,display:'flex',gap:6}}>
-            <button onClick={()=>navigator.clipboard.writeText(stampLogo).then(()=>alert('Base64 copié !'))} style={{...btnSt(undefined,true),fontSize:10}}>📋 Copier base64 timbro</button>
+            <button onClick={()=>navigator.clipboard.writeText(stampLogo).then(()=>alert('Base64 copié !'))} style={{...btnSt(undefined,true),fontSize:10}}>📋 Copier base64 tampon d'entreprise</button>
           </div>}
         </div>
       </div>
@@ -2151,8 +2151,8 @@ function SignPanel({state,update,user}) {
         <input type="range" min="3" max="80" value={state.wmOpacity} onChange={e=>update({wmOpacity:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
       </Fld>}
     </Sect>
-    <Sect title="Timbro">
-      <RowItem label="Activer le timbro" sub="Image chargée par l'administrateur">
+    <Sect title="Tampon d'entreprise">
+      <RowItem label="Activer le tampon d'entreprise" sub="Image chargée par l'administrateur">
         <Toggle checked={state.stampEnabled} onChange={v=>update({stampEnabled:v})}/>
       </RowItem>
       {state.stampEnabled&&<>
