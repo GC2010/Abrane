@@ -162,21 +162,23 @@ const pairPdfPages = async (pageUrls, isLandscape) => {
     const url2=pageUrls[i+1];
     if(!url2){out.push(pageUrls[i]);break;}
     const [img1,img2]=await Promise.all([loadImage(pageUrls[i]),loadImage(url2)]);
+    const w1=img1.naturalWidth||img1.width, h1=img1.naturalHeight||img1.height;
+    const w2=img2.naturalWidth||img2.width, h2=img2.naturalHeight||img2.height;
     const cv=document.createElement('canvas');
-    const ctx=cv.getContext('2d');
-    ctx.fillStyle='#fff';
     if(isLandscape){
-      // landscape template → 2 pages side by side
-      cv.width=img1.width+img2.width; cv.height=Math.max(img1.height,img2.height);
-      ctx.fillRect(0,0,cv.width,cv.height);
-      ctx.drawImage(img1,0,(cv.height-img1.height)/2);
-      ctx.drawImage(img2,img1.width,(cv.height-img2.height)/2);
+      cv.width=w1+w2; cv.height=Math.max(h1,h2);
     }else{
-      // portrait template → 2 pages stacked
-      cv.width=Math.max(img1.width,img2.width); cv.height=img1.height+img2.height;
-      ctx.fillRect(0,0,cv.width,cv.height);
-      ctx.drawImage(img1,(cv.width-img1.width)/2,0);
-      ctx.drawImage(img2,(cv.width-img2.width)/2,img1.height);
+      cv.width=Math.max(w1,w2); cv.height=h1+h2;
+    }
+    const ctx=cv.getContext('2d');
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,cv.width,cv.height);
+    if(isLandscape){
+      ctx.drawImage(img1,0,Math.round((cv.height-h1)/2),w1,h1);
+      ctx.drawImage(img2,w1,Math.round((cv.height-h2)/2),w2,h2);
+    }else{
+      ctx.drawImage(img1,Math.round((cv.width-w1)/2),0,w1,h1);
+      ctx.drawImage(img2,Math.round((cv.width-w2)/2),h1,w2,h2);
     }
     out.push(cv.toDataURL('image/jpeg',0.85));
   }
@@ -2065,6 +2067,7 @@ function ContentPanel({state,update,onNavigate}) {
   const [importing,setImporting]=useState(false);
   const [expandedZoom,setExpandedZoom]=useState({});
   const [pdfTwoPerSheet,setPdfTwoPerSheet]=useState(false);
+  const pdfTwoPerSheetRef=useRef(false);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
   const handleImport=async e=>{
@@ -2079,9 +2082,13 @@ function ContentPanel({state,update,onNavigate}) {
         if(ext==='pdf'){
           const result=await renderPdfToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
-          if(pdfTwoPerSheet&&pageUrls.length>1){
-            pageUrls=await pairPdfPages(pageUrls,state.pageFormat.startsWith('h'));
-            pageCount=pageUrls.length;
+          if(pdfTwoPerSheetRef.current&&pageUrls.length>1){
+            try{
+              pageUrls=await pairPdfPages(pageUrls,state.pageFormat.startsWith('h'));
+              pageCount=pageUrls.length;
+            }catch(pairErr){
+              alert('Erreur lors de la combinaison des pages PDF : '+pairErr.message);
+            }
           }
         } else if(ext==='docx'||ext==='doc'){
           const result=await renderDocxToDataUrls(file);
@@ -2175,7 +2182,7 @@ function ContentPanel({state,update,onNavigate}) {
         <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
         <span style={{fontSize:12,color:T.ink3}}>{importing?'Conversion en cours…':'JPG · PNG · SVG · PDF · Word · Excel'}</span>
       </div>
-      <button onClick={()=>setPdfTwoPerSheet(v=>!v)} style={{marginTop:7,display:'flex',alignItems:'center',gap:6,background:'transparent',border:`1px solid ${pdfTwoPerSheet?T.gold:T.lineSoft}`,borderRadius:5,padding:'4px 10px',cursor:'pointer',color:pdfTwoPerSheet?T.gold:T.ink3,fontSize:10.5,fontWeight:600,width:'100%',justifyContent:'center'}}>
+      <button onClick={()=>{const n=!pdfTwoPerSheetRef.current;pdfTwoPerSheetRef.current=n;setPdfTwoPerSheet(n);}} style={{marginTop:7,display:'flex',alignItems:'center',gap:6,background:'transparent',border:`1px solid ${pdfTwoPerSheet?T.gold:T.lineSoft}`,borderRadius:5,padding:'4px 10px',cursor:'pointer',color:pdfTwoPerSheet?T.gold:T.ink3,fontSize:10.5,fontWeight:600,width:'100%',justifyContent:'center'}}>
         <span style={{width:12,height:12,border:`1.5px solid ${pdfTwoPerSheet?T.gold:T.ink4}`,borderRadius:2,background:pdfTwoPerSheet?T.gold:'transparent',display:'grid',placeItems:'center',flexShrink:0}}>
           {pdfTwoPerSheet&&<span style={{width:7,height:7,background:'#fff',borderRadius:1}}/>}
         </span>
