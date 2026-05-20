@@ -2076,30 +2076,31 @@ function NotesPanel({state,update}) {
 }
 function ContentPanel({state,update,onNavigate}) {
   const fileInputRef=useRef(null);
+  const fileInput2Ref=useRef(null);
   const [dragIdx,setDragIdx]=useState(null);
   const [overIdx,setOverIdx]=useState(null);
   const [renaming,setRenaming]=useState(null);
   const [importing,setImporting]=useState(false);
   const [expandedZoom,setExpandedZoom]=useState({});
-  const pdfTwoPerSheetRef=useRef(false);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
-  const handleImport=async e=>{
-    const list=Array.from(e.target.files);
+  const _importFiles=async(list,pairedMode)=>{
     if(!list.length)return;
     setImporting(true);
     const newFiles=[],newOrders=[];
+    const isLandscape=state.pageFormat.startsWith('h');
     for(const file of list){
       const ext=file.name.split('.').pop().toLowerCase();
       let pageCount=1,pageUrls=[],paired=false;
       try{
         if(ext==='pdf'){
-          const isLandscape=state.pageFormat.startsWith('h');
-          paired=pdfTwoPerSheetRef.current;
-          const result=paired
-            ?await renderPdfToPairedUrls(file,isLandscape)
-            :await renderPdfToDataUrls(file);
-          pageCount=result.pageCount; pageUrls=result.pageUrls;
+          if(pairedMode){
+            const result=await renderPdfToPairedUrls(file,isLandscape);
+            pageCount=result.pageCount; pageUrls=result.pageUrls; paired=true;
+          }else{
+            const result=await renderPdfToDataUrls(file);
+            pageCount=result.pageCount; pageUrls=result.pageUrls;
+          }
         } else if(ext==='docx'||ext==='doc'){
           const result=await renderDocxToDataUrls(file);
           pageCount=result.pageCount; pageUrls=result.pageUrls;
@@ -2118,8 +2119,19 @@ function ContentPanel({state,update,onNavigate}) {
       newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:''});
     }
     update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
-    e.target.value='';
     setImporting(false);
+  };
+
+  const handleImport=async e=>{
+    const list=Array.from(e.target.files||[]);
+    e.target.value='';
+    await _importFiles(list,false);
+  };
+
+  const handleImport2=async e=>{
+    const list=Array.from(e.target.files||[]);
+    e.target.value='';
+    await _importFiles(list,true);
   };
 
   const handleDelete=ordId=>{
@@ -2187,14 +2199,15 @@ function ContentPanel({state,update,onNavigate}) {
   return <>
     <Sect title="Importer">
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImport}/>
-      <div onClick={()=>{if(importing)return;pdfTwoPerSheetRef.current=false;fileInputRef.current?.click();}} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
+      <input ref={fileInput2Ref} type="file" multiple accept=".pdf" style={{display:'none'}} onChange={handleImport2}/>
+      <div onClick={()=>!importing&&fileInputRef.current?.click()} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
         <Icon name="upload" size={22} color={importing?T.navy:T.gold}/>
         <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
         <span style={{fontSize:12,color:T.ink3}}>{importing?'Conversion en cours…':'JPG · PNG · SVG · PDF · Word · Excel'}</span>
       </div>
       <button
         disabled={importing}
-        onClick={()=>{pdfTwoPerSheetRef.current=true;fileInputRef.current?.click();}}
+        onClick={()=>fileInput2Ref.current?.click()}
         title={state.pageFormat.startsWith('h')?'2 pages PDF côte à côte':'2 pages PDF empilées'}
         style={{marginTop:6,display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:'transparent',border:`1px solid ${T.gold}`,borderRadius:6,padding:'5px 10px',cursor:importing?'wait':'pointer',color:T.gold,fontSize:10.5,fontWeight:700,width:'100%',opacity:importing?0.5:1}}
       >
