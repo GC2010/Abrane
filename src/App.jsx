@@ -321,9 +321,9 @@ function AdminPanel({onClose, currentUserId}) {
     setBrand(b=>({...b,shopLogos:updated}));
   };
 
-  return <div style={{position:'fixed',inset:0,background:'rgba(15,20,40,.55)',zIndex:200,display:'grid',placeItems:'center'}}>
-    <div style={{width:480,maxWidth:'94vw',background:T.surface,borderRadius:16,padding:28,boxShadow:'0 24px 80px rgba(0,0,0,.25)',border:`1px solid ${T.line}`}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+  return <div style={{position:'fixed',inset:0,background:'rgba(15,20,40,.55)',zIndex:200,display:'grid',placeItems:'center',padding:'16px 0'}}>
+    <div style={{width:480,maxWidth:'94vw',maxHeight:'90vh',background:T.surface,borderRadius:16,boxShadow:'0 24px 80px rgba(0,0,0,.25)',border:`1px solid ${T.line}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 28px 16px',flexShrink:0,borderBottom:`1px solid ${T.lineSoft}`}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <div style={{width:26,height:26,borderRadius:'50%',background:T.gold,color:'#fff',display:'grid',placeItems:'center',fontSize:12,fontWeight:800}}>A</div>
           <span style={{fontSize:15,fontWeight:700,color:T.ink}}>Administration ABRANE</span>
@@ -331,7 +331,7 @@ function AdminPanel({onClose, currentUserId}) {
         <button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:18,color:T.ink3}}>✕</button>
       </div>
 
-      <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      <div style={{flex:1,overflowY:'auto',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:16}}>
         {/* Logo officiel */}
         <div style={{border:`1px solid ${T.line}`,borderRadius:10,padding:16}}>
           <div style={{fontSize:12,fontWeight:700,color:T.ink,marginBottom:8}}>Logo ABRANE officiel</div>
