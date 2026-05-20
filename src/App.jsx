@@ -888,11 +888,10 @@ function CoverPage({state,isPortrait,isRing}) {
             style={{position:'absolute',left:`${state.logoX??80}%`,top:`${state.logoY??5}%`,height:`${state.logoScale}%`,maxHeight:'90%',maxWidth:'55%',objectFit:'contain',display:'block',transform:'translate(-50%,-50%)'}}/>
         }
       </div>
-      <div style={{position:'absolute',top:'26%',left:isRing?'12%':'0',right:'0',height:'44%',zIndex:1,overflow:'hidden'}}>
-        {state.bgImageUrl
-          ?<img src={state.bgImageUrl} alt="" style={{position:'absolute',width:`${state.bgScale}%`,height:`${state.bgScale}%`,objectFit:'cover',opacity:.20,left:`${state.bgX}%`,top:`${state.bgY}%`,transform:'translate(-50%,-50%)',maxWidth:'none'}}/>
-          :<div style={{width:'100%',height:'100%',background:`repeating-linear-gradient(135deg,${p.c1} 0 14px,${shade(p.c1,-6)} 14px 28px)`,opacity:.6}}/>
-        }
+      <div style={{position:'absolute',top:'26%',left:isRing?'12%':'0',right:'0',height:'44%',zIndex:1,overflow:'hidden',
+        ...(state.bgImageUrl?{backgroundImage:`url(${state.bgImageUrl})`,backgroundSize:`${state.bgScale??100}%`,backgroundPosition:`${state.bgX??50}% ${state.bgY??50}%`,backgroundRepeat:'no-repeat',opacity:.20}:{})
+      }}>
+        {!state.bgImageUrl&&<div style={{width:'100%',height:'100%',background:`repeating-linear-gradient(135deg,${p.c1} 0 14px,${shade(p.c1,-6)} 14px 28px)`,opacity:.6}}/>}
       </div>
       <div style={{position:'relative',zIndex:2,marginTop:'auto'}}>
         <div style={{fontSize:11,letterSpacing:'.28em',color:shade(p.c3,40),fontWeight:500,marginBottom:4}}>{state.year}</div>
@@ -1099,11 +1098,10 @@ function BackPage({state,isPortrait,isRing}) {
       <div style={{marginLeft:'auto',marginBottom:8,display:'inline-block'}}><AbraneLogoBox size="sm"/></div>
       {state.backLines.map((l,i)=><div key={i}>{l}</div>)}
     </div>
-    <div style={{position:'absolute',right:0,bottom:0,width:'48%',height:'50%',overflow:'hidden'}}>
-      {state.bgImageUrl
-        ?<img src={state.bgImageUrl} alt="" style={{position:'absolute',width:`${state.bgScale}%`,height:`${state.bgScale}%`,objectFit:'cover',opacity:.45,left:`${state.bgX}%`,top:`${state.bgY}%`,transform:'translate(-50%,-50%)',maxWidth:'none'}}/>
-        :<div style={{width:'100%',height:'100%',background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,opacity:.35}}/>
-      }
+    <div style={{position:'absolute',right:0,bottom:0,width:'48%',height:'50%',overflow:'hidden',
+      ...(state.bgImageUrl?{backgroundImage:`url(${state.bgImageUrl})`,backgroundSize:`${state.bgScale??100}%`,backgroundPosition:`${state.bgX??50}% ${state.bgY??50}%`,backgroundRepeat:'no-repeat',opacity:.45}:{})
+    }}>
+      {!state.bgImageUrl&&<div style={{width:'100%',height:'100%',background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,opacity:.35}}/>}
     </div>
     <BindingMarks isRing={isRing}/>
   </div>;
