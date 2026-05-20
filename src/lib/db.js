@@ -55,6 +55,7 @@ export async function loadTemplates() {
   const { data, error } = await supabase
     .from('templates')
     .select('id, name, created_at, created_by, data')
+    .not('name', 'like', '__%')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data || [];
@@ -105,6 +106,40 @@ export async function findTemplateByName(name) {
     .ilike('name', name.trim())
     .maybeSingle();
   return data || null;
+}
+
+// ── Modèle officiel ABRANE ────────────────────────────────────
+
+const OFFICIAL_TEMPLATE_NAME = '__official_abrane__';
+
+export async function loadOfficialTemplate() {
+  if (!USE_CLOUD) return null;
+  const { data } = await supabase
+    .from('templates')
+    .select('id, data')
+    .eq('name', OFFICIAL_TEMPLATE_NAME)
+    .maybeSingle();
+  return data || null;
+}
+
+export async function saveOfficialTemplate(stateData) {
+  if (!USE_CLOUD) return;
+  const {
+    sigUrl: _sig, _dirty: _d,
+    files: _f, contentOrder: _co, annotations: _an, annotSnaps: _as, pageNotes: _pn,
+    contentZoom: _cz, contentPos: _cp,
+    ...dataToSave
+  } = stateData;
+  const { data: existing } = await supabase
+    .from('templates')
+    .select('id')
+    .eq('name', OFFICIAL_TEMPLATE_NAME)
+    .maybeSingle();
+  if (existing?.id) {
+    await supabase.from('templates').update({ data: dataToSave }).eq('id', existing.id);
+  } else {
+    await supabase.from('templates').insert({ name: OFFICIAL_TEMPLATE_NAME, data: dataToSave, created_by: null });
+  }
 }
 
 // ── Brand settings (logo, tampon) ─────────────────────────────
