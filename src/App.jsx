@@ -2797,7 +2797,7 @@ function Rail({steps,active,state,compl,onPick}) {
   return <aside style={{width:210,flexShrink:0,background:'#F7F4EE',borderRight:`1px solid ${T.line}`,overflowY:'auto',padding:'16px 0 24px',display:'flex',flexDirection:'column'}}>
     {STEP_GROUPS.map(g=>{
       const isActiveGroup=g===activeGroup;
-      return <div key={g} style={{marginBottom:4,opacity:hasActive&&!isActiveGroup?0.3:1,transition:'opacity .25s'}}>
+      return <div key={g} style={{marginBottom:4,opacity:hasActive&&!isActiveGroup?(g==='Contenu'?0.7:0.3):1,transition:'opacity .25s'}}>
         <div style={{fontSize:9,letterSpacing:'.18em',fontWeight:700,textTransform:'uppercase',color:isActiveGroup?T.navy:T.ink4,padding:'10px 16px 5px',transition:'color .2s'}}>{g}</div>
         {isActiveGroup&&<div style={{margin:'0 10px 4px',height:2,borderRadius:999,background:`linear-gradient(90deg,${T.navy},transparent)`}}/>}
         {steps.filter(s=>s.group===g).map(s=>{
