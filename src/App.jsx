@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { createRoot } from 'react-dom/client';
+import defaultLogoUrl from './assets/Logo.png';
+import defaultWmUrl from './assets/Filigrane.png';
+import defaultStampUrl from './assets/Tampon.jpg';
 import { USE_CLOUD } from './lib/supabase.js';
 import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, updateProfile, toAppUser, listUsers, deleteUser } from './lib/auth.js';
 import { loadProjects, upsertProject, deleteProject, projectToDisplay,
@@ -3997,10 +4000,10 @@ export default function App() {
   const [showAdmin,setShowAdmin]=useState(false);
   const [saveBarProps,setSaveBarProps]=useState({dirty:false,saving:false,lastSaved:null,onSave:()=>{}});
   const [brand,setBrand]=useState(()=>({
-    officialLogo:localStorage.getItem('abrane_logo')||'',
-    wmLogo:localStorage.getItem('abrane_wm')||'',
+    officialLogo:localStorage.getItem('abrane_logo')||defaultLogoUrl,
+    wmLogo:localStorage.getItem('abrane_wm')||defaultWmUrl,
     shopLogos:JSON.parse(localStorage.getItem('abrane_shop_logos')||'{}'),
-    stampLogo:localStorage.getItem('abrane_stamp')||'',
+    stampLogo:localStorage.getItem('abrane_stamp')||defaultStampUrl,
   }));
   const brandCtxVal=useMemo(()=>({...brand,setBrand}),[brand]);
 
@@ -4009,10 +4012,10 @@ export default function App() {
       console.log('[brand] loadBrandSettings remote:', remote ? Object.keys(remote) : 'empty');
       if(!remote||!Object.keys(remote).length) return;
       const merged={
-        officialLogo: remote.officialLogo||'',
-        wmLogo:       remote.wmLogo||'',
+        officialLogo: remote.officialLogo||defaultLogoUrl,
+        wmLogo:       remote.wmLogo||defaultWmUrl,
         shopLogos:    remote.shopLogos||{},
-        stampLogo:    remote.stampLogo||'',
+        stampLogo:    remote.stampLogo||defaultStampUrl,
       };
       if(merged.officialLogo) localStorage.setItem('abrane_logo',merged.officialLogo);
       if(merged.wmLogo)       localStorage.setItem('abrane_wm',merged.wmLogo);
