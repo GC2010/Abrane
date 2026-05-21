@@ -227,7 +227,7 @@ const initialState = project => {
       materials:SAMPLE_MATS,
       backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
       backDecor:'BOOK',sigEnabled:false,sigPlacement:'all',wmEnabled:false,wmOpacity:10,
-      sigScale:30,sigX:78,sigY:88,
+      sigScale:30,sigX:78,sigY:88,groupX:50,groupY:85,
       stampEnabled:false,stampOpacity:70,stampScale:25,stampX:50,stampY:50,stampPlacement:'all',
       symEnabled:false,symPlacement:'all',symText:'',symScale:20,symX:50,symY:50,symPageNum:1,
       advEnabled:false,advStatus:'AF',advPlacement:'all',advScale:15,advX:85,advY:8,advPageNum:1,
@@ -275,7 +275,7 @@ const initialState = project => {
     materials:SAMPLE_MATS, files:[], contentOrder:[],
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, sigPlacement:'all', wmEnabled:false, wmOpacity:10, sigUrl:'',
-    sigScale:30, sigX:78, sigY:88,
+    sigScale:30, sigX:78, sigY:88, groupX:50, groupY:85,
     stampEnabled:false, stampOpacity:70, stampScale:25, stampX:50, stampY:50, stampPlacement:'all',
     symEnabled:false, symPlacement:'all', symText:'', symScale:20, symX:50, symY:50, symPageNum:1,
     advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advX:85, advY:8, advPageNum:1,
@@ -1625,23 +1625,22 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
                 </div>
               </div>
             )}
-            {state.sigEnabled&&state.sigUrl&&(()=>{
-              const pl=state.sigPlacement||'all';
-              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content');
-              return show?(
-                <div style={{position:'absolute',left:`${state.sigX??78}%`,top:`${state.sigY??88}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.sigScale??30}%`,maxWidth:'40%'}}>
-                  <img src={state.sigUrl} alt="" style={{width:'100%',objectFit:'contain',opacity:0.9}}/>
-                </div>
-              ):null;
-            })()}
-            {state.stampEnabled&&stampLogo&&(()=>{
-              const pl=state.stampPlacement||'all';
-              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content');
-              return show?(
-                <div style={{position:'absolute',left:`${state.stampX??50}%`,top:`${state.stampY??50}%`,transform:'translate(-50%,-50%)',zIndex:7,pointerEvents:'none',width:`${state.stampScale??25}%`,maxWidth:'50%'}}>
+            {(()=>{
+              const gx=state.groupX??state.sigX??50;
+              const gy=state.groupY??state.sigY??85;
+              const sigPl=state.sigPlacement||'all';
+              const stPl=state.stampPlacement||'all';
+              const sigShow=state.sigEnabled&&state.sigUrl&&(sigPl==='all'||(sigPl==='first'&&i===0)||(sigPl==='last'&&i===pages.length-1)||(sigPl==='content'&&p.type==='content'));
+              const stampShow=state.stampEnabled&&stampLogo&&(stPl==='all'||(stPl==='first'&&i===0)||(stPl==='last'&&i===pages.length-1)||(stPl==='content'&&p.type==='content'));
+              if(!sigShow&&!stampShow) return null;
+              return <>
+                {stampShow&&<div style={{position:'absolute',left:`${gx}%`,top:`${gy}%`,transform:'translate(-50%,-50%)',zIndex:7,pointerEvents:'none',width:`${state.stampScale??25}%`,maxWidth:'50%'}}>
                   <img src={stampLogo} alt="" style={{width:'100%',objectFit:'contain',opacity:(state.stampOpacity??70)/100}}/>
-                </div>
-              ):null;
+                </div>}
+                {sigShow&&<div style={{position:'absolute',left:`${gx}%`,top:`${gy}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.sigScale??30}%`,maxWidth:'40%'}}>
+                  <img src={state.sigUrl} alt="" style={{width:'100%',objectFit:'contain',opacity:0.9}}/>
+                </div>}
+              </>;
             })()}
             {state.symEnabled&&(()=>{
               const pl=state.symPlacement||'all';
@@ -2554,12 +2553,6 @@ function SignPanel({state,update,user}) {
         <Fld label={`Taille · ${state.sigScale??30}%`}>
           <input type="range" min="5" max="60" value={state.sigScale??30} onChange={e=>update({sigScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
-        <Fld label={`Position horizontale · ${state.sigX??78}%`}>
-          <input type="range" min="0" max="100" value={state.sigX??78} onChange={e=>update({sigX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
-        </Fld>
-        <Fld label={`Position verticale · ${state.sigY??88}%`}>
-          <input type="range" min="0" max="100" value={state.sigY??88} onChange={e=>update({sigY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
-        </Fld>
       </>}
       {sigImg
         ?<div style={{border:`1px solid ${T.line}`,borderRadius:8,overflow:'hidden',background:'#fafaf8'}}>
@@ -2623,14 +2616,22 @@ function SignPanel({state,update,user}) {
         <Fld label={`Taille · ${state.stampScale??25}%`}>
           <input type="range" min="5" max="70" value={state.stampScale??25} onChange={e=>update({stampScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
-        <Fld label={`Position horizontale · ${state.stampX??50}%`}>
-          <input type="range" min="0" max="100" value={state.stampX??50} onChange={e=>update({stampX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
-        </Fld>
-        <Fld label={`Position verticale · ${state.stampY??50}%`}>
-          <input type="range" min="0" max="100" value={state.stampY??50} onChange={e=>update({stampY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
-        </Fld>
       </>}
     </Sect>
+    {(state.sigEnabled||state.stampEnabled)&&(
+      <Sect title="Position commune">
+        <div style={{fontSize:11,color:T.ink3,marginBottom:8}}>Déplace signature et tampon ensemble.</div>
+        <Fld label={`Horizontal · ${state.groupX??50}%`}>
+          <input type="range" min="0" max="100" value={state.groupX??50} onChange={e=>update({groupX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Vertical · ${state.groupY??85}%`}>
+          <input type="range" min="0" max="100" value={state.groupY??85} onChange={e=>update({groupY:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <button onClick={()=>update({groupX:50,groupY:85})} style={{marginTop:4,background:'transparent',border:`1px solid ${T.line}`,borderRadius:6,padding:'5px 12px',fontSize:11,color:T.ink2,cursor:'pointer',width:'100%'}}>
+          Centrer (défaut)
+        </button>
+      </Sect>
+    )}
   </>;
 }
 const ADV_STATUSES=[
