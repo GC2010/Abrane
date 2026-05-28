@@ -1,9 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { loadOfficialTemplate } from '../lib/db';
 import {
   T, Icon, btnSt, inputSt,
   BrandCtx, NotesEditCtx,
   ContentPanel, SignPanel, SymbolsPanel,
   AnnotatorModal, Canvas, ThumbnailPalette,
+  defaultLogoUrl,
 } from '../App';
 
 // ── Costanti ────────────────────────────────────────────────────────────
@@ -21,9 +23,6 @@ const STEP_DESC = {
   sym:      "Symbole d'avertissement et badge d'avancement.",
 };
 
-const EMPTY_BRAND = {
-  officialLogo:'', wmLogo:'', shopLogos:{}, stampLogo:'', setBrand:()=>{},
-};
 
 // ── État minimal compatible avec ContentPanel / SignPanel / SymbolsPanel ─
 const initFastState = () => ({
@@ -56,7 +55,7 @@ const initFastState = () => ({
 });
 
 // ── Rail semplificata (4 voci) ──────────────────────────────────────────
-function FastRail({ active, onPick, onCapture, onExport }) {
+function FastRail({ active, onPick, onCapture, onCopy, onExport, useTemplate, onToggleTemplate }) {
   return (
     <aside style={{
       width:210, flexShrink:0,
@@ -112,7 +111,41 @@ function FastRail({ active, onPick, onCapture, onExport }) {
         })}
       </div>
 
-      <div style={{ padding:'0 12px', display:'flex', flexDirection:'column', gap:8 }}>
+      <div style={{ padding:'0 12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+        {/* Copie contenu dans le presse-papiers */}
+        <button onClick={onCopy} style={{
+          ...btnSt('primary'), justifyContent:'center', width:'100%',
+          background:`linear-gradient(135deg,#6366F1,#4F46E5)`,
+          border:'none', fontSize:13, fontWeight:700, padding:'11px 10px',
+          boxShadow:'0 4px 18px rgba(99,102,241,.35)',
+        }}>
+          <Icon name="layers" size={14} color="#fff"/>Copier
+        </button>
+        <div style={{fontSize:9.5,color:T.ink4,textAlign:'center',lineHeight:1.4,padding:'0 4px'}}>
+          Pages contenu · prêt à coller
+        </div>
+
+        {/* Toggle template — tasto molto visibile */}
+        <button onClick={onToggleTemplate} style={{
+          padding:'11px 10px', borderRadius:10, cursor:'pointer',
+          fontFamily:'inherit', width:'100%',
+          display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+          fontWeight:700, fontSize:12,
+          border: useTemplate ? 'none' : `2px dashed ${T.line}`,
+          background: useTemplate
+            ? `linear-gradient(135deg,${T.navy},#2A4A8C)`
+            : T.surface,
+          color: useTemplate ? '#fff' : T.ink3,
+          boxShadow: useTemplate ? '0 4px 18px rgba(27,46,92,.35)' : 'none',
+          transition:'all .18s',
+        }}>
+          <Icon name={useTemplate ? 'doc' : 'folder'} size={15} color={useTemplate ? '#fff' : T.ink4}/>
+          <span>{useTemplate ? 'Template ON' : 'Pages seules'}</span>
+        </button>
+        <div style={{ fontSize:9.5, color:T.ink4, textAlign:'center', lineHeight:1.4, padding:'0 4px' }}>
+          {useTemplate ? 'Couverture + pages importées' : 'Fichiers importés uniquement'}
+        </div>
+
         <button onClick={onCapture} style={{ ...btnSt('primary'), justifyContent:'center', width:'100%' }}>
           <Icon name="image" size={13} color="#fff"/>Capture
         </button>
@@ -181,6 +214,52 @@ function AnnoterPanel({ state, onOpenAnnotator }) {
   );
 }
 
+// ── Sezione meta fissa: titre / sous-titre / révision ───────────────────
+function FastMeta({ state, update }) {
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+  return (
+    <div style={{
+      padding:'14px 22px 16px', borderBottom:`1px solid ${T.lineSoft}`,
+      display:'flex', flexDirection:'column', gap:10,
+    }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+        <label style={{ fontSize:10, fontWeight:600, color:T.ink4, letterSpacing:'.1em', textTransform:'uppercase' }}>Titre</label>
+        <input
+          style={{ ...inputSt, fontSize:13, fontWeight:600 }}
+          placeholder="Titre du document…"
+          value={state.mainTitle || ''}
+          onChange={e => update({ mainTitle: e.target.value })}
+        />
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+        <label style={{ fontSize:10, fontWeight:600, color:T.ink4, letterSpacing:'.1em', textTransform:'uppercase' }}>Sous-titre</label>
+        <input
+          style={{ ...inputSt, fontSize:12 }}
+          placeholder="Sous-titre…"
+          value={state.subtitle || ''}
+          onChange={e => update({ subtitle: e.target.value })}
+        />
+      </div>
+      <div style={{ display:'flex', gap:10 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:3, flex:1 }}>
+          <label style={{ fontSize:10, fontWeight:600, color:T.ink4, letterSpacing:'.1em', textTransform:'uppercase' }}>Révision</label>
+          <input
+            style={{ ...inputSt, fontSize:12 }}
+            placeholder="Rev.01"
+            value={state.rev || ''}
+            onChange={e => update({ rev: e.target.value })}
+          />
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:3, flex:1 }}>
+          <label style={{ fontSize:10, fontWeight:600, color:T.ink4, letterSpacing:'.1em', textTransform:'uppercase' }}>Date</label>
+          <div style={{ ...inputSt, fontSize:12, color:T.ink3, background:'#F5F4F2', cursor:'default' }}>{dateStr}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Pannello laterale (dispatcher) ──────────────────────────────────────
 function FastInspector({ step, state, update, user, onOpenAnnotator }) {
   const meta = FAST_STEPS.find(s => s.id === step) || FAST_STEPS[0];
@@ -190,20 +269,21 @@ function FastInspector({ step, state, update, user, onOpenAnnotator }) {
       background:T.surface, borderRight:`1px solid ${T.line}`,
       overflowY:'auto', display:'flex', flexDirection:'column',
     }}>
+      <FastMeta state={state} update={update}/>
       <div style={{
-        padding:'20px 22px 14px', borderBottom:`1px solid ${T.lineSoft}`,
+        padding:'14px 22px 10px', borderBottom:`1px solid ${T.lineSoft}`,
         background:T.surface, position:'sticky', top:0, zIndex:5,
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <Icon name={meta.icon} size={18} color={T.navy}/>
-          <h2 style={{ fontSize:16, fontWeight:600, color:T.ink, margin:0 }}>{meta.label}</h2>
+          <h2 style={{ fontSize:15, fontWeight:600, color:T.ink, margin:0 }}>{meta.label}</h2>
         </div>
-        <p style={{ fontSize:12, color:T.ink3, lineHeight:1.5, margin:'6px 0 0' }}>
+        <p style={{ fontSize:11.5, color:T.ink3, lineHeight:1.5, margin:'4px 0 0' }}>
           {STEP_DESC[step]}
         </p>
       </div>
       <div style={{ padding:'16px 22px 60px', display:'flex', flexDirection:'column', gap:18 }}>
-        {step === 'content' && <ContentPanel state={state} update={update}/>}
+        {step === 'content' && <ContentPanel state={state} update={update} prominent/>}
         {step === 'annoter' && <AnnoterPanel state={state} onOpenAnnotator={onOpenAnnotator}/>}
         {step === 'sign'    && <SignPanel    state={state} update={update} user={user}/>}
         {step === 'sym'     && <SymbolsPanel state={state} update={update}/>}
@@ -221,6 +301,41 @@ export default function FastMode({ user }) {
   const [activePage, setActivePage]         = useState(0);
   const [thumbSize, setThumbSize]           = useState('M');
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
+  const [useTemplate, setUseTemplate]       = useState(true);
+
+  // Carica il template ufficiale ABRANE per cover + back
+  useEffect(() => {
+    const today = new Date();
+    const autoDate = today.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const autoYear = String(today.getFullYear());
+    loadOfficialTemplate().then(record => {
+      const tpl = record?.data || {};
+      setState(s => ({
+        ...s,
+        ...tpl,
+        // Data automatica
+        projectDate: autoDate,
+        year: autoYear,
+        // FastMode : sempre senza index, materiali, notes
+        enIdx: false, enMat: false, enNotes: false,
+        // Dati aziendali back page — usa quelli del template se presenti
+        backLines: (tpl.backLines?.length ? tpl.backLines : [
+          'ABRANE — Le fabricant de mobilier',
+          'contact@abrane.fr',
+          'www.abrane.fr',
+        ]),
+        // Preserva i dati FastMode (file importati dall'utente)
+        files: s.files,
+        contentOrder: s.contentOrder,
+        annotations: s.annotations,
+        annotSnaps: s.annotSnaps,
+        pageNotes: s.pageNotes,
+        contentZoom: s.contentZoom,
+        contentPos: s.contentPos,
+        _dirty: false,
+      }));
+    }).catch(() => {});
+  }, []);
 
   const update = useCallback(
     patch => setState(s => ({ ...s, ...patch })),
@@ -234,19 +349,52 @@ export default function FastMode({ user }) {
   const PALETTE_H = { S:99, M:122, L:150 };
   const paletteH = paletteCollapsed ? 32 : PALETTE_H[thumbSize];
 
+  const renderPage = async (h2c, idx) => {
+    const wrapper = document.querySelector(`[data-page-idx="${idx}"]`);
+    const el = wrapper?.querySelector('.page-render-box') || wrapper;
+    if (!el) return null;
+    const btns = el.querySelectorAll('.annot-btn-overlay');
+    btns.forEach(b => { b.style.display = 'none'; });
+    try {
+      return await h2c(el, { scale:5, useCORS:true, backgroundColor:'#ffffff', logging:false });
+    } finally {
+      btns.forEach(b => { b.style.display = ''; });
+    }
+  };
+
+  const renderActivePage = async () => {
+    const { default: h2c } = await import('html2canvas');
+    const canvas = await renderPage(h2c, activePage);
+    if (!canvas) throw new Error('Aucune page à capturer.');
+    return canvas;
+  };
+
+  const handleCopy = async () => {
+    try {
+      const { default: h2c } = await import('html2canvas');
+      const total = document.querySelectorAll('[data-page-idx]').length;
+      if (total < 3) throw new Error('Aucune page de contenu à copier.');
+      const dataUrls = [];
+      for (let i = 1; i <= total - 2; i++) {
+        const c = await renderPage(h2c, i);
+        if (c) dataUrls.push(c.toDataURL('image/png'));
+      }
+      if (!dataUrls.length) throw new Error('Aucune page de contenu à copier.');
+      // Each page as a separate <img> — pastes as individual images in Word/PPT/Keynote
+      const html = dataUrls.map(src => `<img src="${src}" style="display:block;max-width:100%;"/>`).join('');
+      const blob = new Blob([html], { type: 'text/html' });
+      await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
+    } catch(e) { alert(e.message || 'Erreur lors de la copie.'); }
+  };
+
   const handleCapture = async () => {
     try {
-      const { default: html2canvas } = await import('html2canvas');
-      const el = document.querySelector('.fast-canvas-area');
-      if (!el) return;
-      const canvas = await html2canvas(el, { scale:2, useCORS:true, backgroundColor:'#F4F1EA' });
+      const canvas = await renderActivePage();
       const a = document.createElement('a');
       a.href = canvas.toDataURL('image/png');
-      a.download = 'fast-capture.png';
+      a.download = `page-${activePage + 1}.png`;
       a.click();
-    } catch {
-      alert('html2canvas non disponible. Installez-le avec : npm i html2canvas');
-    }
+    } catch(e) { alert(e.message || 'html2canvas non disponible — npm i html2canvas'); }
   };
 
   const handleExport = () => {
@@ -262,13 +410,20 @@ export default function FastMode({ user }) {
     URL.revokeObjectURL(a.href);
   };
 
+  const outerBrand = React.useContext(BrandCtx);
+  const safeBrand = React.useMemo(() => ({
+    ...outerBrand,
+    officialLogo: outerBrand.officialLogo || defaultLogoUrl,
+  }), [outerBrand]);
+
   return (
-    <BrandCtx.Provider value={EMPTY_BRAND}>
-      <div style={{ display:'flex', flex:1, overflow:'hidden', minHeight:0 }}>
+    <BrandCtx.Provider value={safeBrand}>
+    <div style={{ display:'flex', flex:1, overflow:'hidden', minHeight:0 }}>
 
         <FastRail
           active={activeStep} onPick={setActiveStep}
-          onCapture={handleCapture} onExport={handleExport}
+          onCapture={handleCapture} onCopy={handleCopy} onExport={handleExport}
+          useTemplate={useTemplate} onToggleTemplate={() => setUseTemplate(v => !v)}
         />
 
         <FastInspector
@@ -286,6 +441,7 @@ export default function FastMode({ user }) {
               isPortrait:state.pageFormat.startsWith('v'),
             })}
             onUpdatePageNotes={updatePageNotes}
+            hideTemplatePages={!useTemplate}
           />
           <ThumbnailPalette
             state={state} activePage={activePage} onPageClick={setActivePage}
@@ -304,7 +460,7 @@ export default function FastMode({ user }) {
           />
         )}
 
-      </div>
+    </div>
     </BrandCtx.Provider>
   );
 }

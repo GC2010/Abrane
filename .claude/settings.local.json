@@ -12,7 +12,8 @@
       "Read(//c/c/Users/chefprojetsbe03/Documents/GitHub/Abrane/src/**)",
       "Bash(git checkout *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(timeout 5)"
     ]
   }
 }
