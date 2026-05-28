@@ -726,7 +726,8 @@ function AdminPanel({onClose, currentUserId}) {
 function AbraneLogoBox({size='md'}) {
   const {officialLogo}=React.useContext(BrandCtx);
   const h=size==='lg'?56:size==='md'?40:28;
-  if(officialLogo) return <img src={officialLogo} alt="ABRANE" style={{height:h,maxWidth:200,objectFit:'contain',display:'block'}}/>;
+  const src=officialLogo||defaultLogoUrl;
+  if(src) return <img src={src} alt="ABRANE" style={{height:h,maxWidth:200,objectFit:'contain',display:'block'}}/>;
   const fs=size==='lg'?18:size==='md'?13:10;
   return <div style={{background:T.navy,borderRadius:size==='lg'?6:4,padding:size==='lg'?'10px 24px':size==='md'?'5px 12px':'3px 8px',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
     <span style={{color:'#fff',fontWeight:900,fontSize:fs,letterSpacing:2}}>ABRANE</span>
@@ -842,8 +843,8 @@ function LoginScreen({onLogin}) {
   </div>;
 }
 
-function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProject,onEditOfficialTemplate}) {
-  const [tab,setTab]=useState('projects');
+function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProject,onEditOfficialTemplate,onFastMode}) {
+  const [tab,setTab]=useState('home');
   const [q,setQ]=useState('');
   const [viewMode,setViewMode]=useState('grid');
   const [sort,setSort]=useState('recent');
@@ -858,6 +859,7 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
   const [officialTplRecord,setOfficialTplRecord]=useState(null);
   const importRef=useRef(null);
   const isAdmin=user.role==='admin'||user.role==='superadmin';
+  const [hoveredCard,setHoveredCard]=useState(null);
 
   useEffect(()=>{
     if(!USE_CLOUD) return;
@@ -955,9 +957,35 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
   const allTemplates=[...TEAM_TEMPLATES,...dbTemplates];
   const templatesFiltered=allTemplates.filter(t=>!q||t.name.toLowerCase().includes(q.toLowerCase()));
   return <div style={{flex:1,overflowY:'auto',background:T.bg}}>
-    <div style={{maxWidth:1100,margin:'0 auto',padding:'32px 36px 80px'}}>
+    {tab==='home'&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'calc(100vh - 64px)',gap:52,padding:'48px 24px'}}>
+      <div style={{textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:14}}>
+        <AbraneLogoBox size="lg"/>
+        <p style={{fontSize:15,color:T.ink3,margin:0}}>Bonjour {user.name.split(' ')[0]} — que souhaitez-vous faire ?</p>
+      </div>
+      <div style={{display:'flex',gap:22,flexWrap:'wrap',justifyContent:'center'}}>
+        {[
+          {id:'projects',icon:'folder',label:'Mes Projets',sub:`${allProjects.length} projet${allProjects.length!==1?'s':''}`,desc:'Retrouvez et reprenez vos catalogues en cours.',iconBg:'#EEF1F8',iconColor:T.navy,action:()=>setTab('projects')},
+          {id:'templates',icon:'folderTeam',label:'Modèles',sub:`${allTemplates.length} disponible${allTemplates.length!==1?'s':''}`,desc:'Démarrez depuis un modèle ABRANE prêt à l\'emploi.',iconBg:T.goldTint,iconColor:T.gold,action:()=>setTab('templates')},
+          {id:'fastmode',icon:'sparkle',label:'Fast Mode',sub:'Génération rapide',desc:'Importez vos fichiers et exportez un catalogue en quelques clics.',iconBg:'#F0F0FF',iconColor:'#6366F1',action:onFastMode},
+        ].map(c=>{const hov=hoveredCard===c.id;return(
+          <button key={c.id} onClick={c.action}
+            onMouseEnter={()=>setHoveredCard(c.id)}
+            onMouseLeave={()=>setHoveredCard(null)}
+            style={{width:240,padding:'44px 28px 40px',borderRadius:26,border:`1.5px solid ${hov?T.line:'rgba(0,0,0,.06)'}`,background:'#fff',boxShadow:hov?'0 20px 64px rgba(0,0,0,.13)':'0 2px 16px rgba(0,0,0,.06)',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:22,transition:'box-shadow .18s,transform .15s',transform:hov?'translateY(-5px)':'none',fontFamily:'inherit'}}>
+            <div style={{width:80,height:80,borderRadius:22,background:c.iconBg,display:'grid',placeItems:'center'}}><Icon name={c.icon} size={36} color={c.iconColor}/></div>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:20,fontWeight:700,color:T.ink,marginBottom:4,letterSpacing:'-.3px'}}>{c.label}</div>
+              <div style={{fontSize:12,color:T.ink4,marginBottom:8}}>{c.sub}</div>
+              <div style={{fontSize:12.5,color:T.ink3,lineHeight:1.5}}>{c.desc}</div>
+            </div>
+          </button>
+        );})}
+      </div>
+    </div>}
+    {tab!=='home'&&<div style={{maxWidth:1100,margin:'0 auto',padding:'32px 36px 80px'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:24,marginBottom:26}}>
         <div>
+          <button onClick={()=>setTab('home')} style={{display:'inline-flex',alignItems:'center',gap:5,border:'none',background:'transparent',color:T.ink3,fontSize:12,padding:'0 0 10px',cursor:'pointer',fontFamily:'inherit'}}><Icon name="back" size={13} color={T.ink3}/>Accueil</button>
           <h1 style={{fontSize:26,fontWeight:600,color:T.ink,margin:0}}>Bonjour {user.name.split(' ')[0]}.</h1>
           <p style={{fontSize:13.5,color:T.ink3,marginTop:4,marginBottom:0}}>Reprenez un projet ou démarrez depuis un modèle client.</p>
         </div>
@@ -979,6 +1007,10 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
             <span style={{fontSize:10,padding:'1px 6px',borderRadius:999,background:tab===tb.id?T.navyTint:T.panel2,color:tab===tb.id?T.navy:T.ink3}}>{tb.cnt}</span>
           </button>
         ))}
+        <div style={{width:1,height:20,background:T.lineStrong,margin:'auto 2px'}}/>
+        <button onClick={onFastMode} style={{display:'inline-flex',alignItems:'center',gap:7,padding:'6px 14px',borderRadius:7,fontSize:12.5,fontWeight:600,color:T.navy,border:'none',background:'transparent',cursor:'pointer'}}>
+          <Icon name="sparkle" size={14} color={T.navy}/>Fast Mode
+        </button>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
         <div style={{position:'relative',flex:'0 0 300px'}}>
@@ -1099,7 +1131,7 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
         <div style={{fontSize:15,fontWeight:600,color:T.ink,marginBottom:6}}>Aucun projet partagé</div>
         <div style={{color:T.ink3,fontSize:12.5}}>Lorsqu'un collègue partagera un projet, il apparaîtra ici.</div>
       </div>}
-    </div>
+    </div>}
     {applyModal&&<TemplateApplyModal template={applyModal} onClose={()=>setApplyModal(null)} onConfirm={opts=>{setApplyModal(null);onOpenTemplate({...applyModal,...opts});}}/>}
     {updateModal&&<TemplateUpdateModal project={updateModal} onClose={()=>setUpdateModal(null)} onDecision={()=>setUpdateModal(null)}/>}
     {deleteConfirm&&<Scrim onClose={()=>setDeleteConfirm(null)}>
@@ -1565,9 +1597,13 @@ function PdfExportModal({state,onClose}) {
   );
 }
 
-function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageNotes}) {
+function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageNotes,hideTemplatePages=false}) {
   const {wmLogo,stampLogo}=React.useContext(BrandCtx);
-  const pages=useMemo(()=>buildPageList(state),[state]);
+  const pages=useMemo(()=>{
+    const all=buildPageList(state);
+    if(hideTemplatePages) return all.filter(p=>p.type==='content'||p.type==='category');
+    return all;
+  },[state,hideTemplatePages]);
   const isP=state.pageFormat.startsWith('v');
   const canvasRef=useRef(null);
   const pageRefs=useRef([]);
@@ -1597,7 +1633,7 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
     </div>
     <div style={{display:'flex',flexDirection:'column',gap:24,alignItems:'center',width:'100%',transform:`scale(${zoom})`,transformOrigin:'top center',transition:'transform .15s'}}>
       {pages.map((p,i)=>(
-        <div key={p.key} ref={el=>pageRefs.current[i]=el} style={{width:'100%',maxWidth:isP?700:1000}}>
+        <div key={p.key} ref={el=>pageRefs.current[i]=el} data-page-idx={i} style={{width:'100%',maxWidth:isP?700:1000}}>
           <div style={{fontSize:10,color:T.ink4,letterSpacing:'.08em',textTransform:'uppercase',display:'flex',justifyContent:'space-between',marginBottom:6,padding:'0 2px'}}>
             <span style={{display:'flex',alignItems:'center',gap:6}}>
               {p.label}
@@ -1607,7 +1643,7 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
             </span>
             <span>Page {i+1} / {pages.length}</span>
           </div>
-          <div style={{background:'#fff',boxShadow:'0 6px 22px rgba(20,20,30,.12)',borderRadius:2,position:'relative'}}>
+          <div className="page-render-box" style={{background:'#fff',boxShadow:'0 6px 22px rgba(20,20,30,.12)',borderRadius:2,position:'relative'}}>
             <NotesEditCtx.Provider value={notesCtxVal}>
               <PageRender page={p} state={state}/>
             </NotesEditCtx.Provider>
@@ -1686,7 +1722,7 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
               ):null;
             })()}
             {p.type==='content'&&onAnnotate&&(
-              <div style={{position:'absolute',top:8,right:10,zIndex:10}}>
+              <div className="annot-btn-overlay" style={{position:'absolute',top:8,right:10,zIndex:10}}>
                 <button onClick={e=>{e.stopPropagation();onAnnotate(p);}} style={{
                   background:'rgba(15,27,45,.82)',backdropFilter:'blur(6px)',
                   border:`1px solid ${state.annotations?.[p.key]?T.gold:'rgba(255,255,255,.25)'}`,
@@ -2106,7 +2142,7 @@ function NotesPanel({state,update}) {
     </Sect>}
   </>;
 }
-function ContentPanel({state,update,onNavigate}) {
+function ContentPanel({state,update,onNavigate,prominent=false}) {
   const fileInputRef=useRef(null);
   const [dragIdx,setDragIdx]=useState(null);
   const [overIdx,setOverIdx]=useState(null);
@@ -2114,10 +2150,10 @@ function ContentPanel({state,update,onNavigate}) {
   const [renaming,setRenaming]=useState(null);
   const [importing,setImporting]=useState(false);
   const [expandedZoom,setExpandedZoom]=useState({});
+  const [dropHighlight,setDropHighlight]=useState(false);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
-  const handleImport=async e=>{
-    const list=Array.from(e.target.files);
+  const processFiles=async list=>{
     if(!list.length)return;
     setImporting(true);
     const newFiles=[],newOrders=[];
@@ -2146,8 +2182,17 @@ function ContentPanel({state,update,onNavigate}) {
       newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:''});
     }
     update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
-    e.target.value='';
     setImporting(false);
+  };
+
+  const handleImport=async e=>{
+    await processFiles(Array.from(e.target.files||[]));
+    e.target.value='';
+  };
+
+  const handleDrop=async e=>{
+    e.preventDefault();e.stopPropagation();setDropHighlight(false);
+    await processFiles(Array.from(e.dataTransfer.files||[]));
   };
 
   const mergeItems=async(fromIdx,toIdx)=>{
@@ -2295,11 +2340,57 @@ function ContentPanel({state,update,onNavigate}) {
   return <>
     <Sect title="Importer">
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImport}/>
-      <div onClick={()=>!importing&&fileInputRef.current?.click()} style={{border:`1.5px dashed ${T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
-        <Icon name="upload" size={22} color={importing?T.navy:T.gold}/>
-        <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
-        <span style={{fontSize:12,color:T.ink3}}>{importing?'Conversion en cours…':'JPG · PNG · SVG · PDF · Word · Excel'}</span>
-      </div>
+      {prominent ? (
+        <div
+          onClick={()=>!importing&&fileInputRef.current?.click()}
+          onDragOver={e=>{e.preventDefault();e.stopPropagation();setDropHighlight(true);}}
+          onDragLeave={()=>setDropHighlight(false)}
+          onDrop={handleDrop}
+          style={{
+            border:`3px dashed ${dropHighlight?T.navy:T.gold}`,
+            borderRadius:18, padding:'40px 20px',
+            textAlign:'center',
+            background: importing ? T.navyTint : dropHighlight ? T.navyTint : '#FFFDF9',
+            display:'flex', flexDirection:'column', alignItems:'center', gap:14,
+            cursor: importing ? 'wait' : 'pointer',
+            transition:'all .18s',
+            boxShadow: dropHighlight ? `0 0 0 4px ${T.navyTint}` : '0 4px 28px rgba(27,46,92,.10)',
+          }}>
+          <div style={{
+            width:72, height:72, borderRadius:'50%',
+            background: importing ? T.navyTint : T.navy,
+            display:'grid', placeItems:'center',
+            boxShadow:`0 8px 28px rgba(27,46,92,${dropHighlight?'.4':'.25'})`,
+            transition:'box-shadow .18s',
+          }}>
+            <Icon name="upload" size={32} color={importing?T.navy:'#fff'}/>
+          </div>
+          <div>
+            <div style={{fontSize:17,fontWeight:800,color:T.navy,marginBottom:6,letterSpacing:'-.3px'}}>
+              {importing ? 'Conversion…' : 'Importer des fichiers'}
+            </div>
+            <div style={{fontSize:12,color:T.ink3}}>PDF · Word · Excel · Images</div>
+          </div>
+          {!importing&&<div style={{
+            background:T.navy, color:'#fff',
+            padding:'10px 32px', borderRadius:999,
+            fontSize:13, fontWeight:700,
+            letterSpacing:'.02em',
+            boxShadow:'0 4px 16px rgba(27,46,92,.3)',
+          }}>Cliquez ou glissez ici</div>}
+        </div>
+      ) : (
+        <div
+          onClick={()=>!importing&&fileInputRef.current?.click()}
+          onDragOver={e=>{e.preventDefault();e.stopPropagation();setDropHighlight(true);}}
+          onDragLeave={()=>setDropHighlight(false)}
+          onDrop={handleDrop}
+          style={{border:`1.5px dashed ${dropHighlight?T.navy:T.lineStrong}`,borderRadius:8,padding:18,textAlign:'center',background:importing?T.navyTint:dropHighlight?T.navyTint:T.panel,display:'flex',flexDirection:'column',alignItems:'center',gap:6,cursor:importing?'wait':'pointer',transition:'background .2s'}}>
+          <Icon name="upload" size={22} color={importing?T.navy:T.gold}/>
+          <strong style={{fontSize:12.5,color:T.ink}}>{importing?'Conversion en cours…':'Cliquez ou glissez vos fichiers'}</strong>
+          <span style={{fontSize:12,color:T.ink3}}>JPG · PNG · SVG · PDF · Word · Excel</span>
+        </div>
+      )}
       <div style={{fontSize:10,color:T.ink4,textAlign:'center',marginTop:4}}>Glissez un fichier <em>sur</em> un autre pour les afficher côte à côte</div>
     </Sect>
     <Sect title={`Ordre · ${state.contentOrder.length} entrées`}>
@@ -3035,7 +3126,7 @@ function VueEnsembleModal({state,update,onClose}) {
   </div></Scrim>;
 }
 
-function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed}) {
+function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed,selectedPages=null,onTogglePageSelect=null}) {
   const stripRef=useRef(null);
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isPortrait=state.pageFormat.startsWith('v');
@@ -3111,10 +3202,14 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
       }}>
         {pages.map((page,i)=>{
           const isActive=activePage===i;
+          const isSel=selectedPages?.has(i)??false;
           const hasNotes=page.type==='content'&&!!(state.pageNotes?.[page.key]);
-          const borderCol=isActive?T.gold:hasNotes?'#E53E3E':'rgba(255,255,255,.18)';
+          const borderCol=isSel?'#6366F1':isActive?T.gold:hasNotes?'#E53E3E':'rgba(255,255,255,.18)';
           return (
-            <div key={page.key} onClick={()=>onPageClick(i)} style={{
+            <div key={page.key} onClick={(e)=>{
+              if((e.ctrlKey||e.metaKey)&&onTogglePageSelect) onTogglePageSelect(i);
+              else onPageClick(i);
+            }} style={{
               flexShrink:0,display:'flex',flexDirection:'column',
               alignItems:'center',gap:4,cursor:'pointer'
             }}>
@@ -3122,8 +3217,8 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                 width:thumbW,height:thumbH,overflow:'hidden',
                 borderRadius:2,position:'relative',
                 border:`1.5px solid ${borderCol}`,
-                boxShadow:isActive?`0 0 0 2px rgba(184,149,86,.35)`:hasNotes?'0 0 0 2px rgba(229,62,62,.25)':'none',
-                transform:isActive?'translateY(-2px)':'none',
+                boxShadow:isSel?'0 0 0 2px rgba(99,102,241,.4)':isActive?`0 0 0 2px rgba(184,149,86,.35)`:hasNotes?'0 0 0 2px rgba(229,62,62,.25)':'none',
+                transform:(isActive||isSel)?'translateY(-2px)':'none',
                 transition:'transform .15s, border-color .15s, box-shadow .15s',
                 background:'#fff'
               }}>
@@ -3133,6 +3228,14 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                   padding:'0.5px 3px',borderRadius:1.5,letterSpacing:'.04em',
                   pointerEvents:'none'
                 }}>{i+1}</div>
+                {isSel&&<div style={{
+                  position:'absolute',bottom:2,left:2,zIndex:2,
+                  background:'#6366F1',borderRadius:'50%',
+                  width:10,height:10,display:'grid',placeItems:'center',
+                  pointerEvents:'none'
+                }}>
+                  <span style={{fontSize:6,color:'#fff',fontWeight:900,lineHeight:1}}>✓</span>
+                </div>}
                 <div style={{
                   width:REF_W,transformOrigin:'top left',
                   transform:`scale(${scale})`,pointerEvents:'none'
@@ -3142,7 +3245,7 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
               </div>
               <div style={{
                 fontSize:8.5,
-                color:isActive?T.gold:'rgba(255,255,255,.35)',
+                color:isSel?'#818CF8':isActive?T.gold:'rgba(255,255,255,.35)',
                 maxWidth:Math.max(thumbW,50),
                 overflow:'hidden',textOverflow:'ellipsis',
                 whiteSpace:'nowrap',textAlign:'center',
@@ -3994,6 +4097,14 @@ function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin,onSave,onSaveAs
   </header>;
 }
 
+export { T, Icon, btnSt, inputSt,
+         BrandCtx, NotesEditCtx,
+         ContentPanel, SignPanel, SymbolsPanel,
+         AnnotatorModal, Canvas, ThumbnailPalette,
+         defaultLogoUrl };
+
+const FastMode = React.lazy(() => import('./components/FastMode'));
+
 export default function App() {
   const [user,setUser]=useState(null);
   const [screen,setScreen]=useState('login');
@@ -4068,6 +4179,7 @@ export default function App() {
           onNewProject={()=>{setProject(null);setScreen('configurator');}}
           onImportProject={proj=>{setProject(proj);setScreen('configurator');}}
           onEditOfficialTemplate={data=>{setProject({_isOfficialTemplate:true,data:data||{}});setScreen('configurator');}}
+          onFastMode={()=>setScreen('fastmode')}
           onOpenTemplate={tpl=>{
             if(tpl._raw?.data){
               setProject({_isTemplate:true,name:'Nouveau — '+(tpl.author||tpl.name),basedOn:tpl.name,data:tpl._raw.data});
@@ -4078,6 +4190,11 @@ export default function App() {
           }}/>}
         {screen==='configurator'&&<Configurator user={user} project={project}
           onSaveStateChange={setSaveBarProps}/>}
+        {screen==='fastmode'&&(
+          <React.Suspense fallback={<div style={{flex:1,display:'grid',placeItems:'center',color:'#9C9690',fontSize:13}}>Chargement Fast Mode…</div>}>
+            <FastMode user={user}/>
+          </React.Suspense>
+        )}
         {showAdmin&&<AdminPanel onClose={()=>setShowAdmin(false)} currentUserId={user?.id}/>}
       </div>
     </BrandCtx.Provider>
