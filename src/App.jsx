@@ -3003,7 +3003,7 @@ function VueEnsembleModal({state,update,onClose}) {
     if(s.enNotes) pages.push({key:'notes0',type:'notes',label:'Notes',coIdx:-1});
     s.contentOrder.forEach((it,coIdx)=>{
       if(it.type==='cat'){pages.push({key:'cat-'+it.id,type:'category',label:it.name,catName:it.name,coIdx});}
-      else{const f=s.files.find(x=>x.id===it.fileId);if(!f)return;for(let i=0;i<(f.pages||1);i++) pages.push({key:'f-'+it.id+'-'+i,type:'content',label:f.name.replace(/\.[^.]+$/,''),file:f,pageIdx:i,coIdx});}
+      else{const f=s.files.find(x=>x.id===it.fileId);if(!f)return;const dn=it.label||f.name.replace(/\.[^.]+$/,'');for(let i=0;i<(f.pages||1);i++) pages.push({key:'f-'+it.id+'-'+i,type:'content',label:dn,file:f,pageIdx:i,coIdx,ordId:it.id,rotation:(it.pageRotations?.[i]??it.rotation)??0,pageUrl:(f.pageUrls&&f.pageUrls[i])||null});}
     });
     pages.push({key:'back',type:'back',label:'Quatrième de couverture',coIdx:-1});
     return pages;
