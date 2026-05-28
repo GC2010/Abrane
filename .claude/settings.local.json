@@ -5,7 +5,14 @@
       "Bash(npm install *)",
       "Bash(npm run *)",
       "Read(//c/Users/chefprojetsbe03/Documents/GitHub/150ppi/**)",
-      "Bash(dir \"C:\\\\Users\\\\chefprojetsbe03\\\\Documents\\\\GitHub\\\\150ppi\")"
+      "Bash(dir \"C:\\\\Users\\\\chefprojetsbe03\\\\Documents\\\\GitHub\\\\150ppi\")",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\chefprojetsbe03\\\\Documents\\\\GitHub\\\\Abrane\\\\src\\\\components\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Host \"ok\")",
+      "Read(//c/c/Users/chefprojetsbe03/Documents/GitHub/Abrane/src/**)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

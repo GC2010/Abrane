@@ -842,7 +842,7 @@ function LoginScreen({onLogin}) {
   </div>;
 }
 
-function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProject,onEditOfficialTemplate}) {
+function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProject,onEditOfficialTemplate,onFastMode}) {
   const [tab,setTab]=useState('projects');
   const [q,setQ]=useState('');
   const [viewMode,setViewMode]=useState('grid');
@@ -979,6 +979,10 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
             <span style={{fontSize:10,padding:'1px 6px',borderRadius:999,background:tab===tb.id?T.navyTint:T.panel2,color:tab===tb.id?T.navy:T.ink3}}>{tb.cnt}</span>
           </button>
         ))}
+        <div style={{width:1,height:20,background:T.lineStrong,margin:'auto 2px'}}/>
+        <button onClick={onFastMode} style={{display:'inline-flex',alignItems:'center',gap:7,padding:'6px 14px',borderRadius:7,fontSize:12.5,fontWeight:600,color:T.navy,border:'none',background:'transparent',cursor:'pointer'}}>
+          <Icon name="sparkle" size={14} color={T.navy}/>Fast Mode
+        </button>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
         <div style={{position:'relative',flex:'0 0 300px'}}>
@@ -3994,6 +3998,13 @@ function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin,onSave,onSaveAs
   </header>;
 }
 
+export { T, Icon, btnSt, inputSt,
+         BrandCtx, NotesEditCtx,
+         ContentPanel, SignPanel, SymbolsPanel,
+         AnnotatorModal, Canvas, ThumbnailPalette };
+
+const FastMode = React.lazy(() => import('./components/FastMode'));
+
 export default function App() {
   const [user,setUser]=useState(null);
   const [screen,setScreen]=useState('login');
@@ -4068,6 +4079,7 @@ export default function App() {
           onNewProject={()=>{setProject(null);setScreen('configurator');}}
           onImportProject={proj=>{setProject(proj);setScreen('configurator');}}
           onEditOfficialTemplate={data=>{setProject({_isOfficialTemplate:true,data:data||{}});setScreen('configurator');}}
+          onFastMode={()=>setScreen('fastmode')}
           onOpenTemplate={tpl=>{
             if(tpl._raw?.data){
               setProject({_isTemplate:true,name:'Nouveau — '+(tpl.author||tpl.name),basedOn:tpl.name,data:tpl._raw.data});
@@ -4078,6 +4090,11 @@ export default function App() {
           }}/>}
         {screen==='configurator'&&<Configurator user={user} project={project}
           onSaveStateChange={setSaveBarProps}/>}
+        {screen==='fastmode'&&(
+          <React.Suspense fallback={<div style={{flex:1,display:'grid',placeItems:'center',color:'#9C9690',fontSize:13}}>Chargement Fast Mode…</div>}>
+            <FastMode user={user}/>
+          </React.Suspense>
+        )}
         {showAdmin&&<AdminPanel onClose={()=>setShowAdmin(false)} currentUserId={user?.id}/>}
       </div>
     </BrandCtx.Provider>
