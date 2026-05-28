@@ -2337,6 +2337,10 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     background:active?T.gold:'transparent',color:active?'#fff':T.ink4,
   });
 
+  const fileCount=state.contentOrder.filter(x=>x.type==='file').length;
+  const catCount=state.contentOrder.filter(x=>x.type==='cat').length;
+  const sectTitle=`${fileCount} fichier${fileCount!==1?'s':''}${catCount?` · ${catCount} cat.`:''}`;
+
   return <>
     <Sect title="Importer">
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImport}/>
@@ -2393,10 +2397,15 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
       )}
       <div style={{fontSize:10,color:T.ink4,textAlign:'center',marginTop:4}}>Glissez un fichier <em>sur</em> un autre pour les afficher côte à côte</div>
     </Sect>
-    <Sect title={`Ordre · ${state.contentOrder.length} entrées`}>
+    <Sect title={sectTitle}>
       <button onClick={addCategory} style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',marginBottom:6}}>
         <Icon name="plus" size={13} color={T.gold}/> Ajouter une catégorie
       </button>
+      {state.contentOrder.length===0&&(
+        <div style={{textAlign:'center',padding:'16px 10px',color:T.ink4,fontSize:11,fontStyle:'italic',background:T.panel,borderRadius:6,border:`1px dashed ${T.lineSoft}`}}>
+          Aucun fichier · importez ci-dessus
+        </div>
+      )}
       <div style={{display:'flex',flexDirection:'column',gap:4}}>
         {state.contentOrder.map((item,idx)=>{
           const isCat=item.type==='cat';
@@ -2433,12 +2442,19 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
               style={{padding:'6px 8px',background:isMergeTarget?T.navyTint:isCat?T.goldTint:T.surface,border:`1px solid ${isMergeTarget?T.navy:isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderLeft:`3px solid ${isMergeTarget?T.navy:isOver?T.gold:isCat?T.goldSoft:T.lineSoft}`,borderRadius:6,cursor:isRenaming?'default':'grab',userSelect:isRenaming?'text':'none',outline:isMergeTarget?`2px solid ${T.navy}`:undefined,transition:'background .1s,border .1s'}}
             >
               {/* Main row */}
-              <div style={{display:'grid',gridTemplateColumns:'14px 26px 1fr auto',alignItems:'center',gap:7}}>
-                <Icon name="move" size={10} color={T.ink5}/>
-                <div style={{width:26,height:26,borderRadius:3,background:isCat?'#fff':T.panel2,display:'grid',placeItems:'center',flexShrink:0}}>
-                  <Icon name={isCat?'bookmark':f.type==='pdf'||f.type==='merged'?'pdf':'image'} size={13} color={isCat?T.gold:f.type==='merged'?T.navy:T.ink3}/>
+              <div style={{display:'grid',gridTemplateColumns:'14px 44px 1fr auto',alignItems:'start',gap:7}}>
+                <Icon name="move" size={10} color={T.ink5} style={{marginTop:8}}/>
+                {/* Thumbnail */}
+                <div style={{width:44,height:56,borderRadius:5,overflow:'hidden',flexShrink:0,border:`1px solid ${isCat?T.goldSoft:T.lineSoft}`,background:isCat?T.goldTint:T.panel2,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {isCat
+                    ?<Icon name="bookmark" size={18} color={T.gold}/>
+                    :(f.pageUrls?.[0]
+                        ?<img src={f.pageUrls[0]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                        :<Icon name={f.type==='pdf'||f.type==='merged'?'pdf':'image'} size={18} color={T.ink4}/>
+                    )
+                  }
                 </div>
-                <div style={{minWidth:0}}>
+                <div style={{minWidth:0,paddingTop:2}}>
                   {isRenaming?(
                     <input autoFocus value={renaming.val}
                       onChange={e=>setRenaming(r=>({...r,val:e.target.value}))}
@@ -2448,21 +2464,28 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
                       style={{width:'100%',border:`1px solid ${T.gold}`,borderRadius:3,padding:'1px 5px',fontSize:11.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
                     />
                   ):(
-                    <div style={{fontSize:11.5,fontWeight:isCat?600:400,color:T.ink,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}} title="Double-clic pour renommer">{displayName}</div>
+                    <div style={{fontSize:11.5,fontWeight:isCat?600:400,color:T.ink,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{displayName}</div>
                   )}
-                  <div style={{fontSize:10,color:T.ink4,display:'flex',alignItems:'center',gap:4}}>
-                    {isCat?'Catégorie':`${f.pages}p · ${f.size}`}
-                    {!isCat&&f.type==='merged'&&<span style={{fontSize:8,fontWeight:700,background:T.navy,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>combiné</span>}
+                  <div style={{fontSize:10,color:T.ink4,display:'flex',alignItems:'center',gap:4,marginTop:2}}>
+                    {isCat
+                      ?<span style={{background:T.goldSoft,color:T.navy,fontSize:8.5,fontWeight:700,padding:'1px 5px',borderRadius:3,letterSpacing:'.06em'}}>CATÉGORIE</span>
+                      :<><span>{f.pages}p</span>{f.size&&<span>· {f.size}</span>}{f.type==='merged'&&<span style={{fontSize:8,fontWeight:700,background:T.navy,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>combiné</span>}</>
+                    }
                   </div>
                 </div>
-                <div style={{display:'flex',alignItems:'center',gap:2}}>
+                <div style={{display:'flex',alignItems:'center',gap:2,paddingTop:2}}>
                   {onNavigate&&<button onClick={e=>{e.stopPropagation();goToItem(item);}}
                     title="Aller à cette page"
-                    style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
+                    style={{background:T.navyTint,border:`1px solid rgba(27,46,92,.12)`,padding:'3px 5px',cursor:'pointer',borderRadius:4,display:'flex',alignItems:'center',gap:2,flexShrink:0}}>
                     <Icon name="eye" size={12} color={T.navy}/>
                   </button>}
+                  <button onClick={e=>{e.stopPropagation();if(!isRenaming)startRename(item);}}
+                    title="Renommer"
+                    style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center',flexShrink:0}}>
+                    <Icon name="pencil" size={12} color={T.ink4}/>
+                  </button>
                   <button onClick={e=>{e.stopPropagation();handleDelete(item.id);}}
-                    style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center'}}>
+                    style={{background:'transparent',border:'none',padding:'3px',cursor:'pointer',borderRadius:4,display:'grid',placeItems:'center',flexShrink:0}}>
                     <Icon name="trash" size={12} color={T.ink4}/>
                   </button>
                 </div>
@@ -2470,7 +2493,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
               {/* Controls — only for files */}
               {!isCat&&(
                 <div
-                  style={{marginTop:6,paddingLeft:47}}
+                  style={{marginTop:6,paddingLeft:65}}
                   onMouseDown={e=>e.stopPropagation()}
                   onDragStart={e=>{e.stopPropagation();e.preventDefault();}}
                   draggable={false}
@@ -4101,7 +4124,7 @@ export { T, Icon, btnSt, inputSt,
          BrandCtx, NotesEditCtx,
          ContentPanel, SignPanel, SymbolsPanel,
          AnnotatorModal, Canvas, ThumbnailPalette,
-         VueEnsembleModal,
+         VueEnsembleModal, buildPageList,
          defaultLogoUrl };
 
 const FastMode = React.lazy(() => import('./components/FastMode'));

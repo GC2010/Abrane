@@ -5,7 +5,7 @@ import {
   BrandCtx, NotesEditCtx,
   ContentPanel, SignPanel, SymbolsPanel,
   AnnotatorModal, Canvas, ThumbnailPalette,
-  VueEnsembleModal,
+  VueEnsembleModal, buildPageList,
   defaultLogoUrl,
 } from '../App';
 
@@ -262,7 +262,7 @@ function FastMeta({ state, update }) {
 }
 
 // ── Pannello laterale (dispatcher) ──────────────────────────────────────
-function FastInspector({ step, state, update, user, onOpenAnnotator }) {
+function FastInspector({ step, state, update, user, onOpenAnnotator, onNavigate }) {
   const meta = FAST_STEPS.find(s => s.id === step) || FAST_STEPS[0];
   return (
     <section style={{
@@ -284,7 +284,7 @@ function FastInspector({ step, state, update, user, onOpenAnnotator }) {
         </p>
       </div>
       <div style={{ padding:'16px 22px 60px', display:'flex', flexDirection:'column', gap:18 }}>
-        {step === 'content' && <ContentPanel state={state} update={update} prominent/>}
+        {step === 'content' && <ContentPanel state={state} update={update} prominent onNavigate={onNavigate}/>}
         {step === 'annoter' && <AnnoterPanel state={state} onOpenAnnotator={onOpenAnnotator}/>}
         {step === 'sign'    && <SignPanel    state={state} update={update} user={user}/>}
         {step === 'sym'     && <SymbolsPanel state={state} update={update}/>}
@@ -347,6 +347,18 @@ export default function FastMode({ user }) {
     setState(s => ({ ...s, pageNotes:{ ...(s.pageNotes||{}), [pageKey]:html } })),
     []
   );
+
+  const handleNavigate = useCallback((fullIdx) => {
+    if (!useTemplate) {
+      const allPages = buildPageList(state);
+      const filtered = allPages.filter(p => p.type === 'content' || p.type === 'category');
+      const page = allPages[fullIdx];
+      const fi = filtered.findIndex(p => p.key === page?.key);
+      if (fi >= 0) setActivePage(fi);
+    } else {
+      setActivePage(fullIdx);
+    }
+  }, [state, useTemplate]);
 
   const PALETTE_H = { S:99, M:122, L:150 };
   const paletteH = paletteCollapsed ? 32 : PALETTE_H[thumbSize];
@@ -431,6 +443,7 @@ export default function FastMode({ user }) {
         <FastInspector
           step={activeStep} state={state} update={update}
           user={user} onOpenAnnotator={setAnnotating}
+          onNavigate={handleNavigate}
         />
 
         <div className="fast-canvas-area"
