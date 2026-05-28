@@ -4101,6 +4101,7 @@ export { T, Icon, btnSt, inputSt,
          BrandCtx, NotesEditCtx,
          ContentPanel, SignPanel, SymbolsPanel,
          AnnotatorModal, Canvas, ThumbnailPalette,
+         VueEnsembleModal,
          defaultLogoUrl };
 
 const FastMode = React.lazy(() => import('./components/FastMode'));

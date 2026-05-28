@@ -5,6 +5,7 @@ import {
   BrandCtx, NotesEditCtx,
   ContentPanel, SignPanel, SymbolsPanel,
   AnnotatorModal, Canvas, ThumbnailPalette,
+  VueEnsembleModal,
   defaultLogoUrl,
 } from '../App';
 
@@ -302,6 +303,7 @@ export default function FastMode({ user }) {
   const [thumbSize, setThumbSize]           = useState('M');
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [useTemplate, setUseTemplate]       = useState(true);
+  const [showVueEnsemble, setShowVueEnsemble] = useState(false);
 
   // Carica il template ufficiale ABRANE per cover + back
   useEffect(() => {
@@ -446,7 +448,7 @@ export default function FastMode({ user }) {
           <ThumbnailPalette
             state={state} activePage={activePage} onPageClick={setActivePage}
             thumbSize={thumbSize} setThumbSize={setThumbSize}
-            onOpenVueEnsemble={() => {}}
+            onOpenVueEnsemble={() => setShowVueEnsemble(true)}
             collapsed={paletteCollapsed} setCollapsed={setPaletteCollapsed}
           />
         </div>
@@ -457,6 +459,13 @@ export default function FastMode({ user }) {
             pageKey={annotating.pageKey} pageUrl={annotating.pageUrl}
             isPortrait={annotating.isPortrait}
             onClose={() => setAnnotating(null)}
+          />
+        )}
+
+        {showVueEnsemble && (
+          <VueEnsembleModal
+            state={state} update={update}
+            onClose={() => setShowVueEnsemble(false)}
           />
         )}
 
