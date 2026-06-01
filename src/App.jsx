@@ -1384,17 +1384,10 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
         }
       </div>
     )}
-    {state.showPageNames?(
-      <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',right:'12%',fontSize:9,color:shade(p.c3,50),display:'flex',alignItems:'baseline',gap:6,overflow:'hidden'}}>
-        <span style={{flexShrink:0}}>{String(pageIdx+5).padStart(2,'0')}</span>
-        <span style={{flexShrink:0,opacity:.4}}>·</span>
-        <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-          {(state.contentOrder.find(x=>x.id===ordId)?.label||file.name.replace(/\.[^.]+$/,''))+(pageIdx>0?` (${pageIdx+1})`:'')}
-        </span>
-      </div>
-    ):(
-      <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',fontSize:9,color:shade(p.c3,50)}}>{String(pageIdx+5).padStart(2,'0')}</div>
-    )}
+    {state.showPageNames&&<div style={{position:'absolute',top:'2%',left:isRing?'14%':'4%',right:'12%',fontSize:11,fontWeight:600,color:shade(p.c3,40),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'.01em'}}>
+      {(state.contentOrder.find(x=>x.id===ordId)?.label||file.name.replace(/\.[^.]+$/,''))+(pageIdx>0?` (${pageIdx+1})`:'')}
+    </div>}
+    <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',fontSize:9,color:shade(p.c3,50)}}>{String(pageIdx+5).padStart(2,'0')}</div>
     <BindingMarks isRing={isRing}/>
   </div>;
 }
