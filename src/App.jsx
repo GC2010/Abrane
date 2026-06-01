@@ -3308,13 +3308,15 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                 {isActive&&onImportFromPage&&!isSel&&<>
                   <div title="Ajouter ici"
                     onClick={e=>{e.stopPropagation();if(!importingFromPage){importModeRef.current='add';importFromPageRef.current?.click();}}}
-                    style={{position:'absolute',bottom:2,left:2,zIndex:3,background:T.navy,borderRadius:3,width:16,height:16,display:'grid',placeItems:'center',cursor:importingFromPage?'wait':'pointer',opacity:importingFromPage?0.6:1,transition:'opacity .15s'}}>
-                    <Icon name="upload" size={9} color="#fff"/>
+                    style={{position:'absolute',bottom:2,left:2,right:2,zIndex:3,background:T.navy,borderRadius:3,height:15,display:'flex',alignItems:'center',justifyContent:'center',gap:3,cursor:importingFromPage?'wait':'pointer',opacity:importingFromPage?0.6:1,transition:'opacity .15s',overflow:'hidden'}}>
+                    <Icon name="upload" size={8} color="#fff"/>
+                    <span style={{fontSize:7,fontWeight:700,color:'#fff',whiteSpace:'nowrap',letterSpacing:'.04em'}}>Ajouter</span>
                   </div>
                   {pages[activePage]?.type==='content'&&<div title="Remplacer"
                     onClick={e=>{e.stopPropagation();if(!importingFromPage){importModeRef.current='replace';importFromPageRef.current?.click();}}}
-                    style={{position:'absolute',bottom:20,left:2,zIndex:3,background:T.gold,borderRadius:3,width:16,height:16,display:'grid',placeItems:'center',cursor:importingFromPage?'wait':'pointer',opacity:importingFromPage?0.6:1,transition:'opacity .15s'}}>
-                    <Icon name="refresh" size={9} color="#fff"/>
+                    style={{position:'absolute',bottom:19,left:2,right:2,zIndex:3,background:T.gold,borderRadius:3,height:15,display:'flex',alignItems:'center',justifyContent:'center',gap:3,cursor:importingFromPage?'wait':'pointer',opacity:importingFromPage?0.6:1,transition:'opacity .15s',overflow:'hidden'}}>
+                    <Icon name="refresh" size={8} color="#fff"/>
+                    <span style={{fontSize:7,fontWeight:700,color:'#fff',whiteSpace:'nowrap',letterSpacing:'.04em'}}>Remplacer</span>
                   </div>}
                 </>}
                 <div style={{
