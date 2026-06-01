@@ -223,7 +223,7 @@ const initialState = project => {
       logoScale:100,logoX:80,logoY:5,clientLogoUrl:'',
       showQuoteRef:false,quoteRef:'',showInternalRef:false,internalRef:'',
       showContact:false,contact:'',showSendDate:false,sendDate:'',showProjectType:false,projectType:'',
-      tags:[],enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,
+      tags:[],enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,showPageNames:false,
       materials:SAMPLE_MATS,
       backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
       backDecor:'BOOK',sigEnabled:false,sigPlacement:'all',wmEnabled:false,wmOpacity:10,
@@ -271,7 +271,7 @@ const initialState = project => {
     showQuoteRef:false,quoteRef:'',showInternalRef:false,internalRef:'',
     showContact:false,contact:'',showSendDate:false,sendDate:'',showProjectType:false,projectType:'',
     tags:[],
-    enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,
+    enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,showPageNames:false,
     materials:SAMPLE_MATS, files:[], contentOrder:[],
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, sigPlacement:'all', wmEnabled:false, wmOpacity:10, sigUrl:'',
@@ -282,7 +282,7 @@ const initialState = project => {
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, showPageNames:false, _dirty:false,
   };
 };
 
@@ -1384,7 +1384,17 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
         }
       </div>
     )}
-    <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',fontSize:9,color:shade(p.c3,50)}}>{String(pageIdx+5).padStart(2,'0')}</div>
+    {state.showPageNames?(
+      <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',right:'12%',fontSize:9,color:shade(p.c3,50),display:'flex',alignItems:'baseline',gap:6,overflow:'hidden'}}>
+        <span style={{flexShrink:0}}>{String(pageIdx+5).padStart(2,'0')}</span>
+        <span style={{flexShrink:0,opacity:.4}}>·</span>
+        <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+          {(state.contentOrder.find(x=>x.id===ordId)?.label||file.name.replace(/\.[^.]+$/,''))+(pageIdx>0?` (${pageIdx+1})`:'')}
+        </span>
+      </div>
+    ):(
+      <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',fontSize:9,color:shade(p.c3,50)}}>{String(pageIdx+5).padStart(2,'0')}</div>
+    )}
     <BindingMarks isRing={isRing}/>
   </div>;
 }
@@ -2569,6 +2579,11 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
           );
         })}
       </div>
+    </Sect>
+    <Sect title="Affichage">
+      <RowItem label="Afficher le nom des pages" sub="Visible sur chaque page et dans l'export PDF">
+        <Toggle checked={!!state.showPageNames} onChange={v=>update({showPageNames:v})}/>
+      </RowItem>
     </Sect>
   </>;
 }
