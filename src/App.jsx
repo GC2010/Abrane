@@ -3186,7 +3186,6 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
   const stripRef=useRef(null);
   const importFromPageRef=useRef(null);
   const importModeRef=useRef('add');
-  const [importChoicePending,setImportChoicePending]=useState(false);
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isPortrait=state.pageFormat.startsWith('v');
 
@@ -3301,19 +3300,18 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                 }}>
                   <span style={{fontSize:6,color:'#fff',fontWeight:900,lineHeight:1}}>✓</span>
                 </div>}
-                {isActive&&onImportFromPage&&!isSel&&!importChoicePending&&<div
-                  title="Importer ici"
-                  onClick={e=>{e.stopPropagation();if(!importingFromPage)setImportChoicePending(true);}}
-                  style={{
-                    position:'absolute',bottom:2,left:2,zIndex:3,
-                    background:T.navy,borderRadius:3,
-                    width:16,height:16,display:'grid',placeItems:'center',
-                    cursor:importingFromPage?'wait':'pointer',
-                    opacity:importingFromPage?0.6:1,transition:'opacity .15s',
-                  }}
-                >
-                  <Icon name="upload" size={9} color="#fff"/>
-                </div>}
+                {isActive&&onImportFromPage&&!isSel&&<>
+                  <div title="Ajouter ici"
+                    onClick={e=>{e.stopPropagation();if(!importingFromPage){importModeRef.current='add';importFromPageRef.current?.click();}}}
+                    style={{position:'absolute',bottom:2,left:2,zIndex:3,background:T.navy,borderRadius:3,width:16,height:16,display:'grid',placeItems:'center',cursor:importingFromPage?'wait':'pointer',opacity:importingFromPage?0.6:1,transition:'opacity .15s'}}>
+                    <Icon name="upload" size={9} color="#fff"/>
+                  </div>
+                  {pages[activePage]?.type==='content'&&<div title="Remplacer"
+                    onClick={e=>{e.stopPropagation();if(!importingFromPage){importModeRef.current='replace';importFromPageRef.current?.click();}}}
+                    style={{position:'absolute',bottom:20,left:2,zIndex:3,background:T.gold,borderRadius:3,width:16,height:16,display:'grid',placeItems:'center',cursor:importingFromPage?'wait':'pointer',opacity:importingFromPage?0.6:1,transition:'opacity .15s'}}>
+                    <Icon name="refresh" size={9} color="#fff"/>
+                  </div>}
+                </>}
                 <div style={{
                   width:REF_W,transformOrigin:'top left',
                   transform:`scale(${scale})`,pointerEvents:'none'
@@ -3321,27 +3319,6 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                   <PageRender page={page} state={state}/>
                 </div>
               </div>
-              {isActive&&onImportFromPage&&!isSel&&importChoicePending&&<div
-                onClick={e=>e.stopPropagation()}
-                style={{position:'absolute',bottom:'100%',left:0,zIndex:20,marginBottom:6,
-                  background:'#1E2A3B',border:'1px solid rgba(255,255,255,.18)',
-                  borderRadius:6,padding:'5px 6px',display:'flex',flexDirection:'column',gap:4,
-                  boxShadow:'0 4px 16px rgba(0,0,0,.45)',minWidth:90,
-                }}
-              >
-                <button onClick={e=>{e.stopPropagation();importModeRef.current='add';setImportChoicePending(false);importFromPageRef.current?.click();}}
-                  style={{background:T.navy,border:'none',color:'#fff',borderRadius:4,padding:'4px 8px',fontSize:9.5,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:5}}>
-                  <Icon name="upload" size={9} color="#fff"/>Ajouter
-                </button>
-                {pages[activePage]?.type==='content'&&<button onClick={e=>{e.stopPropagation();importModeRef.current='replace';setImportChoicePending(false);importFromPageRef.current?.click();}}
-                  style={{background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',color:'rgba(255,255,255,.85)',borderRadius:4,padding:'4px 8px',fontSize:9.5,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:5}}>
-                  <Icon name="refresh" size={9} color="rgba(255,255,255,.85)"/>Remplacer
-                </button>}
-                <button onClick={e=>{e.stopPropagation();setImportChoicePending(false);}}
-                  style={{background:'transparent',border:'none',color:'rgba(255,255,255,.4)',borderRadius:4,padding:'2px 8px',fontSize:9,cursor:'pointer',textAlign:'center'}}>
-                  ✕ Annuler
-                </button>
-              </div>}
               <div style={{
                 fontSize:8.5,
                 color:isSel?'#818CF8':isActive?T.gold:'rgba(255,255,255,.35)',
