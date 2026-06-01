@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(Out-Null)",
+      "Bash(Write-Host \"ok\")",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(timeout 5)",
+      "Bash(git push *)",
+      "Bash(gh repo *)",
+      "Bash(git pull *)",
+      "Bash(pip install *)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import fastapi, psycopg2, pydantic, dotenv; print\\('imports OK'\\)\")",
+      "Bash(python -c \"from main import app; print\\('main.py OK — app loaded'\\)\")"
+    ]
+  }
+}
