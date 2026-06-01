@@ -3149,8 +3149,9 @@ function VueEnsembleModal({state,update,onClose}) {
   </div></Scrim>;
 }
 
-function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed,selectedPages=null,onTogglePageSelect=null}) {
+function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed,selectedPages=null,onTogglePageSelect=null,onImportFromPage=null,importingFromPage=false}) {
   const stripRef=useRef(null);
+  const importFromPageRef=useRef(null);
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isPortrait=state.pageFormat.startsWith('v');
 
@@ -3171,6 +3172,12 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
 
   return (
     <div style={{flexShrink:0,background:'#18202E',borderTop:'1px solid rgba(255,255,255,.1)',display:'flex',flexDirection:'column'}}>
+      <input ref={importFromPageRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={e=>{
+        if(!onImportFromPage)return;
+        const pg=pages[activePage];
+        onImportFromPage(Array.from(e.target.files||[]),pg?.ordId||null);
+        e.target.value='';
+      }}/>
       {/* ── Toolbar */}
       <div style={{display:'flex',alignItems:'center',gap:6,padding:'5px 10px',borderBottom:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
         <Icon name="layers" size={12} color="rgba(255,255,255,.4)"/>
@@ -3258,6 +3265,19 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                   pointerEvents:'none'
                 }}>
                   <span style={{fontSize:6,color:'#fff',fontWeight:900,lineHeight:1}}>✓</span>
+                </div>}
+                {isActive&&onImportFromPage&&!isSel&&<div
+                  title="Importer ici"
+                  onClick={e=>{e.stopPropagation();if(!importingFromPage)importFromPageRef.current?.click();}}
+                  style={{
+                    position:'absolute',bottom:2,left:2,zIndex:3,
+                    background:T.navy,borderRadius:3,
+                    width:16,height:16,display:'grid',placeItems:'center',
+                    cursor:importingFromPage?'wait':'pointer',
+                    opacity:importingFromPage?0.6:1,transition:'opacity .15s',
+                  }}
+                >
+                  <Icon name="upload" size={9} color="#fff"/>
                 </div>}
                 <div style={{
                   width:REF_W,transformOrigin:'top left',
@@ -3899,6 +3919,38 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const updatePageNotes=useCallback((pageKey,html)=>{setState(s=>({...s,pageNotes:{...(s.pageNotes||{}),[pageKey]:html},_dirty:true}));setDirtySteps(d=>({...d,content:true}));},[]);
   const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2800);};
 
+  const [importingFromPage,setImportingFromPage]=useState(false);
+
+  const processFilesFromPage=useCallback(async(fileList,insertBeforeOrdId)=>{
+    if(!fileList.length)return;
+    setImportingFromPage(true);
+    const newFiles=[],newOrders=[];
+    for(const file of fileList){
+      const ext=file.name.split('.').pop().toLowerCase();
+      let pageCount=1,pageUrls=[];
+      try{
+        if(ext==='pdf'){const r=await renderPdfToDataUrls(file);pageCount=r.pageCount;pageUrls=r.pageUrls;}
+        else if(ext==='docx'||ext==='doc'){const r=await renderDocxToDataUrls(file);pageCount=r.pageCount;pageUrls=r.pageUrls;}
+        else if(ext==='xlsx'||ext==='xls'){const r=await renderXlsxToDataUrls(file);pageCount=r.pageCount;pageUrls=r.pageUrls;}
+        else{const dataUrl=await readFileAsDataUrl(file);pageUrls=[dataUrl];}
+      }catch(err){console.warn('Import error:',err);}
+      const sz=file.size>1024*1024?(file.size/1024/1024).toFixed(1)+' Mo':Math.round(file.size/1024)+' Ko';
+      const id='f'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+      newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls});
+      const ordId='fi'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+      newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:''});
+    }
+    setState(s=>{
+      const insertIdx=insertBeforeOrdId!=null?s.contentOrder.findIndex(x=>x.id===insertBeforeOrdId):s.contentOrder.length;
+      const idx=insertIdx<0?s.contentOrder.length:insertIdx;
+      const newOrder=[...s.contentOrder];
+      newOrder.splice(idx,0,...newOrders);
+      return {...s,files:[...s.files,...newFiles],contentOrder:newOrder,_dirty:true};
+    });
+    setDirtySteps(d=>({...d,content:true}));
+    setImportingFromPage(false);
+  },[]);
+
   const [saveModal,setSaveModal]=useState(false);
   const [saveAsName,setSaveAsName]=useState('');
 
@@ -4000,7 +4052,8 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       <ThumbnailPalette state={state} activePage={activePage} onPageClick={setActivePage}
         thumbSize={thumbSize} setThumbSize={setThumbSize}
         onOpenVueEnsemble={()=>setShowVueEnsemble(true)}
-        collapsed={paletteCollapsed} setCollapsed={setPaletteCollapsed}/>
+        collapsed={paletteCollapsed} setCollapsed={setPaletteCollapsed}
+        onImportFromPage={processFilesFromPage} importingFromPage={importingFromPage}/>
     </div>
     {state._dirty&&<div style={{position:'fixed',bottom:paletteH+16,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:8,background:'rgba(20,20,30,.92)',backdropFilter:'blur(20px)',borderRadius:999,padding:'6px 8px 6px 14px',zIndex:30,boxShadow:'0 8px 24px rgba(0,0,0,.22)'}}>
       <span style={{fontSize:11.5,color:'rgba(255,255,255,.6)'}}>Modifications non enregistrées</span>
