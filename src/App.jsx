@@ -223,7 +223,7 @@ const initialState = project => {
       logoScale:100,logoX:80,logoY:5,clientLogoUrl:'',
       showQuoteRef:false,quoteRef:'',showInternalRef:false,internalRef:'',
       showContact:false,contact:'',showSendDate:false,sendDate:'',showProjectType:false,projectType:'',
-      tags:[],enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,showPageNames:false,pageNameSize:11,pageNamePos:'top',
+      tags:[],enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,showPageNames:false,pageNameSize:11,pageNamePos:'top',pageNameX:4,
       materials:SAMPLE_MATS,
       backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
       backDecor:'BOOK',sigEnabled:false,sigPlacement:'all',wmEnabled:false,wmOpacity:10,
@@ -271,7 +271,7 @@ const initialState = project => {
     showQuoteRef:false,quoteRef:'',showInternalRef:false,internalRef:'',
     showContact:false,contact:'',showSendDate:false,sendDate:'',showProjectType:false,projectType:'',
     tags:[],
-    enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,showPageNames:false,pageNameSize:11,pageNamePos:'top',
+    enIdx:true,enMat:true,enNotes:false,idxMode:'all',thumbCount:12,showPageNames:false,pageNameSize:11,pageNamePos:'top',pageNameX:4,
     materials:SAMPLE_MATS, files:[], contentOrder:[],
     backLines:['ABRANE France S.A.S','7 rue du Pont à Lunettes','69390 Vourles','Tél: +33(0)4.78.95.96.20'],
     backDecor:'BOOK', sigEnabled:false, sigPlacement:'all', wmEnabled:false, wmOpacity:10, sigUrl:'',
@@ -282,7 +282,7 @@ const initialState = project => {
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, showPageNames:false, pageNameSize:11, pageNamePos:'top', _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, showPageNames:false, pageNameSize:11, pageNamePos:'top', pageNameX:4, _dirty:false,
   };
 };
 
@@ -1388,7 +1388,8 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       position:'absolute',
       top:(state.pageNamePos??'top')==='top'?'2%':undefined,
       bottom:(state.pageNamePos??'top')==='bottom'?'4.5%':undefined,
-      left:isRing?'14%':'4%',right:'12%',
+      left:`${state.pageNameX??4}%`,
+      maxWidth:`${88-(state.pageNameX??4)}%`,
       fontSize:state.pageNameSize??11,fontWeight:600,
       color:shade(p.c3,40),overflow:'hidden',textOverflow:'ellipsis',
       whiteSpace:'nowrap',letterSpacing:'.01em'
@@ -2589,7 +2590,11 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
         <Fld label={`Taille du texte · ${state.pageNameSize??11}px`}>
           <input type="range" min="8" max="18" value={state.pageNameSize??11} onChange={e=>update({pageNameSize:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
-        <Fld label="Position">
+        <Fld label={`Position horizontale · ${state.pageNameX??4}%`}>
+          <input type="range" min="0" max="85" value={state.pageNameX??4} onChange={e=>update({pageNameX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:T.ink4}}><span>← Gauche</span><span>Droite →</span></div>
+        </Fld>
+        <Fld label="Position verticale">
           <div style={{display:'inline-flex',gap:2,background:T.panel,borderRadius:5,padding:2}}>
             {[['top','En haut'],['bottom','En bas']].map(([v,l])=>(
               <button key={v} onClick={()=>update({pageNamePos:v})} style={{
