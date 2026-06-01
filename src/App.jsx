@@ -3167,6 +3167,8 @@ function VueEnsembleModal({state,update,onClose}) {
 function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed,selectedPages=null,onTogglePageSelect=null,onImportFromPage=null,importingFromPage=false}) {
   const stripRef=useRef(null);
   const importFromPageRef=useRef(null);
+  const importModeRef=useRef('add');
+  const [importChoicePending,setImportChoicePending]=useState(false);
   const pages=useMemo(()=>buildPageList(state),[state]);
   const isPortrait=state.pageFormat.startsWith('v');
 
@@ -3190,7 +3192,7 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
       <input ref={importFromPageRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={e=>{
         if(!onImportFromPage)return;
         const pg=pages[activePage];
-        onImportFromPage(Array.from(e.target.files||[]),pg?.ordId||null);
+        onImportFromPage(Array.from(e.target.files||[]),pg?.ordId||null,importModeRef.current);
         e.target.value='';
       }}/>
       {/* ── Toolbar */}
@@ -3281,9 +3283,9 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                 }}>
                   <span style={{fontSize:6,color:'#fff',fontWeight:900,lineHeight:1}}>✓</span>
                 </div>}
-                {isActive&&onImportFromPage&&!isSel&&<div
+                {isActive&&onImportFromPage&&!isSel&&!importChoicePending&&<div
                   title="Importer ici"
-                  onClick={e=>{e.stopPropagation();if(!importingFromPage)importFromPageRef.current?.click();}}
+                  onClick={e=>{e.stopPropagation();if(!importingFromPage)setImportChoicePending(true);}}
                   style={{
                     position:'absolute',bottom:2,left:2,zIndex:3,
                     background:T.navy,borderRadius:3,
@@ -3293,6 +3295,27 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                   }}
                 >
                   <Icon name="upload" size={9} color="#fff"/>
+                </div>}
+                {isActive&&onImportFromPage&&!isSel&&importChoicePending&&<div
+                  onClick={e=>e.stopPropagation()}
+                  style={{position:'absolute',bottom:20,left:0,zIndex:10,
+                    background:'#1E2A3B',border:'1px solid rgba(255,255,255,.18)',
+                    borderRadius:6,padding:'5px 6px',display:'flex',flexDirection:'column',gap:4,
+                    boxShadow:'0 4px 16px rgba(0,0,0,.45)',minWidth:90,
+                  }}
+                >
+                  <button onClick={e=>{e.stopPropagation();importModeRef.current='add';setImportChoicePending(false);importFromPageRef.current?.click();}}
+                    style={{background:T.navy,border:'none',color:'#fff',borderRadius:4,padding:'4px 8px',fontSize:9.5,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:5}}>
+                    <Icon name="upload" size={9} color="#fff"/>Ajouter
+                  </button>
+                  {pages[activePage]?.type==='content'&&<button onClick={e=>{e.stopPropagation();importModeRef.current='replace';setImportChoicePending(false);importFromPageRef.current?.click();}}
+                    style={{background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',color:'rgba(255,255,255,.85)',borderRadius:4,padding:'4px 8px',fontSize:9.5,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:5}}>
+                    <Icon name="refresh" size={9} color="rgba(255,255,255,.85)"/>Remplacer
+                  </button>}
+                  <button onClick={e=>{e.stopPropagation();setImportChoicePending(false);}}
+                    style={{background:'transparent',border:'none',color:'rgba(255,255,255,.4)',borderRadius:4,padding:'2px 8px',fontSize:9,cursor:'pointer',textAlign:'center'}}>
+                    ✕ Annuler
+                  </button>
                 </div>}
                 <div style={{
                   width:REF_W,transformOrigin:'top left',
@@ -3936,7 +3959,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
 
   const [importingFromPage,setImportingFromPage]=useState(false);
 
-  const processFilesFromPage=useCallback(async(fileList,insertBeforeOrdId)=>{
+  const processFilesFromPage=useCallback(async(fileList,insertBeforeOrdId,mode='add')=>{
     if(!fileList.length)return;
     setImportingFromPage(true);
     const newFiles=[],newOrders=[];
@@ -3959,8 +3982,18 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       const insertIdx=insertBeforeOrdId!=null?s.contentOrder.findIndex(x=>x.id===insertBeforeOrdId):s.contentOrder.length;
       const idx=insertIdx<0?s.contentOrder.length:insertIdx;
       const newOrder=[...s.contentOrder];
-      newOrder.splice(idx,0,...newOrders);
-      return {...s,files:[...s.files,...newFiles],contentOrder:newOrder,_dirty:true};
+      let newFilesArr=[...s.files,...newFiles];
+      if(mode==='replace'&&insertIdx>=0){
+        const removed=s.contentOrder[idx];
+        newOrder.splice(idx,1,...newOrders);
+        if(removed?.type==='file'){
+          const stillUsed=newOrder.some(x=>x.type==='file'&&x.fileId===removed.fileId);
+          if(!stillUsed) newFilesArr=newFilesArr.filter(f=>f.id!==removed.fileId);
+        }
+      }else{
+        newOrder.splice(idx,0,...newOrders);
+      }
+      return {...s,files:newFilesArr,contentOrder:newOrder,_dirty:true};
     });
     setDirtySteps(d=>({...d,content:true}));
     setImportingFromPage(false);
