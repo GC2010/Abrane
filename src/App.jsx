@@ -1500,9 +1500,77 @@ function PageRender({page,state}) {
   }
 }
 
+function PageOverlays({state,page,pageIndex,totalPages}) {
+  const {wmLogo,stampLogo}=React.useContext(BrandCtx);
+  const gx=state.groupX??state.sigX??50;
+  const gy=state.groupY??state.sigY??85;
+  const last=totalPages-1;
+  const match=(pl,spec)=>pl==='all'||(pl==='first'&&pageIndex===0)||(pl==='last'&&pageIndex===last)||(pl==='content'&&page.type==='content')||(pl==='specific'&&pageIndex===spec);
+  const sigShow=state.sigEnabled&&state.sigUrl&&match(state.sigPlacement||'all');
+  const stampShow=state.stampEnabled&&stampLogo&&match(state.stampPlacement||'all');
+  const symShow=state.symEnabled&&match(state.symPlacement||'all',(state.symPageNum??1)-1);
+  const advShow=state.advEnabled&&match(state.advPlacement||'all',(state.advPageNum??1)-1);
+  const disShow=state.disclaimerEnabled&&match(state.disclaimerPlacement||'all',(state.disclaimerPageNum??1)-1);
+  const advSt=ADV_STATUSES.find(s=>s.v===(state.advStatus||'AF'))||ADV_STATUSES[0];
+  const sz=state.disclaimerSize??6;
+  const lang=state.disclaimerLang||'fr';
+  const FR='Tous les dessins techniques et documents associés sont la propriété exclusive de ABRANE France S.A.S. Toute reproduction ou utilisation sans autorisation est interdite.';
+  const EN='All technical drawings and associated documents are the exclusive property of ABRANE France S.A.S. Any reproduction or use without authorization is prohibited.';
+  const txt=lang==='both'?`${FR}\n${EN}`:lang==='en'?EN:FR;
+  return <>
+    {state.wmEnabled&&<div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:6}}>
+      <div style={{position:'absolute',inset:'-80%',display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'repeat(12,1fr)',transform:'rotate(-40deg)',transformOrigin:'center',opacity:state.wmOpacity/100}}>
+        {Array.from({length:84}).map((_,k)=>(
+          <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3%'}}>
+            {wmLogo?<img src={wmLogo} alt="" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',userSelect:'none'}}/>
+              :<span style={{fontWeight:900,letterSpacing:'.18em',fontSize:'clamp(3px,0.75vw,7px)',color:'#1A1F2E',whiteSpace:'nowrap',userSelect:'none',fontFamily:'inherit'}}>ABRANE</span>}
+          </div>
+        ))}
+      </div>
+    </div>}
+    {(sigShow||stampShow)&&<>
+      {stampShow&&<div style={{position:'absolute',left:`${gx}%`,top:`${gy}%`,transform:'translate(-50%,-50%)',zIndex:7,pointerEvents:'none',width:`${state.stampScale??25}%`,maxWidth:'50%'}}>
+        <img src={stampLogo} alt="" style={{width:'100%',objectFit:'contain',opacity:(state.stampOpacity??70)/100}}/>
+      </div>}
+      {sigShow&&<div style={{position:'absolute',left:`${gx}%`,top:`${gy}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.sigScale??30}%`,maxWidth:'40%'}}>
+        <img src={state.sigUrl} alt="" style={{width:'100%',objectFit:'contain',opacity:0.9}}/>
+      </div>}
+    </>}
+    {symShow&&<div style={{position:'absolute',left:`${state.symX??50}%`,top:`${state.symY??50}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.symScale??20}%`,maxWidth:'35%',display:'flex',flexDirection:'column',alignItems:'center',gap:'6%'}}>
+      <svg viewBox="0 0 100 90" style={{width:'68%',display:'block',overflow:'visible',filter:'drop-shadow(0 2px 4px rgba(0,0,0,.25))'}}>
+        <polygon points="50,4 96,86 4,86" fill="#DC2626" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+        <text x="50" y="74" textAnchor="middle" fontWeight="900" fontSize="54" fill="#fff" fontFamily="Arial,Helvetica,sans-serif">!</text>
+      </svg>
+      {state.symText&&<div style={{fontSize:'clamp(6px,2vw,16px)',fontWeight:700,color:'#DC2626',textAlign:'center',lineHeight:1.2,wordBreak:'break-word',width:'160%'}}>{state.symText}</div>}
+    </div>}
+    {advShow&&<div style={{position:'absolute',left:`${state.advX??85}%`,top:`${state.advY??8}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.advScale??15}%`,maxWidth:'28%'}}>
+      <div style={{background:advSt.color+'28',border:`2px solid ${advSt.color}`,borderRadius:8,padding:'8% 12%',display:'flex',flexDirection:'column',alignItems:'center',gap:'5%',boxShadow:'0 2px 8px rgba(0,0,0,.18)'}}>
+        <span style={{fontSize:'clamp(7px,2vw,18px)',lineHeight:1}}>{advSt.emoji}</span>
+        <span style={{fontSize:'clamp(12px,3.3vw,27px)',fontWeight:900,color:advSt.color,letterSpacing:'.08em',lineHeight:1}}>{advSt.v}</span>
+        <span style={{fontSize:'clamp(9px,2.25vw,18px)',fontWeight:600,color:advSt.color,textAlign:'center',lineHeight:1.25}}>{advSt.l}</span>
+      </div>
+    </div>}
+    {disShow&&<div style={{position:'absolute',left:`${state.disclaimerX??50}%`,top:`${state.disclaimerY??95}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:'88%',textAlign:'center'}}>
+      {txt.split('\n').map((line,li)=>(
+        <div key={li} style={{fontSize:`clamp(2px,${sz*0.09}vw,${sz}pt)`,color:'rgba(0,0,0,0.3)',fontStyle:'italic',lineHeight:1.5,letterSpacing:'.01em',marginTop:li?'0.3em':0}}>{line}</div>
+      ))}
+    </div>}
+  </>;
+}
+
+function ExportPageWrapper({page,pageIndex,totalPages,state}) {
+  return(
+    <div style={{position:'relative',width:'100%',height:'100%'}}>
+      <PageRender page={page} state={state}/>
+      <PageOverlays state={state} page={page} pageIndex={pageIndex} totalPages={totalPages}/>
+    </div>
+  );
+}
+
 function PdfExportModal({state,onClose}) {
   const [quality,setQuality]=useState('standard');
   const [withAnnot,setWithAnnot]=useState(true);
+  const [withOverlays,setWithOverlays]=useState(true);
   const [exporting,setExporting]=useState(false);
   const [done,setDone]=useState(0);
   const abortRef=useRef(false);
@@ -1531,7 +1599,10 @@ function PdfExportModal({state,onClose}) {
         root.render(
           <BrandCtx.Provider value={brandCtx}>
             <NotesEditCtx.Provider value={null}>
-              <PageRender page={pages[i]} state={exportState}/>
+              {withOverlays
+                ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
+                :<PageRender page={pages[i]} state={exportState}/>
+              }
             </NotesEditCtx.Provider>
           </BrandCtx.Provider>
         );
@@ -1552,7 +1623,7 @@ function PdfExportModal({state,onClose}) {
       if(el){try{root?.unmount();document.body.removeChild(el);}catch(_){}}
       setExporting(false);
     }
-  },[state,isP,BW,BH,quality,withAnnot,pages,brandCtx,cfg,onClose]);
+  },[state,isP,BW,BH,quality,withAnnot,withOverlays,pages,brandCtx,cfg,onClose]);
 
   return(
     <Scrim onClose={exporting?()=>{}:onClose}>
@@ -1584,6 +1655,17 @@ function PdfExportModal({state,onClose}) {
           </div>
         </div>
 
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:T.panel,borderRadius:8,border:`1px solid ${T.lineSoft}`,marginBottom:18,cursor:exporting?'default':'pointer'}}
+          onClick={()=>!exporting&&setWithOverlays(v=>!v)}>
+          <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${withOverlays?T.navy:T.line}`,background:withOverlays?T.navy:'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'.15s'}}>
+            {withOverlays&&<Icon name="check" size={11} color="#fff" stroke={3}/>}
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:500,color:T.ink,fontFamily:'inherit'}}>Inclure les signatures & tampons</div>
+            <div style={{fontSize:11,color:T.ink4,fontFamily:'inherit'}}>Filigrane, signature et tampon d'entreprise</div>
+          </div>
+        </div>
+
         <div style={{fontSize:12,color:T.ink3,marginBottom:exporting?12:20,fontFamily:'inherit'}}>
           {pages.length} pages · {isP?'A4 Portrait':'A4 Paysage'}</div>
 
@@ -1610,7 +1692,6 @@ function PdfExportModal({state,onClose}) {
 }
 
 function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageNotes,hideTemplatePages=false}) {
-  const {wmLogo,stampLogo}=React.useContext(BrandCtx);
   const pages=useMemo(()=>{
     const all=buildPageList(state);
     if(hideTemplatePages) return all.filter(p=>p.type==='content'||p.type==='category');
@@ -1659,80 +1740,7 @@ function Canvas({state,zoom,setZoom,activePage,onAnnotate,paletteH,onUpdatePageN
             <NotesEditCtx.Provider value={notesCtxVal}>
               <PageRender page={p} state={state}/>
             </NotesEditCtx.Provider>
-            {state.wmEnabled&&(
-              <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none',zIndex:6}}>
-                <div style={{position:'absolute',inset:'-80%',display:'grid',gridTemplateColumns:'repeat(7,1fr)',gridTemplateRows:'repeat(12,1fr)',transform:'rotate(-40deg)',transformOrigin:'center',opacity:state.wmOpacity/100}}>
-                  {Array.from({length:84}).map((_,k)=>(
-                    <div key={k} style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3%'}}>
-                      {wmLogo
-                        ?<img src={wmLogo} alt="" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',userSelect:'none'}}/>
-                        :<span style={{fontWeight:900,letterSpacing:'.18em',fontSize:'clamp(3px,0.75vw,7px)',color:'#1A1F2E',whiteSpace:'nowrap',userSelect:'none',fontFamily:'inherit'}}>ABRANE</span>
-                      }
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {(()=>{
-              const gx=state.groupX??state.sigX??50;
-              const gy=state.groupY??state.sigY??85;
-              const sigPl=state.sigPlacement||'all';
-              const stPl=state.stampPlacement||'all';
-              const sigShow=state.sigEnabled&&state.sigUrl&&(sigPl==='all'||(sigPl==='first'&&i===0)||(sigPl==='last'&&i===pages.length-1)||(sigPl==='content'&&p.type==='content'));
-              const stampShow=state.stampEnabled&&stampLogo&&(stPl==='all'||(stPl==='first'&&i===0)||(stPl==='last'&&i===pages.length-1)||(stPl==='content'&&p.type==='content'));
-              if(!sigShow&&!stampShow) return null;
-              return <>
-                {stampShow&&<div style={{position:'absolute',left:`${gx}%`,top:`${gy}%`,transform:'translate(-50%,-50%)',zIndex:7,pointerEvents:'none',width:`${state.stampScale??25}%`,maxWidth:'50%'}}>
-                  <img src={stampLogo} alt="" style={{width:'100%',objectFit:'contain',opacity:(state.stampOpacity??70)/100}}/>
-                </div>}
-                {sigShow&&<div style={{position:'absolute',left:`${gx}%`,top:`${gy}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:`${state.sigScale??30}%`,maxWidth:'40%'}}>
-                  <img src={state.sigUrl} alt="" style={{width:'100%',objectFit:'contain',opacity:0.9}}/>
-                </div>}
-              </>;
-            })()}
-            {state.symEnabled&&(()=>{
-              const pl=state.symPlacement||'all';
-              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content')||(pl==='specific'&&i===(state.symPageNum??1)-1);
-              return show?(
-                <div style={{position:'absolute',left:`${state.symX??50}%`,top:`${state.symY??50}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.symScale??20}%`,maxWidth:'35%',display:'flex',flexDirection:'column',alignItems:'center',gap:'6%'}}>
-                  <svg viewBox="0 0 100 90" style={{width:'68%',display:'block',overflow:'visible',filter:'drop-shadow(0 2px 4px rgba(0,0,0,.25))'}}>
-                    <polygon points="50,4 96,86 4,86" fill="#DC2626" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
-                    <text x="50" y="74" textAnchor="middle" fontWeight="900" fontSize="54" fill="#fff" fontFamily="Arial,Helvetica,sans-serif">!</text>
-                  </svg>
-                  {state.symText&&<div style={{fontSize:'clamp(6px,2vw,16px)',fontWeight:700,color:'#DC2626',textAlign:'center',lineHeight:1.2,wordBreak:'break-word',width:'160%'}}>{state.symText}</div>}
-                </div>
-              ):null;
-            })()}
-            {state.advEnabled&&(()=>{
-              const pl=state.advPlacement||'all';
-              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content')||(pl==='specific'&&i===(state.advPageNum??1)-1);
-              const st=ADV_STATUSES.find(s=>s.v===(state.advStatus||'AF'))||ADV_STATUSES[0];
-              return show?(
-                <div style={{position:'absolute',left:`${state.advX??85}%`,top:`${state.advY??8}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.advScale??15}%`,maxWidth:'28%'}}>
-                  <div style={{background:st.color+'28',border:`2px solid ${st.color}`,borderRadius:8,padding:'8% 12%',display:'flex',flexDirection:'column',alignItems:'center',gap:'5%',boxShadow:'0 2px 8px rgba(0,0,0,.18)'}}>
-                    <span style={{fontSize:'clamp(7px,2vw,18px)',lineHeight:1}}>{st.emoji}</span>
-                    <span style={{fontSize:'clamp(12px,3.3vw,27px)',fontWeight:900,color:st.color,letterSpacing:'.08em',lineHeight:1}}>{st.v}</span>
-                    <span style={{fontSize:'clamp(9px,2.25vw,18px)',fontWeight:600,color:st.color,textAlign:'center',lineHeight:1.25}}>{st.l}</span>
-                  </div>
-                </div>
-              ):null;
-            })()}
-            {state.disclaimerEnabled&&(()=>{
-              const pl=state.disclaimerPlacement||'all';
-              const show=pl==='all'||(pl==='first'&&i===0)||(pl==='last'&&i===pages.length-1)||(pl==='content'&&p.type==='content')||(pl==='specific'&&i===(state.disclaimerPageNum??1)-1);
-              const sz=state.disclaimerSize??6;
-              const lang=state.disclaimerLang||'fr';
-              const FR='Tous les dessins techniques et documents associés sont la propriété exclusive de ABRANE France S.A.S. Toute reproduction ou utilisation sans autorisation est interdite.';
-              const EN='All technical drawings and associated documents are the exclusive property of ABRANE France S.A.S. Any reproduction or use without authorization is prohibited.';
-              const txt=lang==='both'?`${FR}\n${EN}`:lang==='en'?EN:FR;
-              return show?(
-                <div style={{position:'absolute',left:`${state.disclaimerX??50}%`,top:`${state.disclaimerY??95}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:'88%',textAlign:'center'}}>
-                  {txt.split('\n').map((line,li)=>(
-                    <div key={li} style={{fontSize:`clamp(2px,${sz*0.09}vw,${sz}pt)`,color:'rgba(0,0,0,0.3)',fontStyle:'italic',lineHeight:1.5,letterSpacing:'.01em',marginTop:li?'0.3em':0}}>{line}</div>
-                  ))}
-                </div>
-              ):null;
-            })()}
+            <PageOverlays state={state} page={p} pageIndex={i} totalPages={pages.length}/>
             {p.type==='content'&&onAnnotate&&(
               <div className="annot-btn-overlay" style={{position:'absolute',top:8,right:10,zIndex:10}}>
                 <button onClick={e=>{e.stopPropagation();onAnnotate(p);}} style={{
