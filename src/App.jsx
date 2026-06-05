@@ -101,7 +101,7 @@ const ADMIN_PASS = 'ABRANE2026';
 const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},stampLogo:'',setBrand:()=>{}});
 
 const NavCtx = React.createContext(null);
-// Layout constants (fractions of page size) — shared by NavStripe render and addPdfLinks annotations
+// Layout constants (fractions of page size) — used by addPdfLinks for drawing + hotspots
 const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catYEndPct:.76,maxCats:8,idxYPct:.80,idxHPct:.057,matYPct:.867,matHPct:.057};
 
 const USERS = [
@@ -1321,7 +1321,6 @@ function CatPage({state,catName,isPortrait,isRing}) {
 function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,pageKey,ordId}) {
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
   const rot=rotation||0;
-  const nav=React.useContext(NavCtx);
   const accIds=state.pageAccessories?.[pageKey]||[];
   const accItems=accIds.map(id=>{
     const ord=state.contentOrder.find(x=>x.id===id&&x.isAccessory);
@@ -1377,7 +1376,6 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'10%',background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
       <StripeAbraneLogo/>
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
-      {nav&&<NavStripe nav={{...nav,currentCatKey:nav.ordCatMap?.[ordId]||null}} state={state}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
     <div style={{position:'absolute',top:'3%',right:'13%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':hasCompat?'calc(22% + 70px)':'21%'):(hasAcc?'calc(6% + 110px)':hasCompat?'calc(6% + 70px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1641,6 +1639,9 @@ function ExportPageWrapper({page,pageIndex,totalPages,state}) {
 
 // ── PDF INTERACTIF helpers ────────────────────────────────────
 
+// Parse hex '#rrggbb' → [r,g,b] for jsPDF drawing
+const hexRgb=hex=>{try{const v=hex.replace('#','');return[parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)];}catch{return[0,0,0];}};
+
 function buildIndexRows(state){
   const tot=state.contentOrder.filter(it=>it.type==='cat'||(state.idxMode!=='cats'&&state.files.find(x=>x.id===it.fileId))).length;
   const nI=Math.max(1,Math.ceil(tot/40));
@@ -1674,19 +1675,80 @@ function addPdfLinks(pdf,page,navData,state,isP){
   const pageW=isP?210:297,pageH=isP?297:210;
   const BW=isP?794:1123,BH=isP?1123:794;
   const isR=state.pageFormat.includes('ring');
-  const{pageMap,idxPageNum,matPageNum,categories}=navData;
+  const p=state.palette;
+  const{pageMap,idxPageNum,matPageNum,categories,ordCatMap}=navData;
   const curN=pageMap[page.key];
   const go=(x,y,w,h,n)=>{if(n&&n!==curN&&w>0&&h>0)try{pdf.link(x,y,w,h,{pageNumber:n});}catch(_){}};
-  const sX=NAV.stripeXPct*pageW,sW=NAV.stripeWPct*pageW;
-  // Stripe nav: cat tabs + IDX + MAT (all pages except cover/back)
+
+  // ── Right stripe: drawn directly in jsPDF (crisp vector, not rasterised pixels)
   if(page.type!=='cover'&&page.type!=='back'){
-    go(sX,NAV.idxYPct*pageH,sW,NAV.idxHPct*pageH,idxPageNum);
-    if(matPageNum)go(sX,NAV.matYPct*pageH,sW,NAV.matHPct*pageH,matPageNum);
-    const MAX=Math.min(categories.length,NAV.maxCats);
-    if(MAX>0){const aH=(NAV.catYEndPct-NAV.catYStartPct)*pageH/MAX;
-      categories.slice(0,MAX).forEach((c,i)=>go(sX,(NAV.catYStartPct*pageH+i*aH),sW,aH*.87,c.pageNum));}
+    const sX=NAV.stripeXPct*pageW,sW=NAV.stripeWPct*pageW;
+    const pad=sW*.05,bX=sX+pad,bW=sW-pad*2;
+    const cats=categories.slice(0,NAV.maxCats);
+    const n=cats.length;
+    const tH=n>0?(NAV.catYEndPct-NAV.catYStartPct)*pageH/n:0;
+    const currentCatKey=ordCatMap[page.ordId]||null;
+
+    cats.forEach((cat,i)=>{
+      const isCurr=cat.key===currentCatKey;
+      const tY=NAV.catYStartPct*pageH+i*tH;
+      const bH=tH*.87;
+      // Background
+      pdf.setFillColor(...hexRgb(isCurr?p.c2:shade(p.c1,-10)));
+      pdf.roundedRect(bX,tY,bW,bH,.5,.5,'F');
+      if(isCurr){pdf.setDrawColor(...hexRgb(shade(p.c2,-22)));pdf.setLineWidth(.25);pdf.roundedRect(bX,tY,bW,bH,.5,.5,'S');}
+      // Category name: first word line 1, rest line 2
+      const word1=cat.name.split(/\s+/)[0].slice(0,9).toUpperCase();
+      const word2=cat.name.split(/\s+/).slice(1).join(' ').slice(0,9).toUpperCase();
+      pdf.setFont('helvetica','bold');
+      pdf.setTextColor(...hexRgb(isCurr?'#ffffff':shade(p.c3,18)));
+      if(word2){
+        pdf.setFontSize(6.5);
+        pdf.text(word1,bX+bW/2,tY+bH*.40,{align:'center',baseline:'middle'});
+        pdf.setFontSize(5);
+        pdf.setTextColor(...hexRgb(isCurr?'#d8eaff':shade(p.c3,48)));
+        pdf.text(word2,bX+bW/2,tY+bH*.72,{align:'center',baseline:'middle'});
+      }else{
+        pdf.setFontSize(7);
+        pdf.text(word1,bX+bW/2,tY+bH/2,{align:'center',baseline:'middle'});
+      }
+      go(bX,tY,bW,bH,cat.pageNum);
+    });
+
+    if(categories.length>NAV.maxCats){
+      pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);
+      pdf.setTextColor(...hexRgb(shade(p.c3,50)));
+      pdf.text(`+${categories.length-NAV.maxCats}`,bX+bW/2,(NAV.catYEndPct-.02)*pageH,{align:'center',baseline:'middle'});
+    }
+
+    // INDEX button
+    if(idxPageNum){
+      const bY=NAV.idxYPct*pageH,bH=NAV.idxHPct*pageH;
+      pdf.setFillColor(...hexRgb(T.navy));
+      pdf.roundedRect(bX,bY,bW,bH,.5,.5,'F');
+      pdf.setTextColor(255,255,255);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+      pdf.text('INDEX',bX+bW/2,bY+bH*.40,{align:'center',baseline:'middle'});
+      pdf.setFont('helvetica','normal');pdf.setFontSize(4.5);
+      pdf.text('Sommaire',bX+bW/2,bY+bH*.75,{align:'center',baseline:'middle'});
+      go(bX,bY,bW,bH,idxPageNum);
+    }
+
+    // MAT. button
+    if(matPageNum){
+      const bY=NAV.matYPct*pageH,bH=NAV.matHPct*pageH;
+      pdf.setFillColor(...hexRgb(shade(p.c2,-5)));
+      pdf.roundedRect(bX,bY,bW,bH,.5,.5,'F');
+      pdf.setTextColor(255,255,255);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+      pdf.text('MAT.',bX+bW/2,bY+bH*.40,{align:'center',baseline:'middle'});
+      pdf.setFont('helvetica','normal');pdf.setFontSize(4.5);
+      pdf.text('Matériaux',bX+bW/2,bY+bH*.75,{align:'center',baseline:'middle'});
+      go(bX,bY,bW,bH,matPageNum);
+    }
   }
-  // Index: each row → its page
+
+  // Index: each row → its content page
   if(page.type==='index'){
     const pI=page.pageIndex||0,rows=buildIndexRows(state);
     const pRows=rows.slice(pI*40,(pI+1)*40);
@@ -1696,6 +1758,7 @@ function addPdfLinks(pdf,page,navData,state,isP){
     pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});
     if(pRows.length>20){const c2X=lPx+cW+16;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
   }
+
   // Content: accessory thumbnails → accessory pages
   if(page.type==='content'){
     const accIds=state.pageAccessories?.[page.key]||[];
@@ -1711,41 +1774,6 @@ function addPdfLinks(pdf,page,navData,state,isP){
       go(xPx/BW*pageW,yPx/BH*pageH,80/BW*pageW,97/BH*pageH,n);
     });
   }
-}
-
-function NavStripe({nav,state}){
-  const p=state.palette;
-  const{categories,idxPageNum,matPageNum,currentCatKey}=nav;
-  const cats=categories.slice(0,NAV.maxCats);
-  const n=cats.length;
-  const tH=n>0?(NAV.catYEndPct-NAV.catYStartPct)/n:0;
-  return<>
-    {cats.map((cat,i)=>{
-      const isCurr=cat.key===currentCatKey;
-      // First word only, max 9 chars, uppercase — fits horizontally in stripe
-      const label=cat.name.split(/\s+/)[0].slice(0,9).toUpperCase();
-      const rest=cat.name.split(/\s+/).slice(1).join(' ').slice(0,9).toUpperCase();
-      return<div key={cat.key} style={{position:'absolute',top:`${(NAV.catYStartPct+i*tH)*100}%`,height:`${tH*.87*100}%`,left:'4%',right:'4%',borderRadius:3,background:isCurr?p.c2:shade(p.c1,-10),display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',overflow:'hidden',gap:.5,outline:isCurr?`1.5px solid ${shade(p.c2,-22)}`:'none'}}>
-        <span style={{fontSize:7,fontWeight:800,color:isCurr?'#fff':shade(p.c3,18),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90%',textAlign:'center',letterSpacing:'.04em',lineHeight:1}}>
-          {label}
-        </span>
-        {rest&&<span style={{fontSize:5.5,fontWeight:600,color:isCurr?'rgba(255,255,255,.75)':shade(p.c3,45),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90%',textAlign:'center',letterSpacing:'.03em',lineHeight:1}}>
-          {rest}
-        </span>}
-      </div>;
-    })}
-    {categories.length>NAV.maxCats&&<div style={{position:'absolute',top:`${(NAV.catYEndPct-.025)*100}%`,left:0,right:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-      <span style={{fontSize:6,color:shade(p.c3,50),fontWeight:700}}>+{categories.length-NAV.maxCats}</span>
-    </div>}
-    {idxPageNum&&<div style={{position:'absolute',top:`${NAV.idxYPct*100}%`,height:`${NAV.idxHPct*100}%`,left:'4%',right:'4%',borderRadius:3,background:T.navy,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1}}>
-      <span style={{fontSize:9,color:'#fff',lineHeight:1}}>☰</span>
-      <span style={{fontSize:6,fontWeight:800,color:'#fff',letterSpacing:'.09em',lineHeight:1}}>INDEX</span>
-    </div>}
-    {matPageNum&&<div style={{position:'absolute',top:`${NAV.matYPct*100}%`,height:`${NAV.matHPct*100}%`,left:'4%',right:'4%',borderRadius:3,background:shade(p.c2,-5),display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1}}>
-      <span style={{fontSize:8,color:'#fff',lineHeight:1}}>▦</span>
-      <span style={{fontSize:6,fontWeight:800,color:'#fff',letterSpacing:'.09em',lineHeight:1}}>MAT.</span>
-    </div>}
-  </>;
 }
 
 function PdfExportModal({state,onClose}) {
