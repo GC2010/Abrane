@@ -102,7 +102,7 @@ const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},sta
 
 const NavCtx = React.createContext(null);
 // Layout constants (fractions of page size) — used by addPdfLinks for drawing + hotspots
-const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catYEndPct:.76,maxCats:8,idxYPct:.80,idxHPct:.057,matYPct:.867,matHPct:.057};
+const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catYEndPct:.76,maxCats:8,idxYPct:.80,idxHPct:.042,matYPct:.852,matHPct:.042};
 
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
@@ -1680,70 +1680,61 @@ function addPdfLinks(pdf,page,navData,state,isP){
   const curN=pageMap[page.key];
   const go=(x,y,w,h,n)=>{if(n&&n!==curN&&w>0&&h>0)try{pdf.link(x,y,w,h,{pageNumber:n});}catch(_){}};
 
-  // ── Right stripe: drawn directly in jsPDF (crisp vector, not rasterised pixels)
-  if(page.type!=='cover'&&page.type!=='back'){
+  // ── Right stripe: drawn in jsPDF vector (categories + IDX + MAT)
+  // Excluded from index pages (they are the navigation target, not a navigation source)
+  if(page.type!=='cover'&&page.type!=='back'&&page.type!=='index'){
     const sX=NAV.stripeXPct*pageW,sW=NAV.stripeWPct*pageW;
-    const pad=sW*.05,bX=sX+pad,bW=sW-pad*2;
+    const pad=sW*.06,bX=sX+pad,bW=sW-pad*2;
     const cats=categories.slice(0,NAV.maxCats);
     const n=cats.length;
     const tH=n>0?(NAV.catYEndPct-NAV.catYStartPct)*pageH/n:0;
     const currentCatKey=ordCatMap[page.ordId]||null;
+    // 9pt cap-height ≈ 2.1mm → half = 1.05mm offset below visual centre for alphabetic baseline
+    const mid=(bY,bH)=>bY+bH/2+1.05;
+    const drawBtn=(bY,bH,fillRgb,borderRgb,lw)=>{
+      pdf.setFillColor(...fillRgb);pdf.rect(bX,bY,bW,bH,'F');
+      pdf.setDrawColor(...borderRgb);pdf.setLineWidth(lw);pdf.rect(bX,bY,bW,bH,'S');
+    };
 
     cats.forEach((cat,i)=>{
       const isCurr=cat.key===currentCatKey;
       const tY=NAV.catYStartPct*pageH+i*tH;
       const bH=tH*.87;
-      // Background
-      pdf.setFillColor(...hexRgb(isCurr?p.c2:shade(p.c1,-10)));
-      pdf.roundedRect(bX,tY,bW,bH,.5,.5,'F');
-      if(isCurr){pdf.setDrawColor(...hexRgb(shade(p.c2,-22)));pdf.setLineWidth(.25);pdf.roundedRect(bX,tY,bW,bH,.5,.5,'S');}
-      // Category name: first word line 1, rest line 2
-      const word1=cat.name.split(/\s+/)[0].slice(0,9).toUpperCase();
-      const word2=cat.name.split(/\s+/).slice(1).join(' ').slice(0,9).toUpperCase();
-      pdf.setFont('helvetica','bold');
-      pdf.setTextColor(...hexRgb(isCurr?'#ffffff':shade(p.c3,18)));
-      if(word2){
-        pdf.setFontSize(6.5);
-        pdf.text(word1,bX+bW/2,tY+bH*.40,{align:'center',baseline:'middle'});
-        pdf.setFontSize(5);
-        pdf.setTextColor(...hexRgb(isCurr?'#d8eaff':shade(p.c3,48)));
-        pdf.text(word2,bX+bW/2,tY+bH*.72,{align:'center',baseline:'middle'});
+      const label=cat.name.split(/\s+/)[0].slice(0,8).toUpperCase();
+      if(isCurr){
+        drawBtn(tY,bH,hexRgb(p.c2),hexRgb(shade(p.c2,-18)),.4);
+        pdf.setTextColor(255,255,255);
       }else{
-        pdf.setFontSize(7);
-        pdf.text(word1,bX+bW/2,tY+bH/2,{align:'center',baseline:'middle'});
+        drawBtn(tY,bH,[252,252,252],hexRgb(shade(p.c1,-22)),.3);
+        pdf.setTextColor(...hexRgb(shade(p.c3,25)));
       }
+      pdf.setFont('helvetica','bold');pdf.setFontSize(9);
+      pdf.text(label,bX+bW/2,mid(tY,bH),{align:'center'});
       go(bX,tY,bW,bH,cat.pageNum);
     });
 
     if(categories.length>NAV.maxCats){
-      pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7);
       pdf.setTextColor(...hexRgb(shade(p.c3,50)));
-      pdf.text(`+${categories.length-NAV.maxCats}`,bX+bW/2,(NAV.catYEndPct-.02)*pageH,{align:'center',baseline:'middle'});
+      pdf.text('+'+String(categories.length-NAV.maxCats),bX+bW/2,(NAV.catYEndPct-.018)*pageH,{align:'center'});
     }
 
-    // INDEX button
     if(idxPageNum){
       const bY=NAV.idxYPct*pageH,bH=NAV.idxHPct*pageH;
-      pdf.setFillColor(...hexRgb(T.navy));
-      pdf.roundedRect(bX,bY,bW,bH,.5,.5,'F');
-      pdf.setTextColor(255,255,255);
-      pdf.setFont('helvetica','bold');pdf.setFontSize(7);
-      pdf.text('INDEX',bX+bW/2,bY+bH*.40,{align:'center',baseline:'middle'});
-      pdf.setFont('helvetica','normal');pdf.setFontSize(4.5);
-      pdf.text('Sommaire',bX+bW/2,bY+bH*.75,{align:'center',baseline:'middle'});
+      drawBtn(bY,bH,[255,255,255],hexRgb(T.navy),.5);
+      pdf.setTextColor(...hexRgb(T.navy));
+      pdf.setFont('helvetica','bold');pdf.setFontSize(9);
+      pdf.text('INDEX',bX+bW/2,mid(bY,bH),{align:'center'});
       go(bX,bY,bW,bH,idxPageNum);
     }
 
-    // MAT. button
     if(matPageNum){
       const bY=NAV.matYPct*pageH,bH=NAV.matHPct*pageH;
-      pdf.setFillColor(...hexRgb(shade(p.c2,-5)));
-      pdf.roundedRect(bX,bY,bW,bH,.5,.5,'F');
-      pdf.setTextColor(255,255,255);
-      pdf.setFont('helvetica','bold');pdf.setFontSize(7);
-      pdf.text('MAT.',bX+bW/2,bY+bH*.40,{align:'center',baseline:'middle'});
-      pdf.setFont('helvetica','normal');pdf.setFontSize(4.5);
-      pdf.text('Matériaux',bX+bW/2,bY+bH*.75,{align:'center',baseline:'middle'});
+      const cBorder=hexRgb(shade(p.c2,-10));
+      drawBtn(bY,bH,[255,255,255],cBorder,.5);
+      pdf.setTextColor(...cBorder);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(9);
+      pdf.text('MAT.',bX+bW/2,mid(bY,bH),{align:'center'});
       go(bX,bY,bW,bH,matPageNum);
     }
   }
