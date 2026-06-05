@@ -1345,7 +1345,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'34%':'21%'):(hasAcc?'17%':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'37%':'21%'):(hasAcc?'20%':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1356,16 +1356,16 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     </div>
     {/* Accessories strip */}
     {hasAcc&&(
-      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',height:'13%',display:'flex',alignItems:'stretch',gap:'1%',overflow:'hidden'}}>
+      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',height:'16%',display:'flex',alignItems:'stretch',gap:'1%',overflow:'hidden'}}>
         {accItems.map(({id,name,url})=>(
-          <div key={id} style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-            <div style={{height:'calc(100% - 10px)',aspectRatio:'3/4',borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',flexShrink:0}}>
+          <div key={id} style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+            <div style={{flex:1,width:'100%',borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff'}}>
               {url
                 ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                 :<div style={{width:'100%',height:'100%',background:shade(p.c1,-4)}}/>
               }
             </div>
-            <div style={{height:10,fontSize:6,color:shade(p.c3,50),textAlign:'center',lineHeight:'10px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:60}}>{name}</div>
+            <div style={{flexShrink:0,fontSize:7,color:shade(p.c3,50),textAlign:'center',lineHeight:1.3,width:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
           </div>
         ))}
       </div>
