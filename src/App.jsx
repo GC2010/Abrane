@@ -1363,7 +1363,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':hasCompat?'calc(21% + 24px)':'21%'):(hasAcc?'calc(6% + 110px)':hasCompat?'calc(4% + 24px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':hasCompat?'calc(22% + 70px)':'21%'):(hasAcc?'calc(6% + 110px)':hasCompat?'calc(6% + 70px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1377,7 +1377,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'11%',display:'flex',alignItems:'flex-start',gap:6,overflow:'visible'}}>
         {accItems.map(({id,name,url})=>(
           <div key={id} style={{flexShrink:0,width:80,display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
-            <div style={{width:80,height:80,borderRadius:6,overflow:'hidden',border:'1.5px solid #5B6CA8',background:'#fff',padding:3,boxSizing:'border-box',flexShrink:0}}>
+            <div style={{width:80,height:80,borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',padding:3,boxSizing:'border-box',flexShrink:0}}>
               {url
                 ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                 :<div style={{width:'100%',height:'100%',background:shade(p.c1,-4)}}/>
@@ -1390,11 +1390,11 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     )}
     {/* Compatible products footer — shown only on accessory pages that are used in at least one product */}
     {hasCompat&&(
-      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',borderTop:`0.75px solid ${shade(p.c2,-6)}`,paddingTop:3}}>
-        <div style={{fontSize:6.5,color:shade(p.c3,35),lineHeight:1.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+      <div style={{position:'absolute',bottom:isNotes?'22%':'6%',left:isRing?'14%':'4%',right:'11%',borderTop:`0.75px solid ${shade(p.c2,-6)}`,paddingTop:3}}>
+        <div style={{fontSize:6.5,color:shade(p.c3,35),lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:3}}>
           <b>Accessoire compatible avec le(s) produit(s) :</b>{' '}{compatProducts.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · ')}
         </div>
-        <div style={{fontSize:6.5,color:shade(p.c3,50),lineHeight:1.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+        <div style={{fontSize:6.5,color:shade(p.c3,50),lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:3}}>
           <b>Compatible accessory for product(s):</b>{' '}{compatProducts.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · ')}
         </div>
       </div>
@@ -3425,7 +3425,8 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
           const isActive=activePage===i;
           const isSel=selectedPages?.has(i)??false;
           const hasNotes=page.type==='content'&&!!(state.pageNotes?.[page.key]);
-          const borderCol=isSel?'#6366F1':isActive?T.gold:hasNotes?'#E53E3E':'rgba(255,255,255,.18)';
+          const isAccPage=page.type==='content'&&!!state.contentOrder.find(x=>x.id===page.ordId)?.isAccessory;
+          const borderCol=isSel?'#6366F1':isActive?T.gold:isAccPage?'#5B6CA8':hasNotes?'#E53E3E':'rgba(255,255,255,.18)';
           return (
             <div key={page.key} onClick={(e)=>{
               if((e.ctrlKey||e.metaKey)&&onTogglePageSelect) onTogglePageSelect(i);
