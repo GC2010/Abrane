@@ -3282,7 +3282,7 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
     const curr=state.pageAccessories?.[pageKey]||[];
     const next=curr.includes(id)
       ?curr.filter(x=>x!==id)
-      :(curr.length>=6?curr:[...curr,id]);
+      :(curr.length>=10?curr:[...curr,id]);
     update({pageAccessories:{...(state.pageAccessories||{}),[pageKey]:next}});
   };
 
@@ -3294,7 +3294,7 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
         <div style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px',borderBottom:`1px solid ${T.lineSoft}`,flexShrink:0}}>
           <Icon name="link" size={16} color={T.navy}/>
           <span style={{fontSize:15,fontWeight:600,color:T.ink}}>Accessoires de la page</span>
-          <span style={{...pillSt(),fontSize:10}}>{selected.length}/6 sélectionnés</span>
+          <span style={{...pillSt(),fontSize:10}}>{selected.length}/10 sélectionnés</span>
           <div style={{flex:1}}/>
           <button onClick={onClose} style={{background:'transparent',border:`1px solid ${T.line}`,borderRadius:6,padding:'5px 8px',cursor:'pointer',display:'flex',alignItems:'center'}}>
             <Icon name="close" size={15} color={T.ink3}/>
@@ -3313,7 +3313,7 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
             const name=item.label||f.name.replace(/\.[^.]+$/,'');
             const url=f.pageUrls?.[0]||null;
             const isSel=selected.includes(item.id);
-            const isDisabled=!isSel&&selected.length>=6;
+            const isDisabled=!isSel&&selected.length>=10;
             return(
               <div key={item.id} onClick={()=>!isDisabled&&toggle(item.id)}
                 style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5,cursor:isDisabled?'not-allowed':'pointer',opacity:isDisabled?.38:1,transition:'opacity .15s'}}>
