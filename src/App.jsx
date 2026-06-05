@@ -1377,7 +1377,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'11%',display:'flex',alignItems:'flex-start',gap:6,overflow:'visible'}}>
         {accItems.map(({id,name,url})=>(
           <div key={id} style={{flexShrink:0,width:80,display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
-            <div style={{width:80,height:80,borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',padding:3,boxSizing:'border-box',flexShrink:0}}>
+            <div style={{width:80,height:80,borderRadius:6,overflow:'hidden',border:'1.5px solid #5B6CA8',background:'#fff',padding:3,boxSizing:'border-box',flexShrink:0}}>
               {url
                 ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                 :<div style={{width:'100%',height:'100%',background:shade(p.c1,-4)}}/>
@@ -3470,7 +3470,7 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                     <Icon name="refresh" size={8} color="#fff"/>
                     <span style={{fontSize:7,fontWeight:700,color:'#fff',whiteSpace:'nowrap',letterSpacing:'.04em'}}>Remplacer</span>
                   </div>}
-                  {pages[activePage]?.type==='content'&&onOpenAccessories&&<div title="Accessoires"
+                  {pages[activePage]?.type==='content'&&onOpenAccessories&&!state.contentOrder.find(x=>x.id===pages[activePage]?.ordId)?.isAccessory&&<div title="Accessoires"
                     onClick={e=>{e.stopPropagation();onOpenAccessories(pages[activePage].key);}}
                     style={{position:'absolute',bottom:36,left:2,right:2,zIndex:3,background:'#5B6CA8',borderRadius:3,height:15,display:'flex',alignItems:'center',justifyContent:'center',gap:3,cursor:'pointer',overflow:'hidden'}}>
                     <Icon name="link" size={8} color="#fff" stroke={2}/>
