@@ -1345,7 +1345,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'36%':'21%'):(hasAcc?'19%':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':'21%'):(hasAcc?'calc(6% + 110px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1354,18 +1354,18 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       }
       {hasAnn&&<div style={{position:'absolute',top:4,left:4,background:T.gold,color:'#fff',fontSize:7,fontWeight:700,padding:'2px 6px',borderRadius:3,letterSpacing:'.1em',boxShadow:'0 1px 4px rgba(0,0,0,.18)'}}>ANNOTÉ</div>}
     </div>
-    {/* Accessories strip */}
+    {/* Accessories strip — fixed 80px thumbnails regardless of count */}
     {hasAcc&&(
-      <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'11%',height:'13%',display:'flex',alignItems:'stretch',gap:'1%',overflow:'hidden'}}>
+      <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'11%',display:'flex',alignItems:'flex-start',gap:6,overflow:'visible'}}>
         {accItems.map(({id,name,url})=>(
-          <div key={id} style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-            <div style={{flex:1,width:'100%',borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',padding:3,boxSizing:'border-box'}}>
+          <div key={id} style={{flexShrink:0,width:80,display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+            <div style={{width:80,height:80,borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',padding:3,boxSizing:'border-box',flexShrink:0}}>
               {url
                 ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                 :<div style={{width:'100%',height:'100%',background:shade(p.c1,-4)}}/>
               }
             </div>
-            <div style={{flexShrink:0,fontSize:7,color:shade(p.c3,50),textAlign:'center',lineHeight:1.25,width:'100%',overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:2}}>{name}</div>
+            <div style={{width:80,fontSize:7,color:shade(p.c3,50),textAlign:'center',lineHeight:1.25,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:2}}>{name}</div>
           </div>
         ))}
       </div>
