@@ -1345,7 +1345,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'37%':'21%'):(hasAcc?'20%':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'34%':'21%'):(hasAcc?'17%':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1356,16 +1356,16 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     </div>
     {/* Accessories strip */}
     {hasAcc&&(
-      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',height:'15%',display:'flex',alignItems:'flex-start',gap:'1%',overflow:'hidden'}}>
+      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',height:'13%',display:'flex',alignItems:'stretch',gap:'1%',overflow:'hidden'}}>
         {accItems.map(({id,name,url})=>(
-          <div key={id} style={{flex:1,minWidth:0,maxWidth:`${Math.floor(85/accItems.length)}%`,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-            <div style={{width:'100%',aspectRatio:'1/1',borderRadius:10,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',flexShrink:0}}>
+          <div key={id} style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+            <div style={{height:'calc(100% - 10px)',aspectRatio:'3/4',borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',flexShrink:0}}>
               {url
                 ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                 :<div style={{width:'100%',height:'100%',background:shade(p.c1,-4)}}/>
               }
             </div>
-            <div style={{fontSize:6.5,color:shade(p.c3,50),textAlign:'center',lineHeight:1.2,width:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
+            <div style={{height:10,fontSize:6,color:shade(p.c3,50),textAlign:'center',lineHeight:'10px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:60}}>{name}</div>
           </div>
         ))}
       </div>
@@ -3240,66 +3240,70 @@ function VueEnsembleModal({state,update,onClose}) {
 
 // ── ACCESSORIES PICKER MODAL ─────────────────────────────────
 function AccessoriesPickerModal({state,update,pageKey,onClose}) {
-  const p=state.palette;
   const accessories=state.contentOrder.filter(x=>x.type==='file'&&x.isAccessory);
   const selected=state.pageAccessories?.[pageKey]||[];
+  const isP=state.pageFormat.startsWith('v');
+  const thumbH=90;
+  const thumbW=Math.round(thumbH*(isP?3/4:4/3));
 
   const toggle=id=>{
     const curr=state.pageAccessories?.[pageKey]||[];
     const next=curr.includes(id)
       ?curr.filter(x=>x!==id)
-      :(curr.length>=8?curr:[...curr,id]);
+      :(curr.length>=6?curr:[...curr,id]);
     update({pageAccessories:{...(state.pageAccessories||{}),[pageKey]:next}});
   };
 
   return(
     <Scrim onClose={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:14,padding:24,width:540,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,.22)'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <Icon name="link" size={16} color={T.gold}/>
-            <span style={{fontSize:15,fontWeight:700,color:T.ink}}>Accessoires de la page</span>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontSize:11,color:T.ink4}}>{selected.length}/8 sélectionnés</span>
-            <button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',padding:4,borderRadius:4,display:'grid',placeItems:'center'}}>
-              <Icon name="close" size={16} color={T.ink3}/>
-            </button>
-          </div>
+      <div onClick={e=>e.stopPropagation()} style={{width:'auto',maxWidth:860,minWidth:360,maxHeight:'80vh',background:T.surface,borderRadius:16,display:'flex',flexDirection:'column',boxShadow:'0 32px 80px rgba(0,0,0,.3)',border:`1px solid ${T.line}`,overflow:'hidden'}}>
+
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px',borderBottom:`1px solid ${T.lineSoft}`,flexShrink:0}}>
+          <Icon name="link" size={16} color={T.navy}/>
+          <span style={{fontSize:15,fontWeight:600,color:T.ink}}>Accessoires de la page</span>
+          <span style={{...pillSt(),fontSize:10}}>{selected.length}/6 sélectionnés</span>
+          <div style={{flex:1}}/>
+          <button onClick={onClose} style={{background:'transparent',border:`1px solid ${T.line}`,borderRadius:6,padding:'5px 8px',cursor:'pointer',display:'flex',alignItems:'center'}}>
+            <Icon name="close" size={15} color={T.ink3}/>
+          </button>
         </div>
-        {accessories.length===0?(
-          <div style={{textAlign:'center',padding:'32px 16px',color:T.ink4,fontSize:12,fontStyle:'italic'}}>
-            Aucun accessoire importé.<br/>Utilisez "Importer des accessoires" dans le panneau Contenu.
-          </div>
-        ):(
-          <div style={{overflowY:'auto',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,paddingRight:4}}>
-            {accessories.map(item=>{
-              const f=state.files.find(x=>x.id===item.fileId);
-              if(!f)return null;
-              const name=item.label||f.name.replace(/\.[^.]+$/,'');
-              const url=f.pageUrls?.[0]||null;
-              const isSel=selected.includes(item.id);
-              const isDisabled=!isSel&&selected.length>=4;
-              return(
-                <div key={item.id} onClick={()=>!isDisabled&&toggle(item.id)}
-                  style={{cursor:isDisabled?'not-allowed':'pointer',borderRadius:8,border:`2px solid ${isSel?T.gold:T.lineSoft}`,background:isSel?T.goldTint:T.panel,overflow:'hidden',opacity:isDisabled?.45:1,transition:'border-color .15s,background .15s'}}>
-                  <div style={{aspectRatio:'1/1',background:T.panel2,position:'relative',overflow:'hidden'}}>
-                    {url
-                      ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
-                      :<div style={{width:'100%',height:'100%',display:'grid',placeItems:'center'}}><Icon name="image" size={22} color={T.ink5}/></div>
-                    }
-                    {isSel&&<div style={{position:'absolute',top:4,right:4,width:16,height:16,borderRadius:'50%',background:T.gold,display:'grid',placeItems:'center'}}>
-                      <Icon name="check" size={10} color="#fff" stroke={3}/>
-                    </div>}
-                  </div>
-                  <div style={{padding:'4px 5px',fontSize:9,fontWeight:500,color:T.ink2,textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
+
+        {/* Grid */}
+        <div style={{flex:1,overflowY:'auto',padding:18,display:'flex',flexWrap:'wrap',gap:10,alignContent:'flex-start',minHeight:180}}>
+          {accessories.length===0?(
+            <div style={{width:'100%',textAlign:'center',padding:'32px 16px',color:T.ink4,fontSize:12,fontStyle:'italic'}}>
+              Aucun accessoire importé.<br/>Utilisez "Importer des accessoires" dans le panneau Contenu.
+            </div>
+          ):accessories.map(item=>{
+            const f=state.files.find(x=>x.id===item.fileId);
+            if(!f)return null;
+            const name=item.label||f.name.replace(/\.[^.]+$/,'');
+            const url=f.pageUrls?.[0]||null;
+            const isSel=selected.includes(item.id);
+            const isDisabled=!isSel&&selected.length>=6;
+            return(
+              <div key={item.id} onClick={()=>!isDisabled&&toggle(item.id)}
+                style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5,cursor:isDisabled?'not-allowed':'pointer',opacity:isDisabled?.38:1,transition:'opacity .15s'}}>
+                <div style={{width:thumbW,height:thumbH,overflow:'hidden',borderRadius:3,position:'relative',border:`1.5px solid ${isSel?T.navy:T.line}`,boxShadow:isSel?`0 0 0 2px ${T.navyTint}`:'none',background:'#fff',transition:'border-color .12s,box-shadow .12s'}}>
+                  {url
+                    ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                    :<div style={{width:'100%',height:'100%',display:'grid',placeItems:'center'}}><Icon name="image" size={24} color={T.ink5}/></div>
+                  }
+                  {isSel&&<div style={{position:'absolute',top:3,right:3,width:16,height:16,borderRadius:'50%',background:T.navy,display:'grid',placeItems:'center'}}>
+                    <Icon name="check" size={10} color="#fff" stroke={3}/>
+                  </div>}
                 </div>
-              );
-            })}
-          </div>
-        )}
-        <div style={{marginTop:16,display:'flex',justifyContent:'flex-end'}}>
-          <button onClick={onClose} style={{...btnSt('primary'),paddingLeft:20,paddingRight:20}}>Confirmer</button>
+                <div style={{fontSize:9,color:isSel?T.navy:T.ink3,maxWidth:Math.max(thumbW,50),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center',fontWeight:isSel?600:400}}>{name}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 18px',borderTop:`1px solid ${T.lineSoft}`,flexShrink:0,background:T.panel}}>
+          <div style={{fontSize:11,color:T.ink3}}>{selected.length} accessoire{selected.length!==1?'s':''} sélectionné{selected.length!==1?'s':''}</div>
+          <button style={btnSt('primary')} onClick={onClose}><Icon name="check" size={13} color="#fff"/>Confirmer</button>
         </div>
       </div>
     </Scrim>
