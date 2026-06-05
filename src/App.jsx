@@ -1345,7 +1345,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'34%':'21%'):(hasAcc?'17%':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'37%':'21%'):(hasAcc?'20%':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1356,16 +1356,16 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     </div>
     {/* Accessories strip */}
     {hasAcc&&(
-      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',height:'12%',display:'flex',alignItems:'stretch',gap:'1.5%',overflow:'hidden'}}>
+      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',height:'15%',display:'flex',alignItems:'flex-start',gap:'1%',overflow:'hidden'}}>
         {accItems.map(({id,name,url})=>(
-          <div key={id} style={{display:'flex',flexDirection:'column',alignItems:'center',flex:'0 0 auto',maxWidth:'22%',overflow:'hidden'}}>
-            <div style={{flex:1,width:'100%',borderRadius:2,overflow:'hidden',border:`1px solid ${shade(p.c2,-10)}`,background:p.c1}}>
+          <div key={id} style={{flex:1,minWidth:0,maxWidth:`${Math.floor(85/accItems.length)}%`,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+            <div style={{width:'100%',aspectRatio:'1/1',borderRadius:10,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',flexShrink:0}}>
               {url
                 ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                 :<div style={{width:'100%',height:'100%',background:shade(p.c1,-4)}}/>
               }
             </div>
-            <div style={{fontSize:'4.5%',color:shade(p.c3,50),textAlign:'center',lineHeight:1.2,marginTop:'2%',maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
+            <div style={{fontSize:6.5,color:shade(p.c3,50),textAlign:'center',lineHeight:1.2,width:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
           </div>
         ))}
       </div>
@@ -3248,20 +3248,20 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
     const curr=state.pageAccessories?.[pageKey]||[];
     const next=curr.includes(id)
       ?curr.filter(x=>x!==id)
-      :(curr.length>=4?curr:[...curr,id]);
+      :(curr.length>=8?curr:[...curr,id]);
     update({pageAccessories:{...(state.pageAccessories||{}),[pageKey]:next}});
   };
 
   return(
     <Scrim onClose={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:14,padding:24,width:480,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,.22)'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:14,padding:24,width:540,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,.22)'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <Icon name="link" size={16} color={T.gold}/>
             <span style={{fontSize:15,fontWeight:700,color:T.ink}}>Accessoires de la page</span>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontSize:11,color:T.ink4}}>{selected.length}/4 sélectionnés</span>
+            <span style={{fontSize:11,color:T.ink4}}>{selected.length}/8 sélectionnés</span>
             <button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',padding:4,borderRadius:4,display:'grid',placeItems:'center'}}>
               <Icon name="close" size={16} color={T.ink3}/>
             </button>
@@ -3272,7 +3272,7 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
             Aucun accessoire importé.<br/>Utilisez "Importer des accessoires" dans le panneau Contenu.
           </div>
         ):(
-          <div style={{overflowY:'auto',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,paddingRight:4}}>
+          <div style={{overflowY:'auto',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,paddingRight:4}}>
             {accessories.map(item=>{
               const f=state.files.find(x=>x.id===item.fileId);
               if(!f)return null;
