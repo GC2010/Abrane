@@ -1272,6 +1272,7 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   const nIdxPages=Math.max(1,Math.ceil(totalRowCount/40));
   let pgN=2+nIdxPages;
   if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
+  if(state.enNotes)pgN+=1;
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){allRows.push({name:it.name,page:pgN,isCat:true});pgN+=1;}
     else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){const dn=it.label||f.name.replace(/\.[^.]+$/,'');allRows.push({name:dn,page:pgN,isCat:false,isAccessory:!!it.isAccessory});pgN+=f.pages||1;}else pgN+=1;}
@@ -1279,12 +1280,12 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   const pageRows=allRows.slice(pageIndex*40,(pageIndex+1)*40);
   const col1=pageRows.slice(0,20),col2=pageRows.slice(20,40);
   const nav=React.useContext(NavCtx);
-  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'center',gap:4,padding:'5px 0',borderBottom:`1px dotted ${T.line}`,fontSize:11}}>
+  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'center',gap:4,padding:'5px 0',borderBottom:nav&&!r.isCat?`1px solid ${shade(p.c2,-5)}`:`1px dotted ${T.line}`,fontSize:11}}>
     <span style={{flex:1,color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink2,fontWeight:r.isCat?700:400,display:'flex',alignItems:'center',gap:3}}>
       {r.isAccessory&&<Icon name="link" size={8} color="#5B6CA8" stroke={2}/>}
       {r.name}
     </span>
-    {nav&&!r.isCat&&<span style={{fontSize:9,color:shade(p.c2,-8),opacity:.55,flexShrink:0,lineHeight:1}}>›</span>}
+    {nav&&!r.isCat&&<span style={{fontSize:11,color:shade(p.c2,-8),opacity:.75,flexShrink:0,lineHeight:1,marginLeft:2}}>›</span>}
     <span style={{color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink3,fontWeight:r.isCat?600:r.isAccessory?600:400}}>{String(r.page).padStart(2,'0')}</span>
   </div>;
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:'5% '+(isRing?'9% 4% 12%':'9% 4% 5%'),position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
@@ -1647,6 +1648,7 @@ function buildIndexRows(state){
   const nI=Math.max(1,Math.ceil(tot/40));
   let pgN=2+nI;
   if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
+  if(state.enNotes)pgN+=1;
   const rows=[];
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){rows.push({name:it.name,page:pgN,isCat:true});pgN++;}
@@ -1681,8 +1683,8 @@ function addPdfLinks(pdf,page,navData,state,isP){
   const go=(x,y,w,h,n)=>{if(n&&n!==curN&&w>0&&h>0)try{pdf.link(x,y,w,h,{pageNumber:n});}catch(_){}};
 
   // ── Right stripe: drawn in jsPDF vector (categories + IDX + MAT)
-  // Excluded from index pages (they are the navigation target, not a navigation source)
-  if(page.type!=='cover'&&page.type!=='back'&&page.type!=='index'){
+  // Only on category and content pages — not on cover/back/index/notes/materials
+  if(page.type==='category'||page.type==='content'){
     const sX=NAV.stripeXPct*pageW,sW=NAV.stripeWPct*pageW;
     const pad=sW*.06,bX=sX+pad,bW=sW-pad*2;
     const cats=categories.slice(0,NAV.maxCats);
@@ -1691,9 +1693,14 @@ function addPdfLinks(pdf,page,navData,state,isP){
     const currentCatKey=ordCatMap[page.ordId]||null;
     // 9pt cap-height ≈ 2.1mm → half = 1.05mm offset below visual centre for alphabetic baseline
     const mid=(bY,bH)=>bY+bH/2+1.05;
+    // roundedRect with 2mm radius, falls back to rect if API unavailable
+    const rr=(bY,bH,style,lw)=>{
+      if(lw!==undefined){pdf.setLineWidth(lw);}
+      try{pdf.roundedRect(bX,bY,bW,bH,2,2,style);}catch(_){pdf.rect(bX,bY,bW,bH,style);}
+    };
     const drawBtn=(bY,bH,fillRgb,borderRgb,lw)=>{
-      pdf.setFillColor(...fillRgb);pdf.rect(bX,bY,bW,bH,'F');
-      pdf.setDrawColor(...borderRgb);pdf.setLineWidth(lw);pdf.rect(bX,bY,bW,bH,'S');
+      pdf.setFillColor(...fillRgb);rr(bY,bH,'F');
+      pdf.setDrawColor(...borderRgb);rr(bY,bH,'S',lw);
     };
 
     cats.forEach((cat,i)=>{
@@ -1702,10 +1709,10 @@ function addPdfLinks(pdf,page,navData,state,isP){
       const bH=tH*.87;
       const label=cat.name.split(/\s+/)[0].slice(0,8).toUpperCase();
       if(isCurr){
-        drawBtn(tY,bH,hexRgb(p.c2),hexRgb(shade(p.c2,-18)),.4);
+        drawBtn(tY,bH,hexRgb(p.c2),hexRgb(shade(p.c2,-18)),.3);
         pdf.setTextColor(255,255,255);
       }else{
-        drawBtn(tY,bH,[252,252,252],hexRgb(shade(p.c1,-22)),.3);
+        drawBtn(tY,bH,[252,252,252],hexRgb(shade(p.c1,-22)),.2);
         pdf.setTextColor(...hexRgb(shade(p.c3,25)));
       }
       pdf.setFont('helvetica','bold');pdf.setFontSize(9);
@@ -1721,7 +1728,7 @@ function addPdfLinks(pdf,page,navData,state,isP){
 
     if(idxPageNum){
       const bY=NAV.idxYPct*pageH,bH=NAV.idxHPct*pageH;
-      drawBtn(bY,bH,[255,255,255],hexRgb(T.navy),.5);
+      drawBtn(bY,bH,[255,255,255],hexRgb(T.navy),.35);
       pdf.setTextColor(...hexRgb(T.navy));
       pdf.setFont('helvetica','bold');pdf.setFontSize(9);
       pdf.text('INDEX',bX+bW/2,mid(bY,bH),{align:'center'});
@@ -1731,7 +1738,7 @@ function addPdfLinks(pdf,page,navData,state,isP){
     if(matPageNum){
       const bY=NAV.matYPct*pageH,bH=NAV.matHPct*pageH;
       const cBorder=hexRgb(shade(p.c2,-10));
-      drawBtn(bY,bH,[255,255,255],cBorder,.5);
+      drawBtn(bY,bH,[255,255,255],cBorder,.35);
       pdf.setTextColor(...cBorder);
       pdf.setFont('helvetica','bold');pdf.setFontSize(9);
       pdf.text('MAT.',bX+bW/2,mid(bY,bH),{align:'center'});
@@ -1743,11 +1750,13 @@ function addPdfLinks(pdf,page,navData,state,isP){
   if(page.type==='index'){
     const pI=page.pageIndex||0,rows=buildIndexRows(state);
     const pRows=rows.slice(pI*40,(pI+1)*40);
-    const lPx=BW*(isR?.12:.05),tPx=BH*.05+34,rH=22;
-    const cW=(BW-lPx-BW*.09-16)/2;
+    // tPx: top padding (5%) + h3 height (22px×1.2=26) + h3 margin-bottom (12) = 38px
+    // rH: row padding 5+5=10, font 11×1.2≈13, border 1 → ~24px
+    const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=24,gap=16;
+    const cW=(BW-lPx-BW*.09-gap)/2;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
     pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});
-    if(pRows.length>20){const c2X=lPx+cW+16;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
+    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
   }
 
   // Content: accessory thumbnails → accessory pages
