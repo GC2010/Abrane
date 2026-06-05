@@ -78,6 +78,7 @@ const PATHS = {
   alignC:"M3 6h18 M6 11h12 M7 16h10",
   alignR:"M3 6h18 M8 11h13 M12 16h9",
   rotateCW:"M21 12a9 9 0 01-15.8 6M3 12a9 9 0 0115.8-6 M18 3l3 3-3 3",
+  link:"M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71 M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71",
 };
 
 function Icon({name, size=18, color, stroke=1.5, style={}}) {
@@ -238,7 +239,7 @@ const initialState = project => {
       // Always clear content + user-specific
       name:'Modèle officiel ABRANE',
       files:[],contentOrder:[],annotations:{},annotSnaps:{},
-      pageNotes:{},contentZoom:{},contentPos:{},sigUrl:'',_dirty:false,
+      pageNotes:{},contentZoom:{},contentPos:{},pageAccessories:{},sigUrl:'',_dirty:false,
     };
   }
   // Supabase template opened to create a new project
@@ -248,14 +249,14 @@ const initialState = project => {
       name: project.name || project.data.client || 'Nouveau projet',
       basedOn: project.basedOn || '',
       files: [], contentOrder: [], annotations: {}, annotSnaps: {},
-      pageNotes: {}, contentZoom: {}, contentPos: {},
+      pageNotes: {}, contentZoom: {}, contentPos: {}, pageAccessories: {},
       sigUrl: '', _dirty: false,
     };
   }
   // Supabase saved project: has .data with the full saved state
   if(project?.data && typeof project.data==='object' && 'client' in project.data){
     return {
-      files:[], contentOrder:[], annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{},
+      files:[], contentOrder:[], annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, pageAccessories:{},
       ...project.data,
       _dirty:false
     };
@@ -282,7 +283,7 @@ const initialState = project => {
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, showPageNames:false, pageNameSize:11, pageNamePos:'top', pageNameX:4, _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, pageAccessories:{}, showPageNames:false, pageNameSize:11, pageNamePos:'top', pageNameX:4, _dirty:false,
   };
 };
 
@@ -1269,13 +1270,16 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){allRows.push({name:it.name,page:pgN,isCat:true});pgN+=1;}
-    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){const dn=it.label||f.name.replace(/\.[^.]+$/,'');allRows.push({name:dn,page:pgN,isCat:false});pgN+=f.pages||1;}else pgN+=1;}
+    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){const dn=it.label||f.name.replace(/\.[^.]+$/,'');allRows.push({name:dn,page:pgN,isCat:false,isAccessory:!!it.isAccessory});pgN+=f.pages||1;}else pgN+=1;}
   });
   const pageRows=allRows.slice(pageIndex*40,(pageIndex+1)*40);
   const col1=pageRows.slice(0,20),col2=pageRows.slice(20,40);
-  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'baseline',gap:4,padding:'5px 0',borderBottom:`1px dotted ${T.line}`,fontSize:11}}>
-    <span style={{flex:1,color:r.isCat?p.c2:T.ink2,fontWeight:r.isCat?700:400}}>{r.name}</span>
-    <span style={{color:r.isCat?p.c2:T.ink3,fontWeight:r.isCat?600:400}}>{String(r.page).padStart(2,'0')}</span>
+  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'center',gap:4,padding:'5px 0',borderBottom:`1px dotted ${T.line}`,fontSize:11}}>
+    <span style={{flex:1,color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink2,fontWeight:r.isCat?700:400,display:'flex',alignItems:'center',gap:3}}>
+      {r.isAccessory&&<Icon name="link" size={8} color="#5B6CA8" stroke={2}/>}
+      {r.name}
+    </span>
+    <span style={{color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink3,fontWeight:r.isCat?600:r.isAccessory?600:400}}>{String(r.page).padStart(2,'0')}</span>
   </div>;
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:'5% '+(isRing?'9% 4% 12%':'9% 4% 5%'),position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'7%',background:p.c1,borderLeft:`3px solid ${p.c2}`}}/>
@@ -1284,6 +1288,12 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
       <div>{col1.map((r,i)=><Row key={i} r={r} i={i}/>)}</div>
       {col2.length>0&&<div>{col2.map((r,i)=><Row key={i} r={r} i={i}/>)}</div>}
     </div>
+    {state.contentOrder.some(it=>it.isAccessory)&&(
+      <div style={{position:'absolute',bottom:'4%',left:isRing?'12%':'4%',display:'flex',alignItems:'center',gap:5,borderTop:`0.75px solid ${shade(p.c2,-6)}`,paddingTop:4}}>
+        <Icon name="link" size={8} color="#5B6CA8" stroke={2}/>
+        <span style={{fontSize:8,color:'#5B6CA8',fontWeight:600,letterSpacing:'.05em'}}>Accessoire / Accessory</span>
+      </div>
+    )}
     <BindingMarks isRing={isRing}/>
   </div>;
 }
@@ -1305,6 +1315,33 @@ function CatPage({state,catName,isPortrait,isRing}) {
 function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,pageKey,ordId}) {
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
   const rot=rotation||0;
+  const accIds=state.pageAccessories?.[pageKey]||[];
+  const accItems=accIds.map(id=>{
+    const ord=state.contentOrder.find(x=>x.id===id&&x.isAccessory);
+    if(!ord)return null;
+    const f=state.files.find(x=>x.id===ord.fileId);
+    if(!f)return null;
+    return{id,name:ord.label||f.name.replace(/\.[^.]+$/,''),url:f.pageUrls?.[0]||null};
+  }).filter(Boolean);
+  const hasAcc=accItems.length>0;
+  const thisOrd=state.contentOrder.find(x=>x.id===ordId);
+  const isAcc=!!thisOrd?.isAccessory;
+  const compatProducts=useMemo(()=>{
+    if(!isAcc)return[];
+    const allPages=buildPageList(state);
+    return Object.entries(state.pageAccessories||{})
+      .filter(([,ids])=>ids.includes(ordId))
+      .map(([pKey])=>{
+        const productOrdId=pKey.replace(/^f-/,'').replace(/-\d+$/,'');
+        const ord=state.contentOrder.find(x=>x.id===productOrdId);
+        if(!ord)return null;
+        const f=state.files.find(x=>x.id===ord.fileId);
+        const name=ord.label||f?.name.replace(/\.[^.]+$/,'')||'';
+        const pageNum=allPages.findIndex(p=>p.key===pKey)+1;
+        return{name,pageNum};
+      }).filter(Boolean);
+  },[state,ordId]);
+  const hasCompat=compatProducts.length>0;
   const hasAnn=!!(state.annotations?.[pageKey]);
   const displayUrl=state.annotSnaps?.[pageKey]||pageUrl;
   const cZoom=state.contentZoom?.[pageKey]??90;
@@ -1335,7 +1372,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':hasCompat?'calc(22% + 70px)':'21%'):(hasAcc?'calc(6% + 110px)':hasCompat?'calc(6% + 70px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1344,6 +1381,33 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       }
       {hasAnn&&<div style={{position:'absolute',top:4,left:4,background:T.gold,color:'#fff',fontSize:7,fontWeight:700,padding:'2px 6px',borderRadius:3,letterSpacing:'.1em',boxShadow:'0 1px 4px rgba(0,0,0,.18)'}}>ANNOTÉ</div>}
     </div>
+    {/* Accessories strip — fixed 80px thumbnails regardless of count */}
+    {hasAcc&&(
+      <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'11%',display:'flex',alignItems:'flex-start',gap:6,overflow:'visible'}}>
+        {accItems.map(({id,name,url})=>(
+          <div key={id} style={{flexShrink:0,width:80,display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+            <div style={{width:80,height:80,borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',padding:3,boxSizing:'border-box',flexShrink:0}}>
+              {url
+                ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                :<div style={{width:'100%',height:'100%',background:shade(p.c1,-4)}}/>
+              }
+            </div>
+            <div style={{width:80,fontSize:7,color:shade(p.c3,50),textAlign:'center',lineHeight:1.25,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:2}}>{name}</div>
+          </div>
+        ))}
+      </div>
+    )}
+    {/* Compatible products footer — shown only on accessory pages that are used in at least one product */}
+    {hasCompat&&(
+      <div style={{position:'absolute',bottom:isNotes?'22%':'6%',left:isRing?'14%':'4%',right:'11%',borderTop:`0.75px solid ${shade(p.c2,-6)}`,paddingTop:3}}>
+        <div style={{fontSize:6.5,color:shade(p.c3,35),lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:3}}>
+          <b>Accessoire compatible avec le(s) produit(s) :</b>{' '}{compatProducts.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · ')}
+        </div>
+        <div style={{fontSize:6.5,color:shade(p.c3,50),lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:3}}>
+          <b>Compatible accessory for product(s):</b>{' '}{compatProducts.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · ')}
+        </div>
+      </div>
+    )}
     {/* Notes zone — height 17%, bottom 3% */}
     {isNotes&&(
       <div style={{position:'absolute',left:isRing?'14%':'4%',right:'11%',bottom:'3%',height:'17%',background:'#fff',border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -2164,6 +2228,7 @@ function NotesPanel({state,update}) {
 }
 function ContentPanel({state,update,onNavigate,prominent=false}) {
   const fileInputRef=useRef(null);
+  const accFileInputRef=useRef(null);
   const [dragIdx,setDragIdx]=useState(null);
   const [overIdx,setOverIdx]=useState(null);
   const [mergeIdx,setMergeIdx]=useState(null);
@@ -2173,7 +2238,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
   const [dropHighlight,setDropHighlight]=useState(false);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
-  const processFiles=async list=>{
+  const processFiles=async(list,isAccessory=false)=>{
     if(!list.length)return;
     setImporting(true);
     const newFiles=[],newOrders=[];
@@ -2199,7 +2264,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
       const id='f'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
       newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls});
       const ordId='fi'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-      newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:''});
+      newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:'',...(isAccessory?{isAccessory:true}:{})});
     }
     update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
     setImporting(false);
@@ -2207,6 +2272,11 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
 
   const handleImport=async e=>{
     await processFiles(Array.from(e.target.files||[]));
+    e.target.value='';
+  };
+
+  const handleImportAccessory=async e=>{
+    await processFiles(Array.from(e.target.files||[]),true);
     e.target.value='';
   };
 
@@ -2417,6 +2487,17 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
       )}
       <div style={{fontSize:10,color:T.ink4,textAlign:'center',marginTop:4}}>Glissez un fichier <em>sur</em> un autre pour les afficher côte à côte</div>
     </Sect>
+    <Sect title="Accessoires">
+      <input ref={accFileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImportAccessory}/>
+      <div style={{fontSize:11,color:T.ink3,marginBottom:8,lineHeight:1.4}}>Importez les fiches accessoires. Elles génèrent leurs propres pages <em>et</em> peuvent être insérées comme miniatures dans une page produit.</div>
+      <button
+        onClick={()=>!importing&&accFileInputRef.current?.click()}
+        disabled={importing}
+        style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:6,opacity:importing?.6:1}}>
+        <Icon name="link" size={13} color={T.gold}/>
+        {importing?'Conversion…':'Importer des accessoires'}
+      </button>
+    </Sect>
     <Sect title={sectTitle}>
       <button onClick={addCategory} style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',marginBottom:6}}>
         <Icon name="plus" size={13} color={T.gold}/> Ajouter une catégorie
@@ -2489,7 +2570,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
                   <div style={{fontSize:10,color:T.ink4,display:'flex',alignItems:'center',gap:4,marginTop:2}}>
                     {isCat
                       ?<span style={{background:T.goldSoft,color:T.navy,fontSize:8.5,fontWeight:700,padding:'1px 5px',borderRadius:3,letterSpacing:'.06em'}}>CATÉGORIE</span>
-                      :<><span>{f.pages}p</span>{f.size&&<span>· {f.size}</span>}{f.type==='merged'&&<span style={{fontSize:8,fontWeight:700,background:T.navy,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>combiné</span>}</>
+                      :<><span>{f.pages}p</span>{f.size&&<span>· {f.size}</span>}{f.type==='merged'&&<span style={{fontSize:8,fontWeight:700,background:T.navy,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>combiné</span>}{item.isAccessory&&<span style={{fontSize:8,fontWeight:700,background:'#5B6CA8',color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em',display:'flex',alignItems:'center',gap:2}}><Icon name="link" size={8} color="#fff" stroke={2}/>accessoire</span>}</>
                     }
                   </div>
                 </div>
@@ -3195,7 +3276,79 @@ function VueEnsembleModal({state,update,onClose}) {
   </div></Scrim>;
 }
 
-function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed,selectedPages=null,onTogglePageSelect=null,onImportFromPage=null,importingFromPage=false}) {
+// ── ACCESSORIES PICKER MODAL ─────────────────────────────────
+function AccessoriesPickerModal({state,update,pageKey,onClose}) {
+  const accessories=state.contentOrder.filter(x=>x.type==='file'&&x.isAccessory);
+  const selected=state.pageAccessories?.[pageKey]||[];
+  const isP=state.pageFormat.startsWith('v');
+  const thumbH=90;
+  const thumbW=Math.round(thumbH*(isP?3/4:4/3));
+
+  const toggle=id=>{
+    const curr=state.pageAccessories?.[pageKey]||[];
+    const next=curr.includes(id)
+      ?curr.filter(x=>x!==id)
+      :(curr.length>=10?curr:[...curr,id]);
+    update({pageAccessories:{...(state.pageAccessories||{}),[pageKey]:next}});
+  };
+
+  return(
+    <Scrim onClose={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'auto',maxWidth:860,minWidth:360,maxHeight:'80vh',background:T.surface,borderRadius:16,display:'flex',flexDirection:'column',boxShadow:'0 32px 80px rgba(0,0,0,.3)',border:`1px solid ${T.line}`,overflow:'hidden'}}>
+
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px',borderBottom:`1px solid ${T.lineSoft}`,flexShrink:0}}>
+          <Icon name="link" size={16} color={T.navy}/>
+          <span style={{fontSize:15,fontWeight:600,color:T.ink}}>Accessoires de la page</span>
+          <span style={{...pillSt(),fontSize:10}}>{selected.length}/10 sélectionnés</span>
+          <div style={{flex:1}}/>
+          <button onClick={onClose} style={{background:'transparent',border:`1px solid ${T.line}`,borderRadius:6,padding:'5px 8px',cursor:'pointer',display:'flex',alignItems:'center'}}>
+            <Icon name="close" size={15} color={T.ink3}/>
+          </button>
+        </div>
+
+        {/* Grid */}
+        <div style={{flex:1,overflowY:'auto',padding:18,display:'flex',flexWrap:'wrap',gap:10,alignContent:'flex-start',minHeight:180}}>
+          {accessories.length===0?(
+            <div style={{width:'100%',textAlign:'center',padding:'32px 16px',color:T.ink4,fontSize:12,fontStyle:'italic'}}>
+              Aucun accessoire importé.<br/>Utilisez "Importer des accessoires" dans le panneau Contenu.
+            </div>
+          ):accessories.map(item=>{
+            const f=state.files.find(x=>x.id===item.fileId);
+            if(!f)return null;
+            const name=item.label||f.name.replace(/\.[^.]+$/,'');
+            const url=f.pageUrls?.[0]||null;
+            const isSel=selected.includes(item.id);
+            const isDisabled=!isSel&&selected.length>=10;
+            return(
+              <div key={item.id} onClick={()=>!isDisabled&&toggle(item.id)}
+                style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5,cursor:isDisabled?'not-allowed':'pointer',opacity:isDisabled?.38:1,transition:'opacity .15s'}}>
+                <div style={{width:thumbW,height:thumbH,overflow:'hidden',borderRadius:3,position:'relative',border:`1.5px solid ${isSel?T.navy:T.line}`,boxShadow:isSel?`0 0 0 2px ${T.navyTint}`:'none',background:'#fff',transition:'border-color .12s,box-shadow .12s'}}>
+                  {url
+                    ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                    :<div style={{width:'100%',height:'100%',display:'grid',placeItems:'center'}}><Icon name="image" size={24} color={T.ink5}/></div>
+                  }
+                  {isSel&&<div style={{position:'absolute',top:3,right:3,width:16,height:16,borderRadius:'50%',background:T.navy,display:'grid',placeItems:'center'}}>
+                    <Icon name="check" size={10} color="#fff" stroke={3}/>
+                  </div>}
+                </div>
+                <div style={{fontSize:9,color:isSel?T.navy:T.ink3,maxWidth:Math.max(thumbW,50),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center',fontWeight:isSel?600:400}}>{name}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 18px',borderTop:`1px solid ${T.lineSoft}`,flexShrink:0,background:T.panel}}>
+          <div style={{fontSize:11,color:T.ink3}}>{selected.length} accessoire{selected.length!==1?'s':''} sélectionné{selected.length!==1?'s':''}</div>
+          <button style={btnSt('primary')} onClick={onClose}><Icon name="check" size={13} color="#fff"/>Confirmer</button>
+        </div>
+      </div>
+    </Scrim>
+  );
+}
+
+function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed,selectedPages=null,onTogglePageSelect=null,onImportFromPage=null,importingFromPage=false,onOpenAccessories=null}) {
   const stripRef=useRef(null);
   const importFromPageRef=useRef(null);
   const importModeRef=useRef('add');
@@ -3281,6 +3434,7 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
           const isActive=activePage===i;
           const isSel=selectedPages?.has(i)??false;
           const hasNotes=page.type==='content'&&!!(state.pageNotes?.[page.key]);
+          const isAccPage=page.type==='content'&&!!state.contentOrder.find(x=>x.id===page.ordId)?.isAccessory;
           const borderCol=isSel?'#6366F1':isActive?T.gold:hasNotes?'#E53E3E':'rgba(255,255,255,.18)';
           return (
             <div key={page.key} onClick={(e)=>{
@@ -3305,6 +3459,15 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                   padding:'0.5px 3px',borderRadius:1.5,letterSpacing:'.04em',
                   pointerEvents:'none'
                 }}>{i+1}</div>
+                {isAccPage&&<div style={{
+                  position:'absolute',top:2,left:2,zIndex:2,
+                  background:'#5B6CA8',borderRadius:2,
+                  padding:'1px 3px',display:'flex',alignItems:'center',gap:1.5,
+                  pointerEvents:'none'
+                }}>
+                  <Icon name="link" size={6} color="#fff" stroke={2}/>
+                  <span style={{fontSize:6,fontWeight:700,color:'#fff',letterSpacing:'.04em',lineHeight:1}}>accessoire</span>
+                </div>}
                 {isSel&&<div style={{
                   position:'absolute',bottom:2,left:2,zIndex:2,
                   background:'#6366F1',borderRadius:'50%',
@@ -3325,6 +3488,12 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                     style={{position:'absolute',bottom:19,left:2,right:2,zIndex:3,background:T.gold,borderRadius:3,height:15,display:'flex',alignItems:'center',justifyContent:'center',gap:3,cursor:importingFromPage?'wait':'pointer',opacity:importingFromPage?0.6:1,transition:'opacity .15s',overflow:'hidden'}}>
                     <Icon name="refresh" size={8} color="#fff"/>
                     <span style={{fontSize:7,fontWeight:700,color:'#fff',whiteSpace:'nowrap',letterSpacing:'.04em'}}>Remplacer</span>
+                  </div>}
+                  {pages[activePage]?.type==='content'&&onOpenAccessories&&!state.contentOrder.find(x=>x.id===pages[activePage]?.ordId)?.isAccessory&&<div title="Accessoires"
+                    onClick={e=>{e.stopPropagation();onOpenAccessories(pages[activePage].key);}}
+                    style={{position:'absolute',bottom:36,left:2,right:2,zIndex:3,background:'#5B6CA8',borderRadius:3,height:15,display:'flex',alignItems:'center',justifyContent:'center',gap:3,cursor:'pointer',overflow:'hidden'}}>
+                    <Icon name="link" size={8} color="#fff" stroke={2}/>
+                    <span style={{fontSize:7,fontWeight:700,color:'#fff',whiteSpace:'nowrap',letterSpacing:'.04em'}}>Accessoires</span>
                   </div>}
                 </>}
                 <div style={{
@@ -3968,6 +4137,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2800);};
 
   const [importingFromPage,setImportingFromPage]=useState(false);
+  const [accessoriesModal,setAccessoriesModal]=useState(null);
 
   const processFilesFromPage=useCallback(async(fileList,insertBeforeOrdId,mode='add')=>{
     if(!fileList.length)return;
@@ -3993,8 +4163,21 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       const idx=insertIdx<0?s.contentOrder.length:insertIdx;
       const newOrder=[...s.contentOrder];
       let newFilesArr=[...s.files,...newFiles];
+      let newPageAcc=s.pageAccessories||{};
       if(mode==='replace'&&insertIdx>=0){
         const removed=s.contentOrder[idx];
+        // Preserve isAccessory flag and remap pageAccessories refs to new ordId
+        if(removed?.isAccessory){
+          newOrders.forEach(o=>{o.isAccessory=true;});
+          if(newOrders.length===1){
+            const oldId=removed.id,newId=newOrders[0].id;
+            const updated={};
+            for(const [pk,ids] of Object.entries(newPageAcc)){
+              updated[pk]=ids.map(id=>id===oldId?newId:id);
+            }
+            newPageAcc=updated;
+          }
+        }
         newOrder.splice(idx,1,...newOrders);
         if(removed?.type==='file'){
           const stillUsed=newOrder.some(x=>x.type==='file'&&x.fileId===removed.fileId);
@@ -4003,7 +4186,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       }else{
         newOrder.splice(idx,0,...newOrders);
       }
-      return {...s,files:newFilesArr,contentOrder:newOrder,_dirty:true};
+      return {...s,files:newFilesArr,contentOrder:newOrder,pageAccessories:newPageAcc,_dirty:true};
     });
     setDirtySteps(d=>({...d,content:true}));
     setImportingFromPage(false);
@@ -4111,8 +4294,10 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
         thumbSize={thumbSize} setThumbSize={setThumbSize}
         onOpenVueEnsemble={()=>setShowVueEnsemble(true)}
         collapsed={paletteCollapsed} setCollapsed={setPaletteCollapsed}
-        onImportFromPage={processFilesFromPage} importingFromPage={importingFromPage}/>
+        onImportFromPage={processFilesFromPage} importingFromPage={importingFromPage}
+        onOpenAccessories={pageKey=>setAccessoriesModal(pageKey)}/>
     </div>
+    {accessoriesModal&&<AccessoriesPickerModal state={state} update={update} pageKey={accessoriesModal} onClose={()=>setAccessoriesModal(null)}/>}
     {state._dirty&&<div style={{position:'fixed',bottom:paletteH+16,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:8,background:'rgba(20,20,30,.92)',backdropFilter:'blur(20px)',borderRadius:999,padding:'6px 8px 6px 14px',zIndex:30,boxShadow:'0 8px 24px rgba(0,0,0,.22)'}}>
       <span style={{fontSize:11.5,color:'rgba(255,255,255,.6)'}}>Modifications non enregistrées</span>
       <button onClick={save} style={{background:T.surface,border:'none',color:T.ink,padding:'5px 12px',fontSize:12,borderRadius:999,display:'inline-flex',alignItems:'center',gap:5,fontWeight:600,cursor:'pointer'}}><Icon name="save" size={13} color={T.ink}/>Enregistrer</button>
