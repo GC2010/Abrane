@@ -78,6 +78,7 @@ const PATHS = {
   alignC:"M3 6h18 M6 11h12 M7 16h10",
   alignR:"M3 6h18 M8 11h13 M12 16h9",
   rotateCW:"M21 12a9 9 0 01-15.8 6M3 12a9 9 0 0115.8-6 M18 3l3 3-3 3",
+  link:"M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71 M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71",
 };
 
 function Icon({name, size=18, color, stroke=1.5, style={}}) {
@@ -238,7 +239,7 @@ const initialState = project => {
       // Always clear content + user-specific
       name:'Modèle officiel ABRANE',
       files:[],contentOrder:[],annotations:{},annotSnaps:{},
-      pageNotes:{},contentZoom:{},contentPos:{},sigUrl:'',_dirty:false,
+      pageNotes:{},contentZoom:{},contentPos:{},pageAccessories:{},sigUrl:'',_dirty:false,
     };
   }
   // Supabase template opened to create a new project
@@ -248,14 +249,14 @@ const initialState = project => {
       name: project.name || project.data.client || 'Nouveau projet',
       basedOn: project.basedOn || '',
       files: [], contentOrder: [], annotations: {}, annotSnaps: {},
-      pageNotes: {}, contentZoom: {}, contentPos: {},
+      pageNotes: {}, contentZoom: {}, contentPos: {}, pageAccessories: {},
       sigUrl: '', _dirty: false,
     };
   }
   // Supabase saved project: has .data with the full saved state
   if(project?.data && typeof project.data==='object' && 'client' in project.data){
     return {
-      files:[], contentOrder:[], annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{},
+      files:[], contentOrder:[], annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, pageAccessories:{},
       ...project.data,
       _dirty:false
     };
@@ -282,7 +283,7 @@ const initialState = project => {
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, showPageNames:false, pageNameSize:11, pageNamePos:'top', pageNameX:4, _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, pageAccessories:{}, showPageNames:false, pageNameSize:11, pageNamePos:'top', pageNameX:4, _dirty:false,
   };
 };
 
@@ -1305,6 +1306,15 @@ function CatPage({state,catName,isPortrait,isRing}) {
 function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,pageKey,ordId}) {
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
   const rot=rotation||0;
+  const accIds=state.pageAccessories?.[pageKey]||[];
+  const accItems=accIds.map(id=>{
+    const ord=state.contentOrder.find(x=>x.id===id&&x.isAccessory);
+    if(!ord)return null;
+    const f=state.files.find(x=>x.id===ord.fileId);
+    if(!f)return null;
+    return{id,name:ord.label||f.name.replace(/\.[^.]+$/,''),url:f.pageUrls?.[0]||null};
+  }).filter(Boolean);
+  const hasAcc=accItems.length>0;
   const hasAnn=!!(state.annotations?.[pageKey]);
   const displayUrl=state.annotSnaps?.[pageKey]||pageUrl;
   const cZoom=state.contentZoom?.[pageKey]??90;
@@ -1335,7 +1345,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'34%':'21%'):(hasAcc?'17%':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1344,6 +1354,22 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       }
       {hasAnn&&<div style={{position:'absolute',top:4,left:4,background:T.gold,color:'#fff',fontSize:7,fontWeight:700,padding:'2px 6px',borderRadius:3,letterSpacing:'.1em',boxShadow:'0 1px 4px rgba(0,0,0,.18)'}}>ANNOTÉ</div>}
     </div>
+    {/* Accessories strip */}
+    {hasAcc&&(
+      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',height:'12%',display:'flex',alignItems:'stretch',gap:'1.5%',overflow:'hidden'}}>
+        {accItems.map(({id,name,url})=>(
+          <div key={id} style={{display:'flex',flexDirection:'column',alignItems:'center',flex:'0 0 auto',maxWidth:'22%',overflow:'hidden'}}>
+            <div style={{flex:1,width:'100%',borderRadius:2,overflow:'hidden',border:`1px solid ${shade(p.c2,-10)}`,background:p.c1}}>
+              {url
+                ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                :<div style={{width:'100%',height:'100%',background:shade(p.c1,-4)}}/>
+              }
+            </div>
+            <div style={{fontSize:'4.5%',color:shade(p.c3,50),textAlign:'center',lineHeight:1.2,marginTop:'2%',maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
+          </div>
+        ))}
+      </div>
+    )}
     {/* Notes zone — height 17%, bottom 3% */}
     {isNotes&&(
       <div style={{position:'absolute',left:isRing?'14%':'4%',right:'11%',bottom:'3%',height:'17%',background:'#fff',border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -2164,6 +2190,7 @@ function NotesPanel({state,update}) {
 }
 function ContentPanel({state,update,onNavigate,prominent=false}) {
   const fileInputRef=useRef(null);
+  const accFileInputRef=useRef(null);
   const [dragIdx,setDragIdx]=useState(null);
   const [overIdx,setOverIdx]=useState(null);
   const [mergeIdx,setMergeIdx]=useState(null);
@@ -2173,7 +2200,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
   const [dropHighlight,setDropHighlight]=useState(false);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
-  const processFiles=async list=>{
+  const processFiles=async(list,isAccessory=false)=>{
     if(!list.length)return;
     setImporting(true);
     const newFiles=[],newOrders=[];
@@ -2199,7 +2226,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
       const id='f'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
       newFiles.push({id,name:file.name,type:ext,pages:pageCount,size:sz,pageUrls});
       const ordId='fi'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-      newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:''});
+      newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:'',...(isAccessory?{isAccessory:true}:{})});
     }
     update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
     setImporting(false);
@@ -2207,6 +2234,11 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
 
   const handleImport=async e=>{
     await processFiles(Array.from(e.target.files||[]));
+    e.target.value='';
+  };
+
+  const handleImportAccessory=async e=>{
+    await processFiles(Array.from(e.target.files||[]),true);
     e.target.value='';
   };
 
@@ -2417,6 +2449,17 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
       )}
       <div style={{fontSize:10,color:T.ink4,textAlign:'center',marginTop:4}}>Glissez un fichier <em>sur</em> un autre pour les afficher côte à côte</div>
     </Sect>
+    <Sect title="Accessoires">
+      <input ref={accFileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImportAccessory}/>
+      <div style={{fontSize:11,color:T.ink3,marginBottom:8,lineHeight:1.4}}>Importez les fiches accessoires. Elles génèrent leurs propres pages <em>et</em> peuvent être insérées comme miniatures dans une page produit.</div>
+      <button
+        onClick={()=>!importing&&accFileInputRef.current?.click()}
+        disabled={importing}
+        style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:6,opacity:importing?.6:1}}>
+        <Icon name="link" size={13} color={T.gold}/>
+        {importing?'Conversion…':'Importer des accessoires'}
+      </button>
+    </Sect>
     <Sect title={sectTitle}>
       <button onClick={addCategory} style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',marginBottom:6}}>
         <Icon name="plus" size={13} color={T.gold}/> Ajouter une catégorie
@@ -2489,7 +2532,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
                   <div style={{fontSize:10,color:T.ink4,display:'flex',alignItems:'center',gap:4,marginTop:2}}>
                     {isCat
                       ?<span style={{background:T.goldSoft,color:T.navy,fontSize:8.5,fontWeight:700,padding:'1px 5px',borderRadius:3,letterSpacing:'.06em'}}>CATÉGORIE</span>
-                      :<><span>{f.pages}p</span>{f.size&&<span>· {f.size}</span>}{f.type==='merged'&&<span style={{fontSize:8,fontWeight:700,background:T.navy,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>combiné</span>}</>
+                      :<><span>{f.pages}p</span>{f.size&&<span>· {f.size}</span>}{f.type==='merged'&&<span style={{fontSize:8,fontWeight:700,background:T.navy,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>combiné</span>}{item.isAccessory&&<span style={{fontSize:8,fontWeight:700,background:'#5B6CA8',color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em',display:'flex',alignItems:'center',gap:2}}><Icon name="link" size={8} color="#fff" stroke={2}/>accessoire</span>}</>
                     }
                   </div>
                 </div>
@@ -3195,7 +3238,75 @@ function VueEnsembleModal({state,update,onClose}) {
   </div></Scrim>;
 }
 
-function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed,selectedPages=null,onTogglePageSelect=null,onImportFromPage=null,importingFromPage=false}) {
+// ── ACCESSORIES PICKER MODAL ─────────────────────────────────
+function AccessoriesPickerModal({state,update,pageKey,onClose}) {
+  const p=state.palette;
+  const accessories=state.contentOrder.filter(x=>x.type==='file'&&x.isAccessory);
+  const selected=state.pageAccessories?.[pageKey]||[];
+
+  const toggle=id=>{
+    const curr=state.pageAccessories?.[pageKey]||[];
+    const next=curr.includes(id)
+      ?curr.filter(x=>x!==id)
+      :(curr.length>=4?curr:[...curr,id]);
+    update({pageAccessories:{...(state.pageAccessories||{}),[pageKey]:next}});
+  };
+
+  return(
+    <Scrim onClose={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:14,padding:24,width:480,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 60px rgba(0,0,0,.22)'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <Icon name="link" size={16} color={T.gold}/>
+            <span style={{fontSize:15,fontWeight:700,color:T.ink}}>Accessoires de la page</span>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:11,color:T.ink4}}>{selected.length}/4 sélectionnés</span>
+            <button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',padding:4,borderRadius:4,display:'grid',placeItems:'center'}}>
+              <Icon name="close" size={16} color={T.ink3}/>
+            </button>
+          </div>
+        </div>
+        {accessories.length===0?(
+          <div style={{textAlign:'center',padding:'32px 16px',color:T.ink4,fontSize:12,fontStyle:'italic'}}>
+            Aucun accessoire importé.<br/>Utilisez "Importer des accessoires" dans le panneau Contenu.
+          </div>
+        ):(
+          <div style={{overflowY:'auto',display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,paddingRight:4}}>
+            {accessories.map(item=>{
+              const f=state.files.find(x=>x.id===item.fileId);
+              if(!f)return null;
+              const name=item.label||f.name.replace(/\.[^.]+$/,'');
+              const url=f.pageUrls?.[0]||null;
+              const isSel=selected.includes(item.id);
+              const isDisabled=!isSel&&selected.length>=4;
+              return(
+                <div key={item.id} onClick={()=>!isDisabled&&toggle(item.id)}
+                  style={{cursor:isDisabled?'not-allowed':'pointer',borderRadius:8,border:`2px solid ${isSel?T.gold:T.lineSoft}`,background:isSel?T.goldTint:T.panel,overflow:'hidden',opacity:isDisabled?.45:1,transition:'border-color .15s,background .15s'}}>
+                  <div style={{aspectRatio:'1/1',background:T.panel2,position:'relative',overflow:'hidden'}}>
+                    {url
+                      ?<img src={url} alt={name} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
+                      :<div style={{width:'100%',height:'100%',display:'grid',placeItems:'center'}}><Icon name="image" size={22} color={T.ink5}/></div>
+                    }
+                    {isSel&&<div style={{position:'absolute',top:4,right:4,width:16,height:16,borderRadius:'50%',background:T.gold,display:'grid',placeItems:'center'}}>
+                      <Icon name="check" size={10} color="#fff" stroke={3}/>
+                    </div>}
+                  </div>
+                  <div style={{padding:'4px 5px',fontSize:9,fontWeight:500,color:T.ink2,textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div style={{marginTop:16,display:'flex',justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{...btnSt('primary'),paddingLeft:20,paddingRight:20}}>Confirmer</button>
+        </div>
+      </div>
+    </Scrim>
+  );
+}
+
+function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,onOpenVueEnsemble,collapsed,setCollapsed,selectedPages=null,onTogglePageSelect=null,onImportFromPage=null,importingFromPage=false,onOpenAccessories=null}) {
   const stripRef=useRef(null);
   const importFromPageRef=useRef(null);
   const importModeRef=useRef('add');
@@ -3325,6 +3436,12 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                     style={{position:'absolute',bottom:19,left:2,right:2,zIndex:3,background:T.gold,borderRadius:3,height:15,display:'flex',alignItems:'center',justifyContent:'center',gap:3,cursor:importingFromPage?'wait':'pointer',opacity:importingFromPage?0.6:1,transition:'opacity .15s',overflow:'hidden'}}>
                     <Icon name="refresh" size={8} color="#fff"/>
                     <span style={{fontSize:7,fontWeight:700,color:'#fff',whiteSpace:'nowrap',letterSpacing:'.04em'}}>Remplacer</span>
+                  </div>}
+                  {pages[activePage]?.type==='content'&&onOpenAccessories&&<div title="Accessoires"
+                    onClick={e=>{e.stopPropagation();onOpenAccessories(pages[activePage].key);}}
+                    style={{position:'absolute',bottom:36,left:2,right:2,zIndex:3,background:'#5B6CA8',borderRadius:3,height:15,display:'flex',alignItems:'center',justifyContent:'center',gap:3,cursor:'pointer',overflow:'hidden'}}>
+                    <Icon name="link" size={8} color="#fff" stroke={2}/>
+                    <span style={{fontSize:7,fontWeight:700,color:'#fff',whiteSpace:'nowrap',letterSpacing:'.04em'}}>Accessoires</span>
                   </div>}
                 </>}
                 <div style={{
@@ -3968,6 +4085,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2800);};
 
   const [importingFromPage,setImportingFromPage]=useState(false);
+  const [accessoriesModal,setAccessoriesModal]=useState(null);
 
   const processFilesFromPage=useCallback(async(fileList,insertBeforeOrdId,mode='add')=>{
     if(!fileList.length)return;
@@ -4111,8 +4229,10 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
         thumbSize={thumbSize} setThumbSize={setThumbSize}
         onOpenVueEnsemble={()=>setShowVueEnsemble(true)}
         collapsed={paletteCollapsed} setCollapsed={setPaletteCollapsed}
-        onImportFromPage={processFilesFromPage} importingFromPage={importingFromPage}/>
+        onImportFromPage={processFilesFromPage} importingFromPage={importingFromPage}
+        onOpenAccessories={pageKey=>setAccessoriesModal(pageKey)}/>
     </div>
+    {accessoriesModal&&<AccessoriesPickerModal state={state} update={update} pageKey={accessoriesModal} onClose={()=>setAccessoriesModal(null)}/>}
     {state._dirty&&<div style={{position:'fixed',bottom:paletteH+16,left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:8,background:'rgba(20,20,30,.92)',backdropFilter:'blur(20px)',borderRadius:999,padding:'6px 8px 6px 14px',zIndex:30,boxShadow:'0 8px 24px rgba(0,0,0,.22)'}}>
       <span style={{fontSize:11.5,color:'rgba(255,255,255,.6)'}}>Modifications non enregistrées</span>
       <button onClick={save} style={{background:T.surface,border:'none',color:T.ink,padding:'5px 12px',fontSize:12,borderRadius:999,display:'inline-flex',alignItems:'center',gap:5,fontWeight:600,cursor:'pointer'}}><Icon name="save" size={13} color={T.ink}/>Enregistrer</button>
