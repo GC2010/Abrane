@@ -1288,6 +1288,12 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
       <div>{col1.map((r,i)=><Row key={i} r={r} i={i}/>)}</div>
       {col2.length>0&&<div>{col2.map((r,i)=><Row key={i} r={r} i={i}/>)}</div>}
     </div>
+    {state.contentOrder.some(it=>it.isAccessory)&&(
+      <div style={{position:'absolute',bottom:'4%',left:isRing?'12%':'4%',display:'flex',alignItems:'center',gap:5,borderTop:`0.75px solid ${shade(p.c2,-6)}`,paddingTop:4}}>
+        <Icon name="link" size={8} color="#5B6CA8" stroke={2}/>
+        <span style={{fontSize:8,color:'#5B6CA8',fontWeight:600,letterSpacing:'.05em'}}>Accessoire / Accessory</span>
+      </div>
+    )}
     <BindingMarks isRing={isRing}/>
   </div>;
 }
