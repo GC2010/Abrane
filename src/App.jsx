@@ -100,6 +100,10 @@ const ADMIN_PASS = 'ABRANE2026';
 
 const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},stampLogo:'',setBrand:()=>{}});
 
+const NavCtx = React.createContext(null);
+// Layout constants (fractions of page size) — shared by NavStripe render and addPdfLinks annotations
+const NAV={stripeXPct:.92,stripeWPct:.08,catYStartPct:.34,catYEndPct:.81,maxCats:8,idxYPct:.835,idxHPct:.038,matYPct:.880,matHPct:.038};
+
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
 ];
@@ -1274,11 +1278,13 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   });
   const pageRows=allRows.slice(pageIndex*40,(pageIndex+1)*40);
   const col1=pageRows.slice(0,20),col2=pageRows.slice(20,40);
+  const nav=React.useContext(NavCtx);
   const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'center',gap:4,padding:'5px 0',borderBottom:`1px dotted ${T.line}`,fontSize:11}}>
     <span style={{flex:1,color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink2,fontWeight:r.isCat?700:400,display:'flex',alignItems:'center',gap:3}}>
       {r.isAccessory&&<Icon name="link" size={8} color="#5B6CA8" stroke={2}/>}
       {r.name}
     </span>
+    {nav&&!r.isCat&&<span style={{fontSize:9,color:shade(p.c2,-8),opacity:.55,flexShrink:0,lineHeight:1}}>›</span>}
     <span style={{color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink3,fontWeight:r.isCat?600:r.isAccessory?600:400}}>{String(r.page).padStart(2,'0')}</span>
   </div>;
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:'5% '+(isRing?'9% 4% 12%':'9% 4% 5%'),position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
@@ -1315,6 +1321,7 @@ function CatPage({state,catName,isPortrait,isRing}) {
 function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,pageKey,ordId}) {
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
   const rot=rotation||0;
+  const nav=React.useContext(NavCtx);
   const accIds=state.pageAccessories?.[pageKey]||[];
   const accItems=accIds.map(id=>{
     const ord=state.contentOrder.find(x=>x.id===id&&x.isAccessory);
@@ -1370,6 +1377,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
       <StripeAbraneLogo/>
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
+      {nav&&<NavStripe nav={{...nav,currentCatKey:nav.ordCatMap?.[ordId]||null}} state={state}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
     <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':hasCompat?'calc(22% + 70px)':'21%'):(hasAcc?'calc(6% + 110px)':hasCompat?'calc(6% + 70px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1631,10 +1639,106 @@ function ExportPageWrapper({page,pageIndex,totalPages,state}) {
   );
 }
 
+// ── PDF INTERACTIF helpers ────────────────────────────────────
+
+function buildIndexRows(state){
+  const tot=state.contentOrder.filter(it=>it.type==='cat'||(state.idxMode!=='cats'&&state.files.find(x=>x.id===it.fileId))).length;
+  const nI=Math.max(1,Math.ceil(tot/40));
+  let pgN=2+nI;
+  if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
+  const rows=[];
+  state.contentOrder.forEach(it=>{
+    if(it.type==='cat'){rows.push({name:it.name,page:pgN,isCat:true});pgN++;}
+    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){rows.push({name:it.label||f.name.replace(/\.[^.]+$/,''),page:pgN,isCat:false});pgN+=f.pages||1;}else pgN++;}
+  });
+  return rows;
+}
+
+function buildNavData(state,pages){
+  const pageMap={};
+  pages.forEach((p,i)=>{pageMap[p.key]=i+1;});
+  const idxPage=pages.find(p=>p.type==='index');
+  const matPage=pages.find(p=>p.type==='materials');
+  const categories=[];
+  pages.forEach(p=>{if(p.type==='category')categories.push({name:p.catName,key:p.key,pageNum:pageMap[p.key]});});
+  const ordCatMap={};
+  let lastCatKey=null;
+  state.contentOrder.forEach(it=>{
+    if(it.type==='cat')lastCatKey='cat-'+it.id;
+    else ordCatMap[it.id]=lastCatKey;
+  });
+  return{pageMap,idxPageNum:idxPage?pageMap[idxPage.key]:null,matPageNum:matPage?pageMap[matPage.key]:null,categories,ordCatMap};
+}
+
+function addPdfLinks(pdf,page,navData,state,isP){
+  const pageW=isP?210:297,pageH=isP?297:210;
+  const BW=isP?794:1123,BH=isP?1123:794;
+  const isR=state.pageFormat.includes('ring');
+  const{pageMap,idxPageNum,matPageNum,categories}=navData;
+  const curN=pageMap[page.key];
+  const go=(x,y,w,h,n)=>{if(n&&n!==curN&&w>0&&h>0)try{pdf.link(x,y,w,h,{pageNumber:n});}catch(_){}};
+  const sX=NAV.stripeXPct*pageW,sW=NAV.stripeWPct*pageW;
+  // Stripe nav: cat tabs + IDX + MAT (all pages except cover/back)
+  if(page.type!=='cover'&&page.type!=='back'){
+    go(sX,NAV.idxYPct*pageH,sW,NAV.idxHPct*pageH,idxPageNum);
+    if(matPageNum)go(sX,NAV.matYPct*pageH,sW,NAV.matHPct*pageH,matPageNum);
+    const MAX=Math.min(categories.length,NAV.maxCats);
+    if(MAX>0){const aH=(NAV.catYEndPct-NAV.catYStartPct)*pageH/MAX;
+      categories.slice(0,MAX).forEach((c,i)=>go(sX,(NAV.catYStartPct*pageH+i*aH),sW,aH*.87,c.pageNum));}
+  }
+  // Index: each row → its page
+  if(page.type==='index'){
+    const pI=page.pageIndex||0,rows=buildIndexRows(state);
+    const pRows=rows.slice(pI*40,(pI+1)*40);
+    const lPx=BW*(isR?.12:.05),tPx=BH*.05+34,rH=22;
+    const cW=(BW-lPx-BW*.09-16)/2;
+    const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
+    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});
+    if(pRows.length>20){const c2X=lPx+cW+16;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
+  }
+  // Content: accessory thumbnails → accessory pages
+  if(page.type==='content'){
+    const accIds=state.pageAccessories?.[page.key]||[];
+    const isNotes=state.pageFormat.includes('notes');
+    const botPct=isNotes?.23:.06;
+    const lPx=BW*(isR?.14:.04);
+    accIds.forEach((id,i)=>{
+      const ord=state.contentOrder.find(x=>x.id===id&&x.isAccessory);
+      if(!ord)return;
+      const n=pageMap['f-'+ord.id+'-0'];
+      if(!n)return;
+      const xPx=lPx+i*86,yPx=BH*(1-botPct)-80;
+      go(xPx/BW*pageW,yPx/BH*pageH,80/BW*pageW,97/BH*pageH,n);
+    });
+  }
+}
+
+function NavStripe({nav,state}){
+  const p=state.palette;
+  const{categories,idxPageNum,matPageNum,currentCatKey}=nav;
+  const cats=categories.slice(0,NAV.maxCats);
+  const n=cats.length;
+  const tH=n>0?(NAV.catYEndPct-NAV.catYStartPct)/n:0;
+  return<>
+    {cats.map((cat,i)=>{
+      const isCurr=cat.key===currentCatKey;
+      return<div key={cat.key} style={{position:'absolute',top:`${(NAV.catYStartPct+i*tH)*100}%`,height:`${tH*.87*100}%`,left:'8%',right:'8%',borderRadius:2,background:isCurr?p.c2:shade(p.c1,-10),display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+        <span style={{fontSize:5,fontWeight:700,letterSpacing:'.06em',color:isCurr?'#fff':shade(p.c3,25),transform:'rotate(-90deg)',whiteSpace:'nowrap',display:'block',maxWidth:'200%',overflow:'hidden',textOverflow:'ellipsis'}}>
+          {cat.name.length>13?cat.name.slice(0,12)+'…':cat.name}
+        </span>
+      </div>;
+    })}
+    {categories.length>NAV.maxCats&&<div style={{position:'absolute',top:`${(NAV.catYEndPct-.025)*100}%`,height:'3%',left:'8%',right:'8%',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:5,color:shade(p.c3,50)}}>···</span></div>}
+    {idxPageNum&&<div style={{position:'absolute',top:`${NAV.idxYPct*100}%`,height:`${NAV.idxHPct*100}%`,left:'6%',right:'6%',borderRadius:2,background:T.navy,display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:5,fontWeight:800,color:'#fff',letterSpacing:'.12em'}}>IDX</span></div>}
+    {matPageNum&&<div style={{position:'absolute',top:`${NAV.matYPct*100}%`,height:`${NAV.matHPct*100}%`,left:'6%',right:'6%',borderRadius:2,background:shade(p.c2,-5),display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:5,fontWeight:800,color:'#fff',letterSpacing:'.12em'}}>MAT</span></div>}
+  </>;
+}
+
 function PdfExportModal({state,onClose}) {
   const [quality,setQuality]=useState('standard');
   const [withAnnot,setWithAnnot]=useState(true);
   const [withOverlays,setWithOverlays]=useState(true);
+  const [withInteractive,setWithInteractive]=useState(true);
   const [exporting,setExporting]=useState(false);
   const [done,setDone]=useState(0);
   const abortRef=useRef(false);
@@ -1654,27 +1758,32 @@ function PdfExportModal({state,onClose}) {
     try{
       const [{jsPDF},{default:h2c}]=await Promise.all([import('jspdf'),import('html2canvas')]);
       const pdf=new jsPDF({orientation:isP?'portrait':'landscape',unit:'mm',format:'a4',compress:true});
+      const navData=withInteractive?buildNavData(exportState,pages):null;
       for(let i=0;i<pages.length;i++){
         if(abortRef.current) break;
         el=document.createElement('div');
         el.style.cssText=`position:absolute;left:-${BW*4}px;top:0;width:${BW}px;height:${BH}px;overflow:hidden;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;`;
         document.body.appendChild(el);
         root=createRoot(el);
+        const navCtxVal=navData?{...navData,currentCatKey:navData.ordCatMap?.[pages[i].ordId]||null}:null;
         root.render(
-          <BrandCtx.Provider value={brandCtx}>
-            <NotesEditCtx.Provider value={null}>
-              {withOverlays
-                ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
-                :<PageRender page={pages[i]} state={exportState}/>
-              }
-            </NotesEditCtx.Provider>
-          </BrandCtx.Provider>
+          <NavCtx.Provider value={navCtxVal}>
+            <BrandCtx.Provider value={brandCtx}>
+              <NotesEditCtx.Provider value={null}>
+                {withOverlays
+                  ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
+                  :<PageRender page={pages[i]} state={exportState}/>
+                }
+              </NotesEditCtx.Provider>
+            </BrandCtx.Provider>
+          </NavCtx.Provider>
         );
         await new Promise(r=>setTimeout(r,280));
         if(abortRef.current){root.unmount();document.body.removeChild(el);el=null;root=null;break;}
         const canvas=await h2c(el,{scale:cfg.scale,useCORS:true,allowTaint:true,logging:false,width:BW,height:BH,windowWidth:BW,windowHeight:BH,imageTimeout:5000});
         if(i>0) pdf.addPage();
         pdf.addImage(canvas.toDataURL('image/jpeg',cfg.q),'JPEG',0,0,isP?210:297,isP?297:210);
+        if(navData)addPdfLinks(pdf,pages[i],navData,exportState,isP);
         root.unmount();document.body.removeChild(el);el=null;root=null;
         setDone(i+1);
       }
@@ -1687,7 +1796,7 @@ function PdfExportModal({state,onClose}) {
       if(el){try{root?.unmount();document.body.removeChild(el);}catch(_){}}
       setExporting(false);
     }
-  },[state,isP,BW,BH,quality,withAnnot,withOverlays,pages,brandCtx,cfg,onClose]);
+  },[state,isP,BW,BH,quality,withAnnot,withOverlays,withInteractive,pages,brandCtx,cfg,onClose]);
 
   return(
     <Scrim onClose={exporting?()=>{}:onClose}>
@@ -1719,7 +1828,7 @@ function PdfExportModal({state,onClose}) {
           </div>
         </div>
 
-        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:T.panel,borderRadius:8,border:`1px solid ${T.lineSoft}`,marginBottom:18,cursor:exporting?'default':'pointer'}}
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:T.panel,borderRadius:8,border:`1px solid ${T.lineSoft}`,marginBottom:8,cursor:exporting?'default':'pointer'}}
           onClick={()=>!exporting&&setWithOverlays(v=>!v)}>
           <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${withOverlays?T.navy:T.line}`,background:withOverlays?T.navy:'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'.15s'}}>
             {withOverlays&&<Icon name="check" size={11} color="#fff" stroke={3}/>}
@@ -1727,6 +1836,17 @@ function PdfExportModal({state,onClose}) {
           <div>
             <div style={{fontSize:12.5,fontWeight:500,color:T.ink,fontFamily:'inherit'}}>Inclure les signatures & tampons</div>
             <div style={{fontSize:11,color:T.ink4,fontFamily:'inherit'}}>Filigrane, signature et tampon d'entreprise</div>
+          </div>
+        </div>
+
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:withInteractive?T.navyTint:T.panel,borderRadius:8,border:`1px solid ${withInteractive?T.navy:T.lineSoft}`,marginBottom:18,cursor:exporting?'default':'pointer'}}
+          onClick={()=>!exporting&&setWithInteractive(v=>!v)}>
+          <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${withInteractive?T.navy:T.line}`,background:withInteractive?T.navy:'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'.15s'}}>
+            {withInteractive&&<Icon name="check" size={11} color="#fff" stroke={3}/>}
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:500,color:T.ink,fontFamily:'inherit'}}>PDF interactif</div>
+            <div style={{fontSize:11,color:T.ink4,fontFamily:'inherit'}}>Navigation par liens : index → pages, catégories, accessoires</div>
           </div>
         </div>
 
