@@ -3426,7 +3426,7 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
           const isSel=selectedPages?.has(i)??false;
           const hasNotes=page.type==='content'&&!!(state.pageNotes?.[page.key]);
           const isAccPage=page.type==='content'&&!!state.contentOrder.find(x=>x.id===page.ordId)?.isAccessory;
-          const borderCol=isSel?'#6366F1':isActive?T.gold:isAccPage?'#5B6CA8':hasNotes?'#E53E3E':'rgba(255,255,255,.18)';
+          const borderCol=isSel?'#6366F1':isActive?T.gold:hasNotes?'#E53E3E':'rgba(255,255,255,.18)';
           return (
             <div key={page.key} onClick={(e)=>{
               if((e.ctrlKey||e.metaKey)&&onTogglePageSelect) onTogglePageSelect(i);
@@ -3450,6 +3450,15 @@ function ThumbnailPalette({state,activePage,onPageClick,thumbSize,setThumbSize,o
                   padding:'0.5px 3px',borderRadius:1.5,letterSpacing:'.04em',
                   pointerEvents:'none'
                 }}>{i+1}</div>
+                {isAccPage&&<div style={{
+                  position:'absolute',top:2,left:2,zIndex:2,
+                  background:'#5B6CA8',borderRadius:2,
+                  padding:'1px 3px',display:'flex',alignItems:'center',gap:1.5,
+                  pointerEvents:'none'
+                }}>
+                  <Icon name="link" size={6} color="#fff" stroke={2}/>
+                  <span style={{fontSize:6,fontWeight:700,color:'#fff',letterSpacing:'.04em',lineHeight:1}}>accessoire</span>
+                </div>}
                 {isSel&&<div style={{
                   position:'absolute',bottom:2,left:2,zIndex:2,
                   background:'#6366F1',borderRadius:'50%',
