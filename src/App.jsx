@@ -287,7 +287,7 @@ const initialState = project => {
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, pageAccessories:{}, showPageNames:false, pageNameSize:11, pageNamePos:'top', pageNameX:4, _dirty:false,
+    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, pageAccessories:{}, _dirty:false,
   };
 };
 
