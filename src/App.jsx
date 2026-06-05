@@ -4144,8 +4144,21 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       const idx=insertIdx<0?s.contentOrder.length:insertIdx;
       const newOrder=[...s.contentOrder];
       let newFilesArr=[...s.files,...newFiles];
+      let newPageAcc=s.pageAccessories||{};
       if(mode==='replace'&&insertIdx>=0){
         const removed=s.contentOrder[idx];
+        // Preserve isAccessory flag and remap pageAccessories refs to new ordId
+        if(removed?.isAccessory){
+          newOrders.forEach(o=>{o.isAccessory=true;});
+          if(newOrders.length===1){
+            const oldId=removed.id,newId=newOrders[0].id;
+            const updated={};
+            for(const [pk,ids] of Object.entries(newPageAcc)){
+              updated[pk]=ids.map(id=>id===oldId?newId:id);
+            }
+            newPageAcc=updated;
+          }
+        }
         newOrder.splice(idx,1,...newOrders);
         if(removed?.type==='file'){
           const stillUsed=newOrder.some(x=>x.type==='file'&&x.fileId===removed.fileId);
@@ -4154,7 +4167,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       }else{
         newOrder.splice(idx,0,...newOrders);
       }
-      return {...s,files:newFilesArr,contentOrder:newOrder,_dirty:true};
+      return {...s,files:newFilesArr,contentOrder:newOrder,pageAccessories:newPageAcc,_dirty:true};
     });
     setDirtySteps(d=>({...d,content:true}));
     setImportingFromPage(false);
