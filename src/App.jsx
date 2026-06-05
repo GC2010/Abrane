@@ -1270,13 +1270,16 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){allRows.push({name:it.name,page:pgN,isCat:true});pgN+=1;}
-    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){const dn=it.label||f.name.replace(/\.[^.]+$/,'');allRows.push({name:dn,page:pgN,isCat:false});pgN+=f.pages||1;}else pgN+=1;}
+    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){const dn=it.label||f.name.replace(/\.[^.]+$/,'');allRows.push({name:dn,page:pgN,isCat:false,isAccessory:!!it.isAccessory});pgN+=f.pages||1;}else pgN+=1;}
   });
   const pageRows=allRows.slice(pageIndex*40,(pageIndex+1)*40);
   const col1=pageRows.slice(0,20),col2=pageRows.slice(20,40);
-  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'baseline',gap:4,padding:'5px 0',borderBottom:`1px dotted ${T.line}`,fontSize:11}}>
-    <span style={{flex:1,color:r.isCat?p.c2:T.ink2,fontWeight:r.isCat?700:400}}>{r.name}</span>
-    <span style={{color:r.isCat?p.c2:T.ink3,fontWeight:r.isCat?600:400}}>{String(r.page).padStart(2,'0')}</span>
+  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'center',gap:4,padding:'5px 0',borderBottom:`1px dotted ${T.line}`,fontSize:11}}>
+    <span style={{flex:1,color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink2,fontWeight:r.isCat?700:400,display:'flex',alignItems:'center',gap:3}}>
+      {r.isAccessory&&<Icon name="link" size={8} color="#5B6CA8" stroke={2}/>}
+      {r.name}
+    </span>
+    <span style={{color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink3,fontWeight:r.isCat?600:r.isAccessory?600:400}}>{String(r.page).padStart(2,'0')}</span>
   </div>;
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',padding:'5% '+(isRing?'9% 4% 12%':'9% 4% 5%'),position:'relative',overflow:'hidden',boxSizing:'border-box'}}>
     <div style={{position:'absolute',top:0,right:0,bottom:0,width:'7%',background:p.c1,borderLeft:`3px solid ${p.c2}`}}/>
