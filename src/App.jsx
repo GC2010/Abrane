@@ -102,7 +102,7 @@ const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},sta
 
 const NavCtx = React.createContext(null);
 // Layout constants (fractions of page size) — shared by NavStripe render and addPdfLinks annotations
-const NAV={stripeXPct:.92,stripeWPct:.08,catYStartPct:.34,catYEndPct:.81,maxCats:8,idxYPct:.835,idxHPct:.038,matYPct:.880,matHPct:.038};
+const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catYEndPct:.76,maxCats:8,idxYPct:.80,idxHPct:.057,matYPct:.867,matHPct:.057};
 
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
@@ -1374,13 +1374,13 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
   );
 
   return <div style={{width:'100%',aspectRatio:isPortrait?'210/297':'297/210',background:'#fff',position:'relative',overflow:'hidden'}}>
-    <div style={{position:'absolute',top:0,right:0,bottom:0,width:'8%',background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
+    <div style={{position:'absolute',top:0,right:0,bottom:0,width:'10%',background:'#fff',borderLeft:`3px solid ${p.c2}`,display:'flex',flexDirection:'column',alignItems:'center',paddingTop:'5%',gap:8,overflow:'hidden'}}>
       <StripeAbraneLogo/>
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
       {nav&&<NavStripe nav={{...nav,currentCatKey:nav.ordCatMap?.[ordId]||null}} state={state}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':hasCompat?'calc(22% + 70px)':'21%'):(hasAcc?'calc(6% + 110px)':hasCompat?'calc(6% + 70px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'13%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':hasCompat?'calc(22% + 70px)':'21%'):(hasAcc?'calc(6% + 110px)':hasCompat?'calc(6% + 70px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1391,7 +1391,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     </div>
     {/* Accessories strip — fixed 80px thumbnails regardless of count */}
     {hasAcc&&(
-      <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'11%',display:'flex',alignItems:'flex-start',gap:6,overflow:'visible'}}>
+      <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'13%',display:'flex',alignItems:'flex-start',gap:6,overflow:'visible'}}>
         {accItems.map(({id,name,url})=>(
           <div key={id} style={{flexShrink:0,width:80,display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
             <div style={{width:80,height:80,borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',padding:3,boxSizing:'border-box',flexShrink:0}}>
@@ -1407,7 +1407,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     )}
     {/* Compatible products footer — shown only on accessory pages that are used in at least one product */}
     {hasCompat&&(
-      <div style={{position:'absolute',bottom:isNotes?'22%':'6%',left:isRing?'14%':'4%',right:'11%',borderTop:`0.75px solid ${shade(p.c2,-6)}`,paddingTop:3}}>
+      <div style={{position:'absolute',bottom:isNotes?'22%':'6%',left:isRing?'14%':'4%',right:'13%',borderTop:`0.75px solid ${shade(p.c2,-6)}`,paddingTop:3}}>
         <div style={{fontSize:6.5,color:shade(p.c3,35),lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:3}}>
           <b>Accessoire compatible avec le(s) produit(s) :</b>{' '}{compatProducts.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · ')}
         </div>
@@ -1418,7 +1418,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     )}
     {/* Notes zone — height 17%, bottom 3% */}
     {isNotes&&(
-      <div style={{position:'absolute',left:isRing?'14%':'4%',right:'11%',bottom:'3%',height:'17%',background:'#fff',border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{position:'absolute',left:isRing?'14%':'4%',right:'13%',bottom:'3%',height:'17%',background:'#fff',border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         {/* Compact toolbar — only when editing context available */}
         {notesCtx&&(
           <div style={{display:'flex',alignItems:'center',gap:1,padding:'1px 3px',borderBottom:`1px solid ${shade(p.c1,-6)}`,flexShrink:0,background:shade(p.c1,8),flexWrap:'wrap'}}>
@@ -1722,15 +1722,29 @@ function NavStripe({nav,state}){
   return<>
     {cats.map((cat,i)=>{
       const isCurr=cat.key===currentCatKey;
-      return<div key={cat.key} style={{position:'absolute',top:`${(NAV.catYStartPct+i*tH)*100}%`,height:`${tH*.87*100}%`,left:'8%',right:'8%',borderRadius:2,background:isCurr?p.c2:shade(p.c1,-10),display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-        <span style={{fontSize:5,fontWeight:700,letterSpacing:'.06em',color:isCurr?'#fff':shade(p.c3,25),transform:'rotate(-90deg)',whiteSpace:'nowrap',display:'block',maxWidth:'200%',overflow:'hidden',textOverflow:'ellipsis'}}>
-          {cat.name.length>13?cat.name.slice(0,12)+'…':cat.name}
+      // First word only, max 9 chars, uppercase — fits horizontally in stripe
+      const label=cat.name.split(/\s+/)[0].slice(0,9).toUpperCase();
+      const rest=cat.name.split(/\s+/).slice(1).join(' ').slice(0,9).toUpperCase();
+      return<div key={cat.key} style={{position:'absolute',top:`${(NAV.catYStartPct+i*tH)*100}%`,height:`${tH*.87*100}%`,left:'4%',right:'4%',borderRadius:3,background:isCurr?p.c2:shade(p.c1,-10),display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',overflow:'hidden',gap:.5,outline:isCurr?`1.5px solid ${shade(p.c2,-22)}`:'none'}}>
+        <span style={{fontSize:7,fontWeight:800,color:isCurr?'#fff':shade(p.c3,18),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90%',textAlign:'center',letterSpacing:'.04em',lineHeight:1}}>
+          {label}
         </span>
+        {rest&&<span style={{fontSize:5.5,fontWeight:600,color:isCurr?'rgba(255,255,255,.75)':shade(p.c3,45),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'90%',textAlign:'center',letterSpacing:'.03em',lineHeight:1}}>
+          {rest}
+        </span>}
       </div>;
     })}
-    {categories.length>NAV.maxCats&&<div style={{position:'absolute',top:`${(NAV.catYEndPct-.025)*100}%`,height:'3%',left:'8%',right:'8%',display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:5,color:shade(p.c3,50)}}>···</span></div>}
-    {idxPageNum&&<div style={{position:'absolute',top:`${NAV.idxYPct*100}%`,height:`${NAV.idxHPct*100}%`,left:'6%',right:'6%',borderRadius:2,background:T.navy,display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:5,fontWeight:800,color:'#fff',letterSpacing:'.12em'}}>IDX</span></div>}
-    {matPageNum&&<div style={{position:'absolute',top:`${NAV.matYPct*100}%`,height:`${NAV.matHPct*100}%`,left:'6%',right:'6%',borderRadius:2,background:shade(p.c2,-5),display:'flex',alignItems:'center',justifyContent:'center'}}><span style={{fontSize:5,fontWeight:800,color:'#fff',letterSpacing:'.12em'}}>MAT</span></div>}
+    {categories.length>NAV.maxCats&&<div style={{position:'absolute',top:`${(NAV.catYEndPct-.025)*100}%`,left:0,right:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <span style={{fontSize:6,color:shade(p.c3,50),fontWeight:700}}>+{categories.length-NAV.maxCats}</span>
+    </div>}
+    {idxPageNum&&<div style={{position:'absolute',top:`${NAV.idxYPct*100}%`,height:`${NAV.idxHPct*100}%`,left:'4%',right:'4%',borderRadius:3,background:T.navy,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1}}>
+      <span style={{fontSize:9,color:'#fff',lineHeight:1}}>☰</span>
+      <span style={{fontSize:6,fontWeight:800,color:'#fff',letterSpacing:'.09em',lineHeight:1}}>INDEX</span>
+    </div>}
+    {matPageNum&&<div style={{position:'absolute',top:`${NAV.matYPct*100}%`,height:`${NAV.matHPct*100}%`,left:'4%',right:'4%',borderRadius:3,background:shade(p.c2,-5),display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:1}}>
+      <span style={{fontSize:8,color:'#fff',lineHeight:1}}>▦</span>
+      <span style={{fontSize:6,fontWeight:800,color:'#fff',letterSpacing:'.09em',lineHeight:1}}>MAT.</span>
+    </div>}
   </>;
 }
 
