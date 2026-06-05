@@ -1315,6 +1315,24 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     return{id,name:ord.label||f.name.replace(/\.[^.]+$/,''),url:f.pageUrls?.[0]||null};
   }).filter(Boolean);
   const hasAcc=accItems.length>0;
+  const thisOrd=state.contentOrder.find(x=>x.id===ordId);
+  const isAcc=!!thisOrd?.isAccessory;
+  const compatProducts=useMemo(()=>{
+    if(!isAcc)return[];
+    const allPages=buildPageList(state);
+    return Object.entries(state.pageAccessories||{})
+      .filter(([,ids])=>ids.includes(ordId))
+      .map(([pKey])=>{
+        const productOrdId=pKey.replace(/^f-/,'').replace(/-\d+$/,'');
+        const ord=state.contentOrder.find(x=>x.id===productOrdId);
+        if(!ord)return null;
+        const f=state.files.find(x=>x.id===ord.fileId);
+        const name=ord.label||f?.name.replace(/\.[^.]+$/,'')||'';
+        const pageNum=allPages.findIndex(p=>p.key===pKey)+1;
+        return{name,pageNum};
+      }).filter(Boolean);
+  },[state,ordId]);
+  const hasCompat=compatProducts.length>0;
   const hasAnn=!!(state.annotations?.[pageKey]);
   const displayUrl=state.annotSnaps?.[pageKey]||pageUrl;
   const cZoom=state.contentZoom?.[pageKey]??90;
@@ -1345,7 +1363,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
       {state.clientLogoUrl&&<img src={state.clientLogoUrl} alt={state.client} style={{width:`${state.stripeLogoScale||80}%`,objectFit:'contain',display:'block',flexShrink:0,marginTop:`${state.stripeLogoY||0}%`}}/>}
     </div>
     {/* Image zone — objectFit:contain so it adapts to any page format automatically */}
-    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':'21%'):(hasAcc?'calc(6% + 110px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'absolute',top:'3%',right:'11%',bottom:isNotes?(hasAcc?'calc(21% + 110px)':hasCompat?'calc(21% + 24px)':'21%'):(hasAcc?'calc(6% + 110px)':hasCompat?'calc(4% + 24px)':'4%'),left:isRing?'14%':'4%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
       {displayUrl
         ?<img src={displayUrl} alt={file.name} style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',transform:`scale(${cZoom/100})${rot?` rotate(${rot}deg)`:''}`,transformOrigin:`${cX}% ${cY}%`,transition:'transform .2s'}}/>
         :<div style={{position:'absolute',inset:0,background:`repeating-linear-gradient(135deg,${shade(p.c1,4)} 0 14px,${p.c1} 14px 28px)`,display:'grid',placeItems:'center',fontSize:10,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c3,80)}}>
@@ -1368,6 +1386,17 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
             <div style={{width:80,fontSize:7,color:shade(p.c3,50),textAlign:'center',lineHeight:1.25,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:2}}>{name}</div>
           </div>
         ))}
+      </div>
+    )}
+    {/* Compatible products footer — shown only on accessory pages that are used in at least one product */}
+    {hasCompat&&(
+      <div style={{position:'absolute',bottom:isNotes?'21%':'4%',left:isRing?'14%':'4%',right:'11%',borderTop:`0.75px solid ${shade(p.c2,-6)}`,paddingTop:3}}>
+        <div style={{fontSize:6.5,color:shade(p.c3,35),lineHeight:1.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+          <b>Accessoire compatible avec le(s) produit(s) :</b>{' '}{compatProducts.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · ')}
+        </div>
+        <div style={{fontSize:6.5,color:shade(p.c3,50),lineHeight:1.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+          <b>Compatible accessory for product(s):</b>{' '}{compatProducts.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · ')}
+        </div>
       </div>
     )}
     {/* Notes zone — height 17%, bottom 3% */}
