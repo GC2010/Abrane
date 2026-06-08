@@ -4485,7 +4485,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
   const update=useCallback(patch=>{setState(s=>({...s,...patch,_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const updateNested=useCallback((key,patch)=>{setState(s=>({...s,[key]:{...s[key],...patch},_dirty:true}));setDirtySteps(d=>({...d,[activeStepRef.current]:true}));},[]);
   const updatePageNotes=useCallback((pageKey,html)=>{setState(s=>({...s,pageNotes:{...(s.pageNotes||{}),[pageKey]:html},_dirty:true}));setDirtySteps(d=>({...d,content:true}));},[]);
-  const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),2800);};
+  const showToast=m=>{setToast(m);setTimeout(()=>setToast(null),5000);};
 
   const [importingFromPage,setImportingFromPage]=useState(false);
   const [accessoriesModal,setAccessoriesModal]=useState(null);
@@ -4560,7 +4560,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
     // Fast size estimate: sum of page image data char lengths — no JSON.stringify needed
     const imgMB=(state.files||[]).reduce((sum,f)=>sum+(f.pages||[]).reduce((s,p)=>s+(p.img?.length||0),0),0)/1048576;
     // Block immediately for oversized projects — avoids expensive gzip + Supabase rejection
-    if(imgMB>10){setHeavyModal({mb:Math.round(imgMB)});return;}
+    if(imgMB>10){showToast(`Projet ${Math.round(imgMB)} MB — trop lourd pour le cloud`);setHeavyModal({mb:Math.round(imgMB)});return;}
     if(!state._dirty){showToast('Projet déjà sauvegardé');return;}
     setSaving(true);
     try{
@@ -4634,9 +4634,8 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
     a.click();URL.revokeObjectURL(a.href);
   },[state]);
 
-  useEffect(()=>{
-    if(saveFnRef) saveFnRef.current=isOfficialTemplate?()=>{}:save;
-  },[save,isOfficialTemplate,saveFnRef]);
+  // Always sync saveFnRef at render time — no async useEffect timing gap
+  if(saveFnRef) saveFnRef.current=isOfficialTemplate?()=>{}:save;
 
   useEffect(()=>{
     const isAdmin=user?.role==='admin'||user?.role==='superadmin';
