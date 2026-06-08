@@ -1713,9 +1713,11 @@ function addPdfLinks(pdf,page,navData,state,isP){
 
     cats.forEach((cat,i)=>{
       const isCurr=cat.key===currentCatKey;
-      const tY=NAV.catYStartPct*pageH+i*tH;
-      const bH=tH*.87;
-      const label=cat.name.split(/\s+/)[0].slice(0,8).toUpperCase();
+      const slotY=NAV.catYStartPct*pageH+i*tH;
+      const bH=tH*.50;
+      const tY=slotY+(tH-bH)/2;
+      const words=cat.name.toUpperCase().trim().split(/\s+/).slice(0,2);
+      const label=words.map(w=>w.length>5?w.slice(0,4)+'.':w).join(' ');
       if(isCurr){
         drawBtn(tY,bH,hexRgb(p.c2),hexRgb(shade(p.c2,-18)),.3);
         pdf.setTextColor(255,255,255);
@@ -1725,7 +1727,7 @@ function addPdfLinks(pdf,page,navData,state,isP){
       }
       pdf.setFont('helvetica','bold');pdf.setFontSize(9);
       pdf.text(label,bX+bW/2,mid(tY,bH),{align:'center'});
-      go(bX,tY,bW,bH,cat.pageNum);
+      go(bX,slotY,bW,tH,cat.pageNum);
     });
 
     if(categories.length>NAV.maxCats){
