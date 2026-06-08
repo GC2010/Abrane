@@ -4561,8 +4561,8 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
     const imgMB=(state.files||[]).reduce((sum,f)=>sum+(f.pageUrls||[]).reduce((s,u)=>s+(u?.length||0),0),0)/1048576;
     // Block immediately for oversized projects — avoids expensive gzip + Supabase rejection
     if(imgMB>10){showToast(`Projet ${Math.round(imgMB)} MB — trop lourd pour le cloud`);setHeavyModal({mb:Math.round(imgMB)});return;}
-    // Skip the dirty guard when the save is explicitly forced (modal buttons: Écraser / Créer une copie)
-    if(!force&&!state._dirty){showToast('Projet déjà sauvegardé');return;}
+    // Guard only for existing projects (overwriteId set) that have not changed
+    if(!force&&overwriteId&&!state._dirty){showToast('Projet déjà sauvegardé');return;}
     setSaving(true);
     try{
       const id=await upsertProject(user.id,overwriteId,name||state.name,state);
@@ -4673,7 +4673,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
       <span style={{fontSize:11.5,color:'rgba(255,255,255,.6)'}}>Modifications non enregistrées</span>
       <button onClick={save} style={{background:T.surface,border:'none',color:T.ink,padding:'5px 12px',fontSize:12,borderRadius:999,display:'inline-flex',alignItems:'center',gap:5,fontWeight:600,cursor:'pointer'}}><Icon name="save" size={13} color={T.ink}/>Enregistrer</button>
     </div>}
-    {toast&&<div style={{position:'fixed',bottom:paletteH+16,right:16,background:T.ink,color:'#fff',padding:'9px 14px',borderRadius:8,fontSize:12,zIndex:9999}}>{toast}</div>}
+    {toast&&<div style={{position:'fixed',top:66,left:'50%',transform:'translateX(-50%)',background:T.ink,color:'#fff',padding:'10px 20px',borderRadius:8,fontSize:13,fontWeight:500,zIndex:10000,boxShadow:'0 4px 16px rgba(0,0,0,.3)',whiteSpace:'nowrap'}}>{toast}</div>}
     {heavyModal&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',display:'grid',placeItems:'center',zIndex:9999}} onClick={()=>setHeavyModal(null)}>
       <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,padding:'28px 30px',maxWidth:440,width:'90%',boxShadow:'0 8px 40px rgba(0,0,0,.22)'}}>
         <div style={{fontSize:22,marginBottom:8}}>⚠️</div>
