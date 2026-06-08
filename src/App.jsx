@@ -4557,19 +4557,20 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
 
   const doSave=useCallback(async(overwriteId,name)=>{
     if(!USE_CLOUD){setState(s=>({...s,_dirty:false}));showToast('Projet enregistré (local)');return;}
-    // Fast size estimate: sum of page image data lengths (no JSON.stringify needed)
+    // Fast size estimate: sum of page image data char lengths — no JSON.stringify needed
     const imgMB=(state.files||[]).reduce((sum,f)=>sum+(f.pages||[]).reduce((s,p)=>s+(p.img?.length||0),0),0)/1048576;
+    // Block immediately for oversized projects — avoids expensive gzip + Supabase rejection
+    if(imgMB>10){setHeavyModal({mb:Math.round(imgMB)});return;}
     setSaving(true);
     try{
       const id=await upsertProject(user.id,overwriteId,name||state.name,state);
       setProjectId(id);
       setLastSaved('cloud');
       setState(s=>({...s,_dirty:false,name:name||s.name}));
-      showToast(imgMB>10?`Projet sauvegardé (${Math.round(imgMB)} MB) — pensez à exporter en JSON`:'Projet sauvegardé');
+      showToast('Projet sauvegardé');
       if(onProjectSaved) onProjectSaved(id);
     }catch(e){
-      if(imgMB>10){setHeavyModal({mb:Math.round(imgMB)});}
-      else{showToast('Erreur : '+(e.message||e));}
+      showToast('Erreur : '+(e.message||e));
     }
     finally{setSaving(false);}
   },[user,state,onProjectSaved]);
