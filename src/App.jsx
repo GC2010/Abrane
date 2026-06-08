@@ -240,7 +240,7 @@ const initialState = project => {
       sigScale:30,sigX:78,sigY:88,groupX:50,groupY:85,
       stampEnabled:false,stampOpacity:70,stampScale:25,stampX:50,stampY:50,stampPlacement:'all',
       symEnabled:false,symPlacement:'all',symText:'',symScale:20,symX:50,symY:50,symPageNum:1,
-      advEnabled:false,advStatus:'AF',advPlacement:'all',advScale:15,advX:85,advY:8,advPageNum:1,advPageStatuses:{},
+      advEnabled:false,advStatus:'AF',advPlacement:'all',advScale:15,advFontScale:100,advX:85,advY:8,advPageNum:1,advPageStatuses:{},
       disclaimerEnabled:false,disclaimerLang:'fr',disclaimerPlacement:'all',disclaimerSize:6,disclaimerX:50,disclaimerY:95,disclaimerPageNum:1,
       stripeLogoScale:80,stripeLogoY:0,bgImageUrl:'',bgX:50,bgY:50,bgScale:100,
       notes:[''],noteContent:'',noteHtml:'',
@@ -288,7 +288,7 @@ const initialState = project => {
     sigScale:30, sigX:78, sigY:88, groupX:50, groupY:85,
     stampEnabled:false, stampOpacity:70, stampScale:25, stampX:50, stampY:50, stampPlacement:'all',
     symEnabled:false, symPlacement:'all', symText:'', symScale:20, symX:50, symY:50, symPageNum:1,
-    advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advX:85, advY:8, advPageNum:1, advPageStatuses:{},
+    advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advFontScale:100, advX:85, advY:8, advPageNum:1, advPageStatuses:{},
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
@@ -1591,6 +1591,7 @@ function PageOverlays({state,page,pageIndex,totalPages}) {
   const advShow=state.advEnabled&&match(state.advPlacement||'all',(state.advPageNum??1)-1);
   const disShow=state.disclaimerEnabled&&match(state.disclaimerPlacement||'all',(state.disclaimerPageNum??1)-1);
   const advSt=ADV_STATUSES.find(s=>s.v===((state.advPageStatuses?.[page?.key])||state.advStatus||'AF'))||ADV_STATUSES[0];
+  const advFs=(state.advFontScale??100)/100;
   const sz=state.disclaimerSize??6;
   const lang=state.disclaimerLang||'fr';
   const FR='Tous les dessins techniques et documents associés sont la propriété exclusive de ABRANE France S.A.S. Toute reproduction ou utilisation sans autorisation est interdite.';
@@ -1622,11 +1623,11 @@ function PageOverlays({state,page,pageIndex,totalPages}) {
       </svg>
       {state.symText&&<div style={{fontSize:'clamp(6px,2vw,16px)',fontWeight:700,color:'#DC2626',textAlign:'center',lineHeight:1.2,wordBreak:'break-word',width:'160%'}}>{state.symText}</div>}
     </div>}
-    {advShow&&<div style={{position:'absolute',left:`${state.advX??85}%`,top:`${state.advY??8}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.advScale??15}%`,maxWidth:'28%'}}>
+    {advShow&&advSt.v!=='NONE'&&<div style={{position:'absolute',left:`${state.advX??85}%`,top:`${state.advY??8}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.advScale??15}%`,maxWidth:'28%'}}>
       <div style={{background:advSt.color+'28',border:`2px solid ${advSt.color}`,borderRadius:8,padding:'8% 12%',display:'flex',flexDirection:'column',alignItems:'center',gap:'5%',boxShadow:'0 2px 8px rgba(0,0,0,.18)'}}>
-        <span style={{fontSize:'clamp(7px,2vw,18px)',lineHeight:1}}>{advSt.emoji}</span>
-        <span style={{fontSize:'clamp(12px,3.3vw,27px)',fontWeight:900,color:advSt.color,letterSpacing:'.08em',lineHeight:1}}>{advSt.v}</span>
-        <span style={{fontSize:'clamp(9px,2.25vw,18px)',fontWeight:600,color:advSt.color,textAlign:'center',lineHeight:1.25}}>{advSt.l}</span>
+        <span style={{fontSize:`clamp(${(7*advFs).toFixed(1)}px,${(2*advFs).toFixed(2)}vw,${(18*advFs).toFixed(1)}px)`,lineHeight:1}}>{advSt.emoji}</span>
+        <span style={{fontSize:`clamp(${(12*advFs).toFixed(1)}px,${(3.3*advFs).toFixed(2)}vw,${(27*advFs).toFixed(1)}px)`,fontWeight:900,color:advSt.color,letterSpacing:'.08em',lineHeight:1}}>{advSt.v}</span>
+        <span style={{fontSize:`clamp(${(9*advFs).toFixed(1)}px,${(2.25*advFs).toFixed(2)}vw,${(18*advFs).toFixed(1)}px)`,fontWeight:600,color:advSt.color,textAlign:'center',lineHeight:1.25}}>{advSt.l}</span>
       </div>
     </div>}
     {disShow&&<div style={{position:'absolute',left:`${state.disclaimerX??50}%`,top:`${state.disclaimerY??95}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:'88%',textAlign:'center'}}>
@@ -3168,6 +3169,7 @@ const ADV_STATUSES=[
   {v:'TERM',l:'Terminé',                  emoji:'✔️', color:'#15803D'},
   {v:'LIV', l:'Livré',                    emoji:'📦', color:'#0D9488'},
   {v:'ARCH',l:'Archivé',                  emoji:'🗂️', color:'#9CA3AF'},
+  {v:'NONE',l:'Aucun badge',              emoji:'⊘',  color:'#9CA3AF'},
 ];
 
 function SymbolsPanel({state,update}) {
@@ -3231,7 +3233,7 @@ function SymbolsPanel({state,update}) {
       {state.advEnabled&&<>
         <Fld label="Statut par défaut">
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
-            {ADV_STATUSES.map(s=>{
+            {ADV_STATUSES.filter(s=>s.v!=='NONE').map(s=>{
               const active=(state.advStatus||'AF')===s.v;
               return <button key={s.v} onClick={()=>update({advStatus:s.v})} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 8px',borderRadius:6,border:`1.5px solid ${active?s.color:T.line}`,background:active?s.color+'18':T.surface,cursor:'pointer',fontFamily:'inherit',transition:'border-color .15s'}}>
                 <span style={{fontSize:13}}>{s.emoji}</span>
@@ -3242,6 +3244,10 @@ function SymbolsPanel({state,update}) {
               </button>;
             })}
           </div>
+          <button onClick={()=>update({advStatus:'NONE'})} style={{marginTop:4,width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'5px 8px',borderRadius:6,border:`1.5px solid ${(state.advStatus||'AF')==='NONE'?'#9CA3AF':T.line}`,background:(state.advStatus||'AF')==='NONE'?'#9CA3AF18':T.surface,cursor:'pointer',fontFamily:'inherit',transition:'border-color .15s'}}>
+            <span style={{fontSize:13}}>⊘</span>
+            <span style={{fontSize:12,fontWeight:700,color:(state.advStatus||'AF')==='NONE'?'#6B7280':T.ink}}>Aucun badge</span>
+          </button>
         </Fld>
         {(()=>{
           const pages=[];
@@ -3297,8 +3303,11 @@ function SymbolsPanel({state,update}) {
             <input type="number" min="1" value={state.advPageNum??1} onChange={e=>update({advPageNum:Math.max(1,parseInt(e.target.value)||1)})} style={{...inputSt,width:'80px'}}/>
           </Fld>
         )}
-        <Fld label={`Taille · ${state.advScale??15}%`}>
+        <Fld label={`Taille badge · ${state.advScale??15}%`}>
           <input type="range" min="4" max="40" value={state.advScale??15} onChange={e=>update({advScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        </Fld>
+        <Fld label={`Taille police · ${state.advFontScale??100}%`}>
+          <input type="range" min="40" max="150" value={state.advFontScale??100} onChange={e=>update({advFontScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
         <Fld label={`Position horizontale · ${state.advX??85}%`}>
           <input type="range" min="0" max="100" value={state.advX??85} onChange={e=>update({advX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
