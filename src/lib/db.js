@@ -1,4 +1,25 @@
 import { supabase, USE_CLOUD } from './supabase.js';
+import { deflate, inflate } from 'pako';
+
+function compressState(data) {
+  const bytes = deflate(JSON.stringify(data));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  }
+  return { _c: btoa(binary), _v: 2 };
+}
+
+export function decompressState(data) {
+  if (!data?._c || data._v !== 2) return data;
+  try {
+    const binary = Uint8Array.from(atob(data._c), c => c.charCodeAt(0));
+    return JSON.parse(inflate(binary, { to: 'string' }));
+  } catch (e) {
+    console.error('[decompressState] failed:', e);
+    return data;
+  }
+}
 
 // ── Projects ──────────────────────────────────────────────────
 
@@ -6,21 +27,33 @@ export async function loadProjects(userId) {
   if (!USE_CLOUD) return [];
   const { data, error } = await supabase
     .from('projects')
-    .select('id, name, created_at, template_id, data')
+    .select('id, name, created_at, template_id')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data || [];
 }
 
+export async function loadProject(projectId, userId) {
+  if (!USE_CLOUD) return null;
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name, created_at, template_id, data')
+    .eq('id', projectId)
+    .eq('user_id', userId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function upsertProject(userId, projectId, name, stateData) {
   if (!USE_CLOUD) return null;
-  // Strip non-serialisable / user-specific fields before saving
   const { sigUrl: _sig, _dirty: _d, ...dataToSave } = stateData;
+  const payload = compressState(dataToSave);
   if (projectId) {
     const { data, error } = await supabase
       .from('projects')
-      .update({ name, data: dataToSave })
+      .update({ name, data: payload })
       .eq('id', projectId)
       .eq('user_id', userId)
       .select('id')
@@ -30,7 +63,7 @@ export async function upsertProject(userId, projectId, name, stateData) {
   } else {
     const { data, error } = await supabase
       .from('projects')
-      .insert({ user_id: userId, name, data: dataToSave })
+      .insert({ user_id: userId, name, data: payload })
       .select('id')
       .single();
     if (error) throw error;

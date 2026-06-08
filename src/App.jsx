@@ -5,12 +5,13 @@ import defaultWmUrl from './assets/Filigrane.png';
 import defaultStampUrl from './assets/Tampon.jpg';
 import { USE_CLOUD } from './lib/supabase.js';
 import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, updateProfile, toAppUser, listUsers, deleteUser } from './lib/auth.js';
-import { loadProjects, upsertProject, deleteProject, projectToDisplay,
+import { loadProjects, loadProject, upsertProject, deleteProject, projectToDisplay,
          loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay,
          findTemplateByName, getAdminStorageStats,
          adminExportUserProjects, adminImportProjects, adminDeleteUserProjects,
          loadBrandSettings, saveBrandSettings,
-         loadOfficialTemplate, saveOfficialTemplate } from './lib/db.js';
+         loadOfficialTemplate, saveOfficialTemplate,
+         decompressState } from './lib/db.js';
 
 const PDF_QUALITY = [
   {id:'web',      label:'Web',      sub:'72 dpi · partage en ligne',     scale:1.5, q:0.72},
@@ -218,6 +219,10 @@ const renderXlsxToDataUrls = async file => {
 };
 
 const initialState = project => {
+  // Decompress project data saved with gzip compression
+  if(project?.data?._c && project.data._v === 2) {
+    project = { ...project, data: decompressState(project.data) };
+  }
   // Official ABRANE template opened for editing (admin only)
   if(project?._isOfficialTemplate){
     const t=new Date(),dd=String(t.getDate()).padStart(2,'0'),mm=String(t.getMonth()+1).padStart(2,'0');
@@ -903,9 +908,11 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
     else refreshTemplates();
   };
 
-  const exportProject=p=>{
-    const raw=p._raw||p;
-    const payload={name:raw.name||p.name,exportedAt:new Date().toISOString(),data:raw.data||{}};
+  const exportProject=async p=>{
+    const raw=await loadProject(p.id,user.id);
+    if(!raw) return;
+    const decompressed=decompressState(raw.data)||raw.data||{};
+    const payload={name:raw.name||p.name,exportedAt:new Date().toISOString(),data:decompressed};
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
@@ -913,8 +920,9 @@ function Dashboard({user,onOpenProject,onNewProject,onOpenTemplate,onImportProje
     a.click();URL.revokeObjectURL(a.href);
   };
 
-  const exportAll=()=>{
-    const payload=allProjects.map(p=>({name:p.name,exportedAt:new Date().toISOString(),data:(p._raw||p).data||{}}));
+  const exportAll=async()=>{
+    const rows=await adminExportUserProjects(user.id);
+    const payload=rows.map(r=>({name:r.name,exportedAt:new Date().toISOString(),data:decompressState(r.data)||r.data||{}}));
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
@@ -3404,6 +3412,8 @@ function VueEnsembleModal({state,update,onClose}) {
   const [renameVal,setRenameVal]=useState('');
   const [dragCoIdx,setDragCoIdx]=useState(null);
   const [overCoIdx,setOverCoIdx]=useState(null);
+  const [selectedIds,setSelectedIds]=useState(new Set());
+  const [lastClickId,setLastClickId]=useState(null);
 
   const stateL=useMemo(()=>({...state,contentOrder:localOrder}),[state,localOrder]);
 
@@ -3440,13 +3450,60 @@ function VueEnsembleModal({state,update,onClose}) {
     if(renamingId&&renameVal.trim()) setLocalOrder(o=>o.map(it=>it.id===renamingId?{...it,name:renameVal.trim()}:it));
     setRenamingId(null);
   };
+
   const reorder=(from,to)=>{
-    if(from===to||from===null||to===null)return;
-    const a=[...localOrder];
-    const [item]=a.splice(from,1);
-    a.splice(from<to?Math.min(to-1,a.length):to,0,item);
-    setLocalOrder(a);
+    if(from===null||to===null||from===to)return;
+    const draggedItem=localOrder[from];
+    if(selectedIds.has(draggedItem?.id)&&selectedIds.size>1){
+      // Move all selected items together to the drop position
+      const movingItems=localOrder.filter(it=>selectedIds.has(it.id));
+      const dropTarget=localOrder[to];
+      const remaining=localOrder.filter(it=>!selectedIds.has(it.id));
+      let insertAt=remaining.findIndex(it=>it===dropTarget);
+      if(insertAt<0)insertAt=remaining.length;
+      setLocalOrder([...remaining.slice(0,insertAt),...movingItems,...remaining.slice(insertAt)]);
+    }else{
+      const a=[...localOrder];
+      const [item]=a.splice(from,1);
+      a.splice(from<to?Math.min(to-1,a.length):to,0,item);
+      setLocalOrder(a);
+    }
   };
+
+  const toggleSelect=(e,coItem)=>{
+    if(!coItem)return;
+    if(e.shiftKey&&lastClickId){
+      const ids=localOrder.map(it=>it.id);
+      const a=ids.indexOf(lastClickId),b=ids.indexOf(coItem.id);
+      if(a>=0&&b>=0){
+        const[lo,hi]=[Math.min(a,b),Math.max(a,b)];
+        setSelectedIds(prev=>{const next=new Set(prev);for(let i=lo;i<=hi;i++)next.add(ids[i]);return next;});
+      }
+    }else{
+      setSelectedIds(prev=>{const next=new Set(prev);if(next.has(coItem.id))next.delete(coItem.id);else next.add(coItem.id);return next;});
+      setLastClickId(coItem.id);
+    }
+  };
+
+  const deleteSelected=()=>{
+    setLocalOrder(o=>o.filter(it=>!selectedIds.has(it.id)));
+    setSelectedIds(new Set());setLastClickId(null);
+  };
+
+  useEffect(()=>{
+    const fn=e=>{
+      const active=document.activeElement;
+      const inInput=active?.tagName==='INPUT'||active?.tagName==='TEXTAREA';
+      if(e.key==='Escape'&&selectedIds.size>0){e.stopPropagation();setSelectedIds(new Set());}
+      if((e.key==='Delete'||e.key==='Backspace')&&selectedIds.size>0&&!inInput){
+        setLocalOrder(o=>o.filter(it=>!selectedIds.has(it.id)));
+        setSelectedIds(new Set());setLastClickId(null);
+      }
+    };
+    window.addEventListener('keydown',fn);
+    return()=>window.removeEventListener('keydown',fn);
+  },[selectedIds]);
+
   const apply=()=>{update({contentOrder:localOrder});onClose();};
 
   return <Scrim onClose={onClose}><div style={{
@@ -3487,7 +3544,9 @@ function VueEnsembleModal({state,update,onClose}) {
         const isOver=isDraggable&&overCoIdx===page.coIdx&&dragCoIdx!==null&&dragCoIdx!==page.coIdx;
         const coItem=isDraggable?localOrder[page.coIdx]:null;
         const isRenaming=isCat&&coItem&&renamingId===coItem.id;
+        const isSelected=isDraggable&&!!coItem&&selectedIds.has(coItem.id);
         const numSz=Math.min(10,Math.max(6,Math.round(thumbH*0.09)));
+        const chkSz=Math.max(12,Math.round(thumbH*.14));
         return (
           <div key={page.key}
             draggable={isDraggable}
@@ -3496,18 +3555,24 @@ function VueEnsembleModal({state,update,onClose}) {
             onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setOverCoIdx(null);}}
             onDrop={e=>{e.preventDefault();e.stopPropagation();if(isDraggable){reorder(dragCoIdx,page.coIdx);setDragCoIdx(null);setOverCoIdx(null);}}}
             onDragEnd={()=>{setDragCoIdx(null);setOverCoIdx(null);}}
-            style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5,opacity:isDragging?.28:1,cursor:isDraggable?'grab':'default',position:'relative',transition:'opacity .15s'}}
+            onClick={e=>{if(!isFixed&&!isRenaming)toggleSelect(e,coItem);}}
+            style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5,opacity:isDragging?.28:1,cursor:isDraggable?'pointer':'default',position:'relative',transition:'opacity .15s',userSelect:'none'}}
           >
             {isOver&&<div style={{position:'absolute',left:-7,top:0,bottom:14,width:3,background:T.navy,borderRadius:2,zIndex:10}}/>}
             <div style={{
               width:thumbW,height:thumbH,overflow:'hidden',borderRadius:3,position:'relative',
-              border:`1.5px solid ${isOver?T.navy:isCat?T.goldSoft:isFixed?T.lineSoft:T.line}`,
-              boxShadow:isOver?`0 0 0 2px ${T.navyTint}`:isCat?`0 0 0 1px rgba(184,149,86,.2)`:'none',
+              border:`1.5px solid ${isSelected?T.navy:isOver?T.navy:isCat?T.goldSoft:isFixed?T.lineSoft:T.line}`,
+              boxShadow:isSelected?`0 0 0 2.5px ${T.navyTint}`:isOver?`0 0 0 2px ${T.navyTint}`:isCat?`0 0 0 1px rgba(184,149,86,.2)`:'none',
               background:'#fff',transition:'border-color .12s,box-shadow .12s'
             }}>
               <div style={{position:'absolute',top:2,left:2,zIndex:3,background:'rgba(0,0,0,.4)',color:'#fff',fontSize:numSz,fontWeight:700,padding:'0.5px 3px',borderRadius:1.5,letterSpacing:'.04em',pointerEvents:'none'}}>{i+1}</div>
               {isFixed&&<div style={{position:'absolute',top:2,right:2,zIndex:3,background:'rgba(0,0,0,.3)',borderRadius:2,padding:2,pointerEvents:'none'}}><Icon name="lock" size={Math.max(6,Math.round(thumbH*.08))} color="rgba(255,255,255,.85)"/></div>}
-              {isDraggable&&<div style={{position:'absolute',bottom:2,right:2,zIndex:3,background:'rgba(255,255,255,.72)',borderRadius:2,padding:2,pointerEvents:'none'}}><Icon name="move" size={Math.max(6,Math.round(thumbH*.08))} color={T.ink3}/></div>}
+              {isSelected
+                ?<div style={{position:'absolute',top:2,right:2,zIndex:4,width:chkSz,height:chkSz,borderRadius:'50%',background:T.navy,display:'grid',placeItems:'center',pointerEvents:'none'}}>
+                    <Icon name="check" size={Math.round(chkSz*.65)} color="#fff" stroke={3}/>
+                  </div>
+                :isDraggable&&<div style={{position:'absolute',bottom:2,right:2,zIndex:3,background:'rgba(255,255,255,.72)',borderRadius:2,padding:2,pointerEvents:'none'}}><Icon name="move" size={Math.max(6,Math.round(thumbH*.08))} color={T.ink3}/></div>
+              }
               <div style={{width:REF_W,transformOrigin:'top left',transform:`scale(${scale})`,pointerEvents:'none'}}>
                 <PageRender page={page} state={stateL}/>
               </div>
@@ -3520,9 +3585,9 @@ function VueEnsembleModal({state,update,onClose}) {
                   onClick={e=>e.stopPropagation()}/>
               :<div title={isCat?'Double-cliquer pour renommer':undefined}
                   onDoubleClick={isCat&&coItem?()=>startRename(coItem):undefined}
-                  style={{fontSize:9,color:isCat?T.navy:isFixed?T.ink4:T.ink3,maxWidth:Math.max(thumbW,50),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center',fontWeight:isCat?600:400,cursor:isCat?'text':'default',userSelect:'none',display:'flex',alignItems:'center',gap:3}}>
+                  style={{fontSize:9,color:isSelected?T.navy:isCat?T.navy:isFixed?T.ink4:T.ink3,maxWidth:Math.max(thumbW,50),overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center',fontWeight:isSelected||isCat?600:400,cursor:isCat&&!isSelected?'text':'default',userSelect:'none',display:'flex',alignItems:'center',gap:3}}>
                 <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{page.label}</span>
-                {isCat&&<Icon name="pencil" size={8} color={T.ink4}/>}
+                {isCat&&!isSelected&&<Icon name="pencil" size={8} color={T.ink4}/>}
               </div>
             }
           </div>
@@ -3530,11 +3595,26 @@ function VueEnsembleModal({state,update,onClose}) {
       })}
     </div>
 
+    {/* ── Selection action bar */}
+    {selectedIds.size>0&&(
+      <div style={{background:T.navyTint,borderTop:`1px solid rgba(61,90,153,.18)`,padding:'8px 18px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+        <span style={{fontSize:12,fontWeight:600,color:T.navy,flex:1}}>
+          {selectedIds.size} élément{selectedIds.size>1?'s':''} sélectionné{selectedIds.size>1?'s':''}
+        </span>
+        <button onClick={()=>setSelectedIds(new Set())} style={{...btnSt(),fontSize:11,padding:'4px 10px'}}>
+          Désélectionner
+        </button>
+        <button onClick={deleteSelected} style={{...btnSt(),fontSize:11,padding:'4px 10px',color:'#C53030',borderColor:'#FECACA',background:'#FEF2F2'}}>
+          <Icon name="trash" size={12} color="#C53030"/>Supprimer ({selectedIds.size})
+        </button>
+      </div>
+    )}
+
     {/* ── Footer */}
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 18px',borderTop:`1px solid ${T.lineSoft}`,flexShrink:0,background:T.panel}}>
       <div style={{fontSize:11,color:T.ink3,display:'flex',alignItems:'center',gap:6}}>
         <Icon name="info" size={13} color={T.ink4}/>
-        Glissez pour réorganiser · Double-cliquez sur une catégorie pour renommer
+        Cliquez pour sélectionner · Shift+clic pour étendre · Glissez pour déplacer · Suppr pour effacer
       </div>
       <div style={{display:'flex',gap:8}}>
         <button style={btnSt()} onClick={onClose}>Annuler</button>
@@ -4473,7 +4553,9 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       setState(s=>({...s,_dirty:false,name:name||s.name}));
       showToast('Projet sauvegardé');
       if(onProjectSaved) onProjectSaved(id);
-    }catch(e){showToast('Erreur : '+e.message);}
+    }catch(e){
+      showToast('Erreur : '+(e.message||e));
+    }
     finally{setSaving(false);}
   },[user,state,onProjectSaved]);
 
@@ -4697,6 +4779,7 @@ export default function App() {
   const [user,setUser]=useState(null);
   const [screen,setScreen]=useState('login');
   const [project,setProject]=useState(null);
+  const [loadingProject,setLoadingProject]=useState(false);
   const [showAdmin,setShowAdmin]=useState(false);
   const [saveBarProps,setSaveBarProps]=useState({dirty:false,saving:false,lastSaved:null,onSave:()=>{}});
   const [brand,setBrand]=useState(()=>({
@@ -4762,8 +4845,16 @@ export default function App() {
           onSaveOfficialTemplate={saveBarProps.onSaveOfficialTemplate||null}
           onExportJson={saveBarProps.onExportJson||null}
           onExportPdf={saveBarProps.onExportPdf||null}/>
+        {loadingProject&&<div style={{position:'fixed',inset:0,background:'rgba(255,255,255,.82)',display:'grid',placeItems:'center',zIndex:9999,backdropFilter:'blur(3px)'}}>
+          <div style={{fontSize:14,color:'#3D5A99',fontWeight:500}}>Chargement du projet…</div>
+        </div>}
         {screen==='dashboard'&&<Dashboard user={user}
-          onOpenProject={p=>{setProject(p);setScreen('configurator');}}
+          onOpenProject={async p=>{
+            setLoadingProject(true);
+            try{const full=await loadProject(p.id,user.id);setProject(full||p);setScreen('configurator');}
+            catch(e){console.error('loadProject failed:',e);}
+            finally{setLoadingProject(false);}
+          }}
           onNewProject={()=>{setProject(null);setScreen('configurator');}}
           onImportProject={proj=>{setProject(proj);setScreen('configurator');}}
           onEditOfficialTemplate={data=>{setProject({_isOfficialTemplate:true,data:data||{}});setScreen('configurator');}}
