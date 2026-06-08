@@ -4555,13 +4555,14 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
     a.click();URL.revokeObjectURL(a.href);
   },[state]);
 
-  const doSave=useCallback(async(overwriteId,name)=>{
+  const doSave=useCallback(async(overwriteId,name,force=false)=>{
     if(!USE_CLOUD){setState(s=>({...s,_dirty:false}));showToast('Projet enregistré (local)');return;}
     // Fast size estimate: sum of page image data char lengths — no JSON.stringify needed
     const imgMB=(state.files||[]).reduce((sum,f)=>sum+(f.pageUrls||[]).reduce((s,u)=>s+(u?.length||0),0),0)/1048576;
     // Block immediately for oversized projects — avoids expensive gzip + Supabase rejection
     if(imgMB>10){showToast(`Projet ${Math.round(imgMB)} MB — trop lourd pour le cloud`);setHeavyModal({mb:Math.round(imgMB)});return;}
-    if(!state._dirty){showToast('Projet déjà sauvegardé');return;}
+    // Skip the dirty guard when the save is explicitly forced (modal buttons: Écraser / Créer une copie)
+    if(!force&&!state._dirty){showToast('Projet déjà sauvegardé');return;}
     setSaving(true);
     try{
       const id=await upsertProject(user.id,overwriteId,name||state.name,state);
@@ -4695,18 +4696,18 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
         <div style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:6}}>Enregistrer le projet</div>
         <div style={{fontSize:12,color:T.ink3,marginBottom:20}}>Ce projet existe déjà. Souhaitez-vous l'écraser ou en créer une copie sous un nouveau nom ?</div>
         <div style={{background:T.panel,borderRadius:8,padding:'12px 14px',marginBottom:20,display:'flex',alignItems:'center',gap:10}}>
-          <button onClick={()=>{setSaveModal(false);doSave(projectId,state.name);}} disabled={saving}
+          <button onClick={()=>{setSaveModal(false);doSave(projectId,state.name,true);}} disabled={saving}
             style={{...btnSt('primary'),flex:1,justifyContent:'center',opacity:saving?.7:1}}>
             <Icon name="save" size={13} color="#fff"/>{saving?'Sauvegarde…':'Écraser'}
           </button>
         </div>
         <div style={{fontSize:12,fontWeight:600,color:T.ink,marginBottom:8}}>Ou enregistrer sous un nouveau nom :</div>
         <input value={saveAsName} onChange={e=>setSaveAsName(e.target.value)}
-          onKeyDown={e=>{if(e.key==='Enter'&&saveAsName.trim()){setSaveModal(false);doSave(null,saveAsName.trim());}}}
+          onKeyDown={e=>{if(e.key==='Enter'&&saveAsName.trim()){setSaveModal(false);doSave(null,saveAsName.trim(),true);}}}
           placeholder="Nouveau nom du projet…" style={{...inputSt,marginBottom:12}}/>
         <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
           <button onClick={()=>setSaveModal(false)} style={btnSt()}>Annuler</button>
-          <button onClick={()=>{if(!saveAsName.trim())return;setSaveModal(false);doSave(null,saveAsName.trim());}}
+          <button onClick={()=>{if(!saveAsName.trim())return;setSaveModal(false);doSave(null,saveAsName.trim(),true);}}
             disabled={!saveAsName.trim()||saving}
             style={{...btnSt('gold'),opacity:(!saveAsName.trim()||saving)?.7:1}}>
             <Icon name="plus" size={13} color={T.navy}/>Créer une copie
