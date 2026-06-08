@@ -4561,6 +4561,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
     const imgMB=(state.files||[]).reduce((sum,f)=>sum+(f.pages||[]).reduce((s,p)=>s+(p.img?.length||0),0),0)/1048576;
     // Block immediately for oversized projects — avoids expensive gzip + Supabase rejection
     if(imgMB>10){setHeavyModal({mb:Math.round(imgMB)});return;}
+    if(!state._dirty){showToast('Projet déjà sauvegardé');return;}
     setSaving(true);
     try{
       const id=await upsertProject(user.id,overwriteId,name||state.name,state);
@@ -4771,7 +4772,7 @@ function TopBar({user,screen,project,onHome,onLogout,onOpenAdmin,onSave,onSaveAs
         <Icon name={saving?'history':'save'} size={13} color="#fff"/>
         {saving?'Sauvegarde…':'Mettre à jour le modèle'}
       </button>}
-      {onSave&&<button onClick={onSave} disabled={saving||!dirty} style={{...btnSt(dirty?'primary':'default',true),opacity:(saving||!dirty)?.6:1}}>
+      {onSave&&<button onClick={onSave} disabled={saving} style={{...btnSt(dirty?'primary':'default',true),opacity:saving?.6:1}}>
         <Icon name={saving?'history':'save'} size={13} color={dirty?'#fff':T.ink3}/>
         {saving?'Sauvegarde…':'Sauver projet'}
       </button>}
