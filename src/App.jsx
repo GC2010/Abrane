@@ -240,7 +240,7 @@ const initialState = project => {
       sigScale:30,sigX:78,sigY:88,groupX:50,groupY:85,
       stampEnabled:false,stampOpacity:70,stampScale:25,stampX:50,stampY:50,stampPlacement:'all',
       symEnabled:false,symPlacement:'all',symText:'',symScale:20,symX:50,symY:50,symPageNum:1,
-      advEnabled:false,advStatus:'AF',advPlacement:'all',advScale:15,advFontScale:100,advX:85,advY:8,advPageNum:1,advPageStatuses:{},
+      advEnabled:false,advStatus:'AF',advPlacement:'all',advScale:15,advFontScale:80,advX:85,advY:8,advPageNum:1,advPageStatuses:{},
       disclaimerEnabled:false,disclaimerLang:'fr',disclaimerPlacement:'all',disclaimerSize:6,disclaimerX:50,disclaimerY:95,disclaimerPageNum:1,
       stripeLogoScale:80,stripeLogoY:0,bgImageUrl:'',bgX:50,bgY:50,bgScale:100,
       notes:[''],noteContent:'',noteHtml:'',
@@ -288,7 +288,7 @@ const initialState = project => {
     sigScale:30, sigX:78, sigY:88, groupX:50, groupY:85,
     stampEnabled:false, stampOpacity:70, stampScale:25, stampX:50, stampY:50, stampPlacement:'all',
     symEnabled:false, symPlacement:'all', symText:'', symScale:20, symX:50, symY:50, symPageNum:1,
-    advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advFontScale:100, advX:85, advY:8, advPageNum:1, advPageStatuses:{},
+    advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advFontScale:80, advX:85, advY:8, advPageNum:1, advPageStatuses:{},
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
@@ -1625,9 +1625,9 @@ function PageOverlays({state,page,pageIndex,totalPages}) {
     </div>}
     {advShow&&advSt.v!=='NONE'&&<div style={{position:'absolute',left:`${state.advX??85}%`,top:`${state.advY??8}%`,transform:'translate(-50%,-50%)',zIndex:9,pointerEvents:'none',width:`${state.advScale??15}%`,maxWidth:'28%'}}>
       <div style={{background:advSt.color+'28',border:`2px solid ${advSt.color}`,borderRadius:8,padding:'8% 12%',display:'flex',flexDirection:'column',alignItems:'center',gap:'5%',boxShadow:'0 2px 8px rgba(0,0,0,.18)'}}>
-        <span style={{fontSize:`clamp(${(7*advFs).toFixed(1)}px,${(2*advFs).toFixed(2)}vw,${(18*advFs).toFixed(1)}px)`,lineHeight:1}}>{advSt.emoji}</span>
-        <span style={{fontSize:`clamp(${(12*advFs).toFixed(1)}px,${(3.3*advFs).toFixed(2)}vw,${(27*advFs).toFixed(1)}px)`,fontWeight:900,color:advSt.color,letterSpacing:'.08em',lineHeight:1}}>{advSt.v}</span>
-        <span style={{fontSize:`clamp(${(9*advFs).toFixed(1)}px,${(2.25*advFs).toFixed(2)}vw,${(18*advFs).toFixed(1)}px)`,fontWeight:600,color:advSt.color,textAlign:'center',lineHeight:1.25}}>{advSt.l}</span>
+        <span style={{fontSize:`clamp(${(4*advFs).toFixed(1)}px,${(1.1*advFs).toFixed(2)}vw,${(11*advFs).toFixed(1)}px)`,lineHeight:1}}>{advSt.emoji}</span>
+        <span style={{fontSize:`clamp(${(7*advFs).toFixed(1)}px,${(1.8*advFs).toFixed(2)}vw,${(15*advFs).toFixed(1)}px)`,fontWeight:900,color:advSt.color,letterSpacing:'.08em',lineHeight:1}}>{advSt.v}</span>
+        <span style={{fontSize:`clamp(${(5*advFs).toFixed(1)}px,${(1.2*advFs).toFixed(2)}vw,${(10*advFs).toFixed(1)}px)`,fontWeight:600,color:advSt.color,textAlign:'center',lineHeight:1.25}}>{advSt.l}</span>
       </div>
     </div>}
     {disShow&&<div style={{position:'absolute',left:`${state.disclaimerX??50}%`,top:`${state.disclaimerY??95}%`,transform:'translate(-50%,-50%)',zIndex:8,pointerEvents:'none',width:'88%',textAlign:'center'}}>
@@ -3306,8 +3306,8 @@ function SymbolsPanel({state,update}) {
         <Fld label={`Taille badge · ${state.advScale??15}%`}>
           <input type="range" min="4" max="40" value={state.advScale??15} onChange={e=>update({advScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
-        <Fld label={`Taille police · ${state.advFontScale??100}%`}>
-          <input type="range" min="40" max="150" value={state.advFontScale??100} onChange={e=>update({advFontScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
+        <Fld label={`Taille police · ${state.advFontScale??80}%`}>
+          <input type="range" min="20" max="150" value={state.advFontScale??80} onChange={e=>update({advFontScale:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
         </Fld>
         <Fld label={`Position horizontale · ${state.advX??85}%`}>
           <input type="range" min="0" max="100" value={state.advX??85} onChange={e=>update({advX:parseInt(e.target.value)})} style={{width:'100%',accentColor:T.navy}}/>
