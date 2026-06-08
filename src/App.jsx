@@ -1398,7 +1398,9 @@ function ContentPage({state,file,pageIdx,pageNum,isPortrait,isRing,rotation,page
     </div>
     {/* Accessories strip — fixed 80px thumbnails regardless of count */}
     {hasAcc&&(
-      <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'13%',display:'flex',alignItems:'flex-start',gap:6,overflow:'visible'}}>
+      <div style={{position:'absolute',bottom:isNotes?'23%':'6%',left:isRing?'14%':'4%',right:'13%',display:'flex',flexDirection:'column',gap:4,overflow:'visible'}}>
+        <div style={{fontSize:7,fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:shade(p.c2,-5)}}>Accessoires disponibles</div>
+        <div style={{display:'flex',alignItems:'flex-start',gap:6,overflow:'visible'}}>
         {accItems.map(({id,name,url})=>(
           <div key={id} style={{flexShrink:0,width:80,display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
             <div style={{width:80,height:80,borderRadius:6,overflow:'hidden',border:`1.5px solid ${shade(p.c2,-5)}`,background:'#fff',padding:3,boxSizing:'border-box',flexShrink:0}}>
@@ -1410,6 +1412,7 @@ function ContentPage({state,file,pageIdx,pageNum,isPortrait,isRing,rotation,page
             <div style={{width:80,fontSize:7,color:shade(p.c3,50),textAlign:'center',lineHeight:1.25,overflow:'hidden',display:'-webkit-box',WebkitBoxOrient:'vertical',WebkitLineClamp:2}}>{name}</div>
           </div>
         ))}
+        </div>
       </div>
     )}
     {/* Compatible products footer — shown only on accessory pages that are used in at least one product */}
