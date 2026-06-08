@@ -1327,7 +1327,7 @@ function CatPage({state,catName,isPortrait,isRing}) {
   </div>;
 }
 
-function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,pageKey,ordId}) {
+function ContentPage({state,file,pageIdx,pageNum,isPortrait,isRing,rotation,pageUrl,pageKey,ordId}) {
   const p=state.palette,isNotes=state.pageFormat.includes('notes');
   const rot=rotation||0;
   const accIds=state.pageAccessories?.[pageKey]||[];
@@ -1475,7 +1475,7 @@ function ContentPage({state,file,pageIdx,isPortrait,isRing,rotation,pageUrl,page
     }}>
       {(state.contentOrder.find(x=>x.id===ordId)?.label||file.name.replace(/\.[^.]+$/,''))+(pageIdx>0?` (${pageIdx+1})`:'')}
     </div>}
-    <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',fontSize:9,color:shade(p.c3,50)}}>{String(pageIdx+5).padStart(2,'0')}</div>
+    <div style={{position:'absolute',bottom:'2%',left:isRing?'14%':'4%',fontSize:9,color:shade(p.c3,50)}}>{String(pageNum??pageIdx+1).padStart(2,'0')}</div>
     <BindingMarks isRing={isRing}/>
   </div>;
 }
@@ -1562,6 +1562,7 @@ const buildPageList = s => {
   });
 
   pages.push({key:'back',type:'back',label:'Quatrième de couverture'});
+  pages.forEach((p,i)=>{p.pageNum=i+1;});
   return pages;
 };
 
@@ -1572,7 +1573,7 @@ function PageRender({page,state}) {
     case 'index':     return <IndexPage   state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'materials': return <MatPage     state={state} isPortrait={isP} isRing={isR} pageIndex={page.pageIndex||0}/>;
     case 'category':  return <CatPage     state={state} catName={page.catName} isPortrait={isP} isRing={isR}/>;
-    case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} isPortrait={isP} isRing={isR} rotation={page.rotation} pageUrl={page.pageUrl} pageKey={page.key} ordId={page.ordId}/>;
+    case 'content':   return <ContentPage state={state} file={page.file} pageIdx={page.pageIdx} pageNum={page.pageNum} isPortrait={isP} isRing={isR} rotation={page.rotation} pageUrl={page.pageUrl} pageKey={page.key} ordId={page.ordId}/>;
     case 'notes':     return <NotesPage   state={state} isPortrait={isP} isRing={isR} noteIdx={page.noteIdx||0}/>;
     case 'back':      return <BackPage    state={state} isPortrait={isP} isRing={isR}/>;
     default: return null;
