@@ -2398,7 +2398,29 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
   const [importing,setImporting]=useState(false);
   const [expandedZoom,setExpandedZoom]=useState({});
   const [dropHighlight,setDropHighlight]=useState(false);
+  const [pendingImport,setPendingImport]=useState(null);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
+
+  const InsertSlot=({label,onClick,isEnd=false})=>(
+    <button onClick={onClick} style={{
+      width:'100%',border:'none',cursor:'pointer',
+      padding:'5px 12px 6px',fontFamily:'inherit',textAlign:'left',
+      display:'flex',alignItems:'center',gap:7,
+      background:isEnd?T.goldTint:'transparent',
+      borderTop:`1.5px dashed ${isEnd?T.gold:T.lineSoft}`,
+      borderBottom:`1.5px dashed ${isEnd?T.gold:T.lineSoft}`,
+      color:isEnd?T.navy:T.ink4,
+      fontSize:10,fontWeight:isEnd?700:400,letterSpacing:'.03em',
+      transition:'background .12s',
+    }}
+      onMouseEnter={e=>{e.currentTarget.style.background=isEnd?'#FFF0C8':T.navyTint;}}
+      onMouseLeave={e=>{e.currentTarget.style.background=isEnd?T.goldTint:'transparent';}}
+    >
+      <span style={{fontSize:12,lineHeight:1,opacity:.7}}>▼</span>
+      <span style={{flex:1}}>{label}</span>
+      {isEnd&&<span style={{fontSize:8.5,opacity:.65,flexShrink:0}}>défaut</span>}
+    </button>
+  );
 
   const processFiles=async(list,isAccessory=false)=>{
     if(!list.length)return;
@@ -2428,7 +2450,11 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
       const ordId='fi'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
       newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:'',...(isAccessory?{isAccessory:true}:{})});
     }
-    update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
+    if(state.contentOrder.length>0&&!isAccessory){
+      setPendingImport({files:newFiles,orders:newOrders});
+    }else{
+      update({files:[...state.files,...newFiles],contentOrder:[...state.contentOrder,...newOrders]});
+    }
     setImporting(false);
   };
 
@@ -2511,6 +2537,14 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
   const setContentZoom=(ordId,val)=>update({contentZoom:{...(state.contentZoom||{}),[ordId]:val}});
   const setContentPos=(ordId,x,y)=>update({contentPos:{...(state.contentPos||{}),[ordId]:{x,y}}});
 
+  const insertPending=(insertIdx)=>{
+    if(!pendingImport)return;
+    const newOrder=[...state.contentOrder];
+    newOrder.splice(insertIdx,0,...pendingImport.orders);
+    update({files:[...state.files,...pendingImport.files],contentOrder:newOrder});
+    setPendingImport(null);
+  };
+
   const goToItem=item=>{
     if(!onNavigate)return;
     const pages=buildPageList(state);
@@ -2588,6 +2622,78 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     border:`1px solid ${active?T.gold:T.lineSoft}`,borderRadius:3,cursor:'pointer',
     background:active?T.gold:'transparent',color:active?'#fff':T.ink4,
   });
+
+  if(pendingImport){
+    return(
+      <div style={{display:'flex',flexDirection:'column',borderRadius:10,overflow:'hidden',border:`1.5px solid ${T.navy}`,boxShadow:'0 8px 32px rgba(27,46,92,.18)'}}>
+        {/* Header */}
+        <div style={{background:T.navy,color:'#fff',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:700}}>
+              Où insérer {pendingImport.files.length} fichier{pendingImport.files.length>1?'s':''}?
+            </div>
+            <div style={{fontSize:9.5,opacity:.65,marginTop:2}}>Cliquez sur la position souhaitée</div>
+          </div>
+          <button onClick={()=>setPendingImport(null)} title="Annuler" style={{background:'rgba(255,255,255,.15)',border:'none',cursor:'pointer',width:22,height:22,borderRadius:'50%',color:'#fff',fontSize:16,lineHeight:1,display:'grid',placeItems:'center',flexShrink:0}}>×</button>
+        </div>
+        {/* Preview strip — files being imported */}
+        <div style={{background:T.navyTint,padding:'8px 10px',display:'flex',gap:7,overflowX:'auto',borderBottom:`1px solid ${T.lineSoft}`}}>
+          {pendingImport.files.map(f=>(
+            <div key={f.id} style={{flexShrink:0,textAlign:'center',width:44}}>
+              <div style={{width:38,height:48,borderRadius:4,overflow:'hidden',border:`1.5px solid ${T.navy}`,background:T.panel2,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto'}}>
+                {f.pageUrls?.[0]
+                  ?<img src={f.pageUrls[0]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  :<Icon name={(f.type==='pdf'||f.type==='merged')?'pdf':'image'} size={14} color={T.ink4}/>
+                }
+              </div>
+              <div style={{fontSize:8,color:T.ink3,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',lineHeight:1.2}}>{f.name.replace(/\.[^.]+$/,'')}</div>
+            </div>
+          ))}
+        </div>
+        {/* Position list */}
+        <div style={{maxHeight:340,overflowY:'auto',background:T.surface}}>
+          <InsertSlot label="Au début de la liste" onClick={()=>insertPending(0)}/>
+          {state.contentOrder.map((item,idx)=>{
+            const isCat=item.type==='cat';
+            const f=isCat?null:state.files.find(x=>x.id===item.fileId);
+            const displayName=isCat?item.name:(item.label||f?.name?.replace(/\.[^.]+$/,'')||'?');
+            const short=displayName.length>24?displayName.slice(0,24)+'…':displayName;
+            return(
+              <React.Fragment key={item.id}>
+                <div style={{display:'flex',alignItems:'center',gap:7,padding:'5px 12px',background:isCat?T.goldTint:T.surface,borderBottom:`1px solid ${T.lineSoft}`,pointerEvents:'none',userSelect:'none'}}>
+                  <div style={{width:22,height:28,borderRadius:3,overflow:'hidden',flexShrink:0,border:`1px solid ${T.lineSoft}`,background:T.panel2,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    {isCat
+                      ?<Icon name="bookmark" size={10} color={T.gold}/>
+                      :(f?.pageUrls?.[0]
+                          ?<img src={f.pageUrls[0]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                          :<Icon name={(f?.type==='pdf'||f?.type==='merged')?'pdf':'image'} size={10} color={T.ink4}/>
+                      )
+                    }
+                  </div>
+                  <div style={{fontSize:10.5,color:T.ink,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{short}</div>
+                  {isCat&&<span style={{fontSize:7.5,fontWeight:700,background:T.goldSoft,color:T.navy,borderRadius:2,padding:'1px 4px',flexShrink:0}}>CAT</span>}
+                </div>
+                <InsertSlot
+                  label={`Après "${short}"`}
+                  onClick={()=>insertPending(idx+1)}
+                  isEnd={idx===state.contentOrder.length-1}
+                />
+              </React.Fragment>
+            );
+          })}
+          {state.contentOrder.length===0&&(
+            <InsertSlot label="À la fin (liste vide)" onClick={()=>insertPending(0)} isEnd/>
+          )}
+        </div>
+        {/* Footer */}
+        <div style={{padding:'8px 12px',borderTop:`1px solid ${T.line}`,background:T.surface,display:'flex',justifyContent:'flex-end'}}>
+          <button onClick={()=>setPendingImport(null)} style={{...btnSt('ghost',true),fontSize:11,padding:'6px 16px'}}>
+            Annuler
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const fileCount=state.contentOrder.filter(x=>x.type==='file').length;
   const catCount=state.contentOrder.filter(x=>x.type==='cat').length;
