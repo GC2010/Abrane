@@ -4558,7 +4558,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
   const doSave=useCallback(async(overwriteId,name)=>{
     if(!USE_CLOUD){setState(s=>({...s,_dirty:false}));showToast('Projet enregistré (local)');return;}
     // Fast size estimate: sum of page image data char lengths — no JSON.stringify needed
-    const imgMB=(state.files||[]).reduce((sum,f)=>sum+(f.pages||[]).reduce((s,p)=>s+(p.img?.length||0),0),0)/1048576;
+    const imgMB=(state.files||[]).reduce((sum,f)=>sum+(f.pageUrls||[]).reduce((s,u)=>s+(u?.length||0),0),0)/1048576;
     // Block immediately for oversized projects — avoids expensive gzip + Supabase rejection
     if(imgMB>10){showToast(`Projet ${Math.round(imgMB)} MB — trop lourd pour le cloud`);setHeavyModal({mb:Math.round(imgMB)});return;}
     if(!state._dirty){showToast('Projet déjà sauvegardé');return;}
