@@ -4471,6 +4471,7 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const [dirtySteps,setDirtySteps]=useState({});
   const activeStepRef=React.useRef('project');
   const [toast,setToast]=useState(null);
+  const [heavyModal,setHeavyModal]=useState(null);
   const [zoom,setZoom]=useState(1);
   const [activePage,setActivePage]=useState(0);
   const [thumbSize,setThumbSize]=useState('M');
@@ -4545,18 +4546,30 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
   const [saveModal,setSaveModal]=useState(false);
   const [saveAsName,setSaveAsName]=useState('');
 
+  const exportCurrentProject=useCallback(()=>{
+    const{sigUrl:_s,_dirty:_d,...data}=state;
+    const blob=new Blob([JSON.stringify({name:state.name||'projet',exportedAt:new Date().toISOString(),data},null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`${(state.name||'projet').replace(/[^a-z0-9_\-]/gi,'_')}.abrane.json`;
+    a.click();URL.revokeObjectURL(a.href);
+  },[state]);
+
   const doSave=useCallback(async(overwriteId,name)=>{
     if(!USE_CLOUD){setState(s=>({...s,_dirty:false}));showToast('Projet enregistré (local)');return;}
+    // Fast size estimate: sum of page image data lengths (no JSON.stringify needed)
+    const imgMB=(state.files||[]).reduce((sum,f)=>sum+(f.pages||[]).reduce((s,p)=>s+(p.img?.length||0),0),0)/1048576;
     setSaving(true);
     try{
       const id=await upsertProject(user.id,overwriteId,name||state.name,state);
       setProjectId(id);
       setLastSaved('cloud');
       setState(s=>({...s,_dirty:false,name:name||s.name}));
-      showToast('Projet sauvegardé');
+      showToast(imgMB>10?`Projet sauvegardé (${Math.round(imgMB)} MB) — pensez à exporter en JSON`:'Projet sauvegardé');
       if(onProjectSaved) onProjectSaved(id);
     }catch(e){
-      showToast('Erreur : '+(e.message||e));
+      if(imgMB>10){setHeavyModal({mb:Math.round(imgMB)});}
+      else{showToast('Erreur : '+(e.message||e));}
     }
     finally{setSaving(false);}
   },[user,state,onProjectSaved]);
@@ -4655,6 +4668,23 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
       <button onClick={save} style={{background:T.surface,border:'none',color:T.ink,padding:'5px 12px',fontSize:12,borderRadius:999,display:'inline-flex',alignItems:'center',gap:5,fontWeight:600,cursor:'pointer'}}><Icon name="save" size={13} color={T.ink}/>Enregistrer</button>
     </div>}
     {toast&&<div style={{position:'fixed',bottom:paletteH+16,right:16,background:T.ink,color:'#fff',padding:'9px 14px',borderRadius:8,fontSize:12,zIndex:9999}}>{toast}</div>}
+    {heavyModal&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',display:'grid',placeItems:'center',zIndex:9999}} onClick={()=>setHeavyModal(null)}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:12,padding:'28px 30px',maxWidth:440,width:'90%',boxShadow:'0 8px 40px rgba(0,0,0,.22)'}}>
+        <div style={{fontSize:22,marginBottom:8}}>⚠️</div>
+        <div style={{fontSize:15,fontWeight:700,color:T.navy,marginBottom:10}}>Projet trop volumineux pour le cloud</div>
+        <div style={{fontSize:13,color:T.ink4,lineHeight:1.65,marginBottom:22}}>
+          Ce projet pèse environ <strong>{heavyModal.mb} MB</strong> — au-delà de la limite de stockage cloud.<br/><br/>
+          <strong>Exportez-le en JSON</strong> pour le conserver sur votre ordinateur.<br/>
+          Vous pourrez le réimporter à tout moment pour continuer à travailler dessus.
+        </div>
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+          <button onClick={()=>setHeavyModal(null)} style={{...btnSt(),fontSize:13,padding:'8px 16px'}}>Fermer</button>
+          <button onClick={()=>{exportCurrentProject();setHeavyModal(null);}} style={{...btnSt(),fontSize:13,padding:'8px 16px',background:T.navy,color:'#fff',borderColor:T.navy,display:'inline-flex',alignItems:'center',gap:6}}>
+            <Icon name="download" size={14} color="#fff"/>Exporter JSON
+          </button>
+        </div>
+      </div>
+    </div>}
     {saveModal&&<Scrim onClose={()=>setSaveModal(false)}>
       <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:12,padding:28,width:400,boxShadow:'0 24px 60px rgba(0,0,0,.18)'}}>
         <div style={{fontSize:15,fontWeight:700,color:T.ink,marginBottom:6}}>Enregistrer le projet</div>
