@@ -240,7 +240,7 @@ const initialState = project => {
       sigScale:30,sigX:78,sigY:88,groupX:50,groupY:85,
       stampEnabled:false,stampOpacity:70,stampScale:25,stampX:50,stampY:50,stampPlacement:'all',
       symEnabled:false,symPlacement:'all',symText:'',symScale:20,symX:50,symY:50,symPageNum:1,
-      advEnabled:false,advStatus:'AF',advPlacement:'all',advScale:15,advX:85,advY:8,advPageNum:1,
+      advEnabled:false,advStatus:'AF',advPlacement:'all',advScale:15,advX:85,advY:8,advPageNum:1,advPageStatuses:{},
       disclaimerEnabled:false,disclaimerLang:'fr',disclaimerPlacement:'all',disclaimerSize:6,disclaimerX:50,disclaimerY:95,disclaimerPageNum:1,
       stripeLogoScale:80,stripeLogoY:0,bgImageUrl:'',bgX:50,bgY:50,bgScale:100,
       notes:[''],noteContent:'',noteHtml:'',
@@ -288,7 +288,7 @@ const initialState = project => {
     sigScale:30, sigX:78, sigY:88, groupX:50, groupY:85,
     stampEnabled:false, stampOpacity:70, stampScale:25, stampX:50, stampY:50, stampPlacement:'all',
     symEnabled:false, symPlacement:'all', symText:'', symScale:20, symX:50, symY:50, symPageNum:1,
-    advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advX:85, advY:8, advPageNum:1,
+    advEnabled:false, advStatus:'AF', advPlacement:'all', advScale:15, advX:85, advY:8, advPageNum:1, advPageStatuses:{},
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
@@ -1590,7 +1590,7 @@ function PageOverlays({state,page,pageIndex,totalPages}) {
   const symShow=state.symEnabled&&match(state.symPlacement||'all',(state.symPageNum??1)-1);
   const advShow=state.advEnabled&&match(state.advPlacement||'all',(state.advPageNum??1)-1);
   const disShow=state.disclaimerEnabled&&match(state.disclaimerPlacement||'all',(state.disclaimerPageNum??1)-1);
-  const advSt=ADV_STATUSES.find(s=>s.v===(state.advStatus||'AF'))||ADV_STATUSES[0];
+  const advSt=ADV_STATUSES.find(s=>s.v===((state.advPageStatuses?.[page?.key])||state.advStatus||'AF'))||ADV_STATUSES[0];
   const sz=state.disclaimerSize??6;
   const lang=state.disclaimerLang||'fr';
   const FR='Tous les dessins techniques et documents associés sont la propriété exclusive de ABRANE France S.A.S. Toute reproduction ou utilisation sans autorisation est interdite.';
@@ -3229,7 +3229,7 @@ function SymbolsPanel({state,update}) {
         <Toggle checked={state.advEnabled} onChange={v=>update({advEnabled:v})}/>
       </RowItem>
       {state.advEnabled&&<>
-        <Fld label="Statut">
+        <Fld label="Statut par défaut">
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
             {ADV_STATUSES.map(s=>{
               const active=(state.advStatus||'AF')===s.v;
@@ -3243,19 +3243,45 @@ function SymbolsPanel({state,update}) {
             })}
           </div>
         </Fld>
-        <Fld label="Aperçu">
-          {(()=>{const s=ADV_STATUSES.find(x=>x.v===(state.advStatus||'AF'))||ADV_STATUSES[0];return(
-            <div style={{display:'flex',justifyContent:'center',padding:'8px 0'}}>
-              <div style={{background:s.color+'28',border:`2px solid ${s.color}`,borderRadius:8,padding:'8px 16px',display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:20}}>{s.emoji}</span>
-                <div>
-                  <div style={{fontSize:13,fontWeight:900,color:s.color,letterSpacing:'.06em'}}>{s.v}</div>
-                  <div style={{fontSize:11,fontWeight:600,color:s.color}}>{s.l}</div>
-                </div>
-              </div>
+        {(()=>{
+          const pages=[];
+          (state.contentOrder||[]).forEach(it=>{
+            if(it.type!=='file') return;
+            const f=(state.files||[]).find(x=>x.id===it.fileId);
+            if(!f) return;
+            const n=typeof f.pages==='number'?f.pages:1;
+            const lbl=it.label||f.name.replace(/\.[^.]+$/,'');
+            for(let i=0;i<n;i++) pages.push({key:`f-${it.id}-${i}`,label:n>1?`${lbl} p.${i+1}`:lbl});
+          });
+          if(!pages.length) return null;
+          const ps=state.advPageStatuses||{};
+          const hasOverrides=Object.keys(ps).length>0;
+          return <Fld label="Statut par page">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              <span style={{fontSize:11,color:T.ink3}}>Cliquez sur un statut pour le modifier</span>
+              {hasOverrides&&<button onClick={()=>update({advPageStatuses:{}})} style={{fontSize:10,color:T.ink3,background:'transparent',border:'none',cursor:'pointer',padding:'2px 4px',borderRadius:4,textDecoration:'underline'}}>Tout réinitialiser</button>}
             </div>
-          );})()}
-        </Fld>
+            <div style={{display:'flex',flexDirection:'column',gap:3,maxHeight:260,overflowY:'auto',paddingRight:2}}>
+              {pages.map(p=>{
+                const code=ps[p.key]||state.advStatus||'AF';
+                const s=ADV_STATUSES.find(x=>x.v===code)||ADV_STATUSES[0];
+                const isOverride=!!ps[p.key];
+                return <div key={p.key} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 6px',borderRadius:6,background:isOverride?s.color+'0D':T.panel,border:`1px solid ${isOverride?s.color+'44':T.lineSoft}`}}>
+                  <span style={{flex:1,fontSize:11,color:T.ink,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}} title={p.label}>{p.label}</span>
+                  <select value={code} onChange={e=>{
+                    const v=e.target.value;
+                    const next={...ps};
+                    if(v===state.advStatus) delete next[p.key]; else next[p.key]=v;
+                    update({advPageStatuses:next});
+                  }} style={{fontSize:11,border:`1px solid ${s.color}`,borderRadius:4,padding:'2px 4px',background:s.color+'18',color:s.color,fontWeight:700,cursor:'pointer',outline:'none',maxWidth:110}}>
+                    {ADV_STATUSES.map(x=><option key={x.v} value={x.v}>{x.emoji} {x.v}</option>)}
+                  </select>
+                  {isOverride&&<button onClick={()=>{const next={...ps};delete next[p.key];update({advPageStatuses:next});}} style={{fontSize:11,lineHeight:1,width:16,height:16,display:'flex',alignItems:'center',justifyContent:'center',border:'none',background:'transparent',color:T.ink3,cursor:'pointer',borderRadius:3,flexShrink:0}} title="Réinitialiser">×</button>}
+                </div>;
+              })}
+            </div>
+          </Fld>;
+        })()}
         <Fld label="Appliquer sur">
           <div style={{display:'flex',flexDirection:'column',gap:4}}>
             {PLACEMENTS.map(pl=>(
