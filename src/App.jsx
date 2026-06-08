@@ -227,7 +227,7 @@ const initialState = project => {
   if(project?._isOfficialTemplate){
     const t=new Date(),dd=String(t.getDate()).padStart(2,'0'),mm=String(t.getMonth()+1).padStart(2,'0');
     return {
-      name:'Modèle officiel ABRANE',client:'ABRANE',subtitle:'Détails',year:'2026',rev:'REV 01',
+      client:'ABRANE',subtitle:'Détails',year:'2026',rev:'REV 01',
       projectDate:`${dd}/${mm}/${t.getFullYear()}`,mainTitle:'BOOK',pageFormat:'h-full',
       palette:{c1:'#E8DCC8',c2:'#C8A96E',c3:'#2B2B2B'},
       logoScale:100,logoX:80,logoY:5,clientLogoUrl:'',
@@ -292,7 +292,7 @@ const initialState = project => {
     disclaimerEnabled:false, disclaimerLang:'fr', disclaimerPlacement:'all', disclaimerSize:6, disclaimerX:50, disclaimerY:95, disclaimerPageNum:1,
     stripeLogoScale:80, stripeLogoY:0,
     bgImageUrl:'', bgX:50, bgY:50, bgScale:100,
-    notes:[''],enNotes:false, noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, pageAccessories:{}, _dirty:false,
+    notes:[''], noteContent:'', noteHtml:'', annotations:{}, annotSnaps:{}, pageNotes:{}, contentZoom:{}, contentPos:{}, pageAccessories:{}, _dirty:false,
   };
 };
 
