@@ -4461,7 +4461,7 @@ function AnnotatorModal({state,update,pageKey,pageUrl,isPortrait,onClose}) {
   );
 }
 
-function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
+function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef}) {
   const [state,setState]=useState(()=>{
     const s=initialState(project);
     // Inject user signature from profile (never from saved project data)
@@ -4633,6 +4633,10 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange}) {
     a.download=(state.name||'projet').replace(/[^a-z0-9]/gi,'_')+'.abrane.json';
     a.click();URL.revokeObjectURL(a.href);
   },[state]);
+
+  useEffect(()=>{
+    if(saveFnRef) saveFnRef.current=isOfficialTemplate?()=>{}:save;
+  },[save,isOfficialTemplate,saveFnRef]);
 
   useEffect(()=>{
     const isAdmin=user?.role==='admin'||user?.role==='superadmin';
@@ -4816,6 +4820,7 @@ export default function App() {
   const [loadingProject,setLoadingProject]=useState(false);
   const [showAdmin,setShowAdmin]=useState(false);
   const [saveBarProps,setSaveBarProps]=useState({dirty:false,saving:false,lastSaved:null,onSave:()=>{}});
+  const saveFnRef=React.useRef(()=>{});
   const [brand,setBrand]=useState(()=>({
     officialLogo:localStorage.getItem('abrane_logo')||defaultLogoUrl,
     wmLogo:localStorage.getItem('abrane_wm')||defaultWmUrl,
@@ -4873,7 +4878,7 @@ export default function App() {
         <TopBar user={user} screen={screen} project={project}
           onHome={()=>setScreen('dashboard')} onLogout={handleLogout}
           onOpenAdmin={user.role==='superadmin'?()=>setShowAdmin(true):null}
-          onSave={saveBarProps.onSave} saving={saveBarProps.saving}
+          onSave={()=>saveFnRef.current()} saving={saveBarProps.saving}
           dirty={saveBarProps.dirty} lastSaved={saveBarProps.lastSaved}
           onSaveAsTemplate={saveBarProps.onSaveAsTemplate||null}
           onSaveOfficialTemplate={saveBarProps.onSaveOfficialTemplate||null}
@@ -4902,7 +4907,7 @@ export default function App() {
             setScreen('configurator');
           }}/>}
         {screen==='configurator'&&<Configurator user={user} project={project}
-          onSaveStateChange={setSaveBarProps}/>}
+          onSaveStateChange={setSaveBarProps} saveFnRef={saveFnRef}/>}
         {screen==='fastmode'&&(
           <React.Suspense fallback={<div style={{flex:1,display:'grid',placeItems:'center',color:'#9C9690',fontSize:13}}>Chargement Fast Mode…</div>}>
             <FastMode user={user}/>
