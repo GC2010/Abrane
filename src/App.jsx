@@ -3678,7 +3678,29 @@ function VueEnsembleModal({state,update,onClose}) {
     return()=>window.removeEventListener('keydown',fn);
   },[selectedIds]);
 
-  const apply=()=>{update({contentOrder:localOrder});onClose();};
+  const apply=()=>{
+    // IDs removed from contentOrder in this session
+    const deletedIds=new Set(
+      state.contentOrder
+        .filter(it=>!localOrder.some(lo=>lo.id===it.id))
+        .map(it=>it.id)
+    );
+    // Clean stale accessory IDs from pageAccessories
+    let newPageAcc=state.pageAccessories||{};
+    if(deletedIds.size>0){
+      const cleaned={};
+      for(const[pk,ids] of Object.entries(newPageAcc)){
+        const kept=ids.filter(id=>!deletedIds.has(id));
+        if(kept.length) cleaned[pk]=kept;
+      }
+      newPageAcc=cleaned;
+    }
+    // Remove orphan files no longer referenced by any contentOrder entry
+    const usedFileIds=new Set(localOrder.filter(it=>it.type==='file').map(it=>it.fileId));
+    const newFiles=state.files.filter(f=>usedFileIds.has(f.id));
+    update({contentOrder:localOrder,files:newFiles,pageAccessories:newPageAcc});
+    onClose();
+  };
 
   return <Scrim onClose={onClose}><div style={{
     width:'92vw',maxWidth:1300,maxHeight:'90vh',background:T.surface,
