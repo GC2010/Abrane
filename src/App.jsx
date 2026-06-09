@@ -1818,34 +1818,233 @@ function PdfExportModal({state,onClose}) {
       const [{jsPDF},{default:h2c}]=await Promise.all([import('jspdf'),import('html2canvas')]);
       const pdf=new jsPDF({orientation:isP?'portrait':'landscape',unit:'mm',format:'a4',compress:true});
       const navData=withInteractive?buildNavData(exportState,pages):null;
+      const sc=cfg.scale;
+
+      // Cached image loader — avoids re-decoding repeated images (logos, client logo)
+      const iC={};
+      const li=src=>{
+        if(!src)return Promise.resolve(null);
+        if(iC[src])return iC[src];
+        return(iC[src]=new Promise(res=>{const m=new Image();m.onload=()=>res(m);m.onerror=()=>res(null);m.src=src;}));
+      };
+
+      // Draw the right navigation stripe (white bg + border + ABRANE logo + client logo)
+      const drawStripe=async(ctx,W,H)=>{
+        const p=exportState.palette;
+        const sX=W*NAV.stripeXPct,sW=W*NAV.stripeWPct;
+        ctx.fillStyle='#fff';ctx.fillRect(sX,0,sW,H);
+        const[br,bg,bb]=hexRgb(p.c2);
+        ctx.fillStyle=`rgb(${br},${bg},${bb})`;ctx.fillRect(sX,0,3*sc,H);
+        const lW=sW*.62,lX=sX+(sW-lW)/2,lT=H*.05;
+        if(brandCtx.officialLogo){
+          const img=await li(brandCtx.officialLogo);
+          if(img){const asp=img.width/img.height;const lH=Math.min(lW/asp,H*.15);ctx.drawImage(img,lX+(lW-lH*asp)/2,lT,lH*asp,lH);}
+        }else{
+          const[nr,ng,nb]=hexRgb(T.navy);
+          const fs=8*sc,lnH=fs*1.25,bH=lnH*6+10*sc;
+          ctx.fillStyle=`rgb(${nr},${ng},${nb})`;
+          ctx.beginPath();if(ctx.roundRect)ctx.roundRect(lX,lT,lW,bH,3*sc);else ctx.rect(lX,lT,lW,bH);ctx.fill();
+          ctx.fillStyle='#fff';ctx.font=`900 ${fs}px Arial,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+          'ABRANE'.split('').forEach((c,i)=>ctx.fillText(c,lX+lW/2,lT+5*sc+lnH*(i+.5)));
+        }
+        if(exportState.clientLogoUrl){
+          const img=await li(exportState.clientLogoUrl);
+          if(img){
+            const s=(exportState.stripeLogoScale??80)/100,cw=lW*s,ch=cw*img.height/img.width;
+            const yOff=(exportState.stripeLogoY??0)/100;
+            ctx.drawImage(img,lX+(lW-cw)/2,H*.35+yOff*H,cw,ch);
+          }
+        }
+      };
+
+      // Draw tiled watermark
+      const drawWM=async(ctx,W,H)=>{
+        if(!exportState.wmEnabled)return;
+        const wmImg=brandCtx.wmLogo?await li(brandCtx.wmLogo):null;
+        ctx.save();ctx.globalAlpha=(exportState.wmOpacity??30)/100;
+        ctx.translate(W/2,H/2);ctx.rotate(-40*Math.PI/180);ctx.translate(-W/2,-H/2);
+        const gL=-W*.8,gT=-H*.8,gW=W*2.6,gH=H*2.6,cols=7,rows=12;
+        const cW=gW/cols,cH=gH/rows,pad=cW*.03;
+        if(wmImg){
+          const asp=wmImg.width/wmImg.height;
+          for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+            const bX=gL+c*cW+pad,bY=gT+r*cH+pad,bW=cW-2*pad,bH=cH-2*pad;
+            let dw,dh,dx,dy;
+            if(asp>bW/bH){dw=bW;dh=bW/asp;dx=bX;dy=bY+(bH-dh)/2;}else{dh=bH;dw=bH*asp;dy=bY;dx=bX+(bW-dw)/2;}
+            ctx.drawImage(wmImg,dx,dy,dw,dh);
+          }
+        }else{
+          ctx.fillStyle='#1A1F2E';ctx.font=`900 ${Math.min(7*sc,.0075*W)}px Arial,sans-serif`;
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)ctx.fillText('ABRANE',gL+c*cW+cW/2,gT+r*cH+cH/2);
+        }
+        ctx.restore();
+      };
+
+      // Draw stamp and signature
+      const drawSig=async(ctx,W,H,pi,tot,pg)=>{
+        const last=tot-1;
+        const mt=(pl,sp)=>pl==='all'||(pl==='first'&&pi===0)||(pl==='last'&&pi===last)||(pl==='content'&&pg.type==='content')||(pl==='specific'&&pi===sp);
+        const gx=(exportState.groupX??exportState.sigX??50),gy=(exportState.groupY??exportState.sigY??85);
+        const bX=W*gx/100,bY=H*gy/100;
+        if(exportState.stampEnabled&&brandCtx.stampLogo&&mt(exportState.stampPlacement||'all')){
+          const img=await li(brandCtx.stampLogo);
+          if(img){const sw=W*Math.min((exportState.stampScale??25)/100,.5),sh=sw*img.height/img.width;ctx.save();ctx.globalAlpha=(exportState.stampOpacity??70)/100;ctx.drawImage(img,bX-sw/2,bY-sh/2,sw,sh);ctx.restore();}
+        }
+        if(exportState.sigEnabled&&exportState.sigUrl&&mt(exportState.sigPlacement||'all')){
+          const img=await li(exportState.sigUrl);
+          if(img){const sw=W*Math.min((exportState.sigScale??30)/100,.4),sh=sw*img.height/img.width;ctx.save();ctx.globalAlpha=.9;ctx.drawImage(img,bX-sw/2,bY-sh/2,sw,sh);ctx.restore();}
+        }
+      };
+
+      // Fast-path eligibility: content pages without complex CSS-only overlays
+      const canFast=(pg,pi,tot)=>{
+        if(pg.type!=='content'||!pg.pageUrl)return false;
+        if(exportState.pageFormat.includes('notes'))return false;
+        if(exportState.pageNotes?.[pg.key])return false;
+        if(withOverlays){
+          const last=tot-1;
+          const mt=(pl,sp)=>pl==='all'||(pl==='first'&&pi===0)||(pl==='last'&&pi===last)||(pl==='content'&&pg.type==='content')||(pl==='specific'&&pi===sp);
+          if(exportState.symEnabled&&mt(exportState.symPlacement||'all'))return false;
+          const advSt=ADV_STATUSES.find(s=>s.v===((exportState.advPageStatuses?.[pg.key])||exportState.advStatus||'AF'))||ADV_STATUSES[0];
+          if(exportState.advEnabled&&mt(exportState.advPlacement||'all')&&advSt.v!=='NONE')return false;
+          if(exportState.disclaimerEnabled&&mt(exportState.disclaimerPlacement||'all'))return false;
+        }
+        return true;
+      };
+
+      // Canvas-based render for content pages (bypasses html2canvas)
+      const renderFast=async(pg,pi,tot)=>{
+        const cv=document.createElement('canvas');
+        cv.width=BW*sc;cv.height=BH*sc;
+        const W=cv.width,H=cv.height,ctx=cv.getContext('2d');
+        const p=exportState.palette,isRing=exportState.pageFormat.includes('ring'),pk=pg.key;
+        // Accessories
+        const accIds=exportState.pageAccessories?.[pk]||[];
+        const accItems=accIds.map(id=>{
+          const ord=exportState.contentOrder.find(x=>x.id===id&&x.isAccessory);if(!ord)return null;
+          const f=exportState.files.find(x=>x.id===ord.fileId);if(!f)return null;
+          return{id,name:ord.label||f.name.replace(/\.[^.]+$/,''),url:f.pageUrls?.[0]||null};
+        }).filter(Boolean);
+        const hasAcc=accItems.length>0;
+        // Compat products (accessory pages)
+        const thisOrd=exportState.contentOrder.find(x=>x.id===pg.ordId);
+        const isAcc=!!thisOrd?.isAccessory;
+        let compatList=[];
+        if(isAcc){
+          const allPgs=buildPageList(exportState);
+          compatList=Object.entries(exportState.pageAccessories||{})
+            .filter(([,ids])=>ids.includes(pg.ordId))
+            .map(([pKey])=>{
+              const pOId=pKey.replace(/^f-/,'').replace(/-\d+$/,'');
+              const ord=exportState.contentOrder.find(x=>x.id===pOId);if(!ord)return null;
+              const f=exportState.files.find(x=>x.id===ord.fileId);
+              return{name:ord.label||f?.name.replace(/\.[^.]+$/,'')||'',pageNum:allPgs.findIndex(x=>x.key===pKey)+1};
+            }).filter(Boolean);
+        }
+        const hasCompat=compatList.length>0;
+        // Layout (mirrors ContentPage CSS)
+        const imgL=isRing?W*.14:W*.04,imgT=H*.03,imgR=W*.87;
+        const accH=hasAcc?110*sc:0,compatH=hasCompat?30*sc:0;
+        const imgB=H*.94-accH-compatH,imgW=imgR-imgL,imgH=imgB-imgT;
+        // 1. White background
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+        // 2. Product image with objectFit:contain + zoom/pos/rotation
+        const dispUrl=(withAnnot&&exportState.annotSnaps?.[pk])||pg.pageUrl;
+        const img=await li(dispUrl);
+        if(img){
+          const cZ=exportState.contentZoom?.[pk]??90,cX=exportState.contentPos?.[pk]?.x??50,cY=exportState.contentPos?.[pk]?.y??50,rot=pg.rotation||0;
+          const iAsp=img.width/img.height,zAsp=imgW/imgH;
+          let dw,dh,dx,dy;
+          if(iAsp>zAsp){dw=imgW;dh=imgW/iAsp;dx=imgL;dy=imgT+(imgH-dh)/2;}else{dh=imgH;dw=imgH*iAsp;dy=imgT;dx=imgL+(imgW-dw)/2;}
+          ctx.save();
+          ctx.beginPath();ctx.rect(imgL,imgT,imgW,imgH);ctx.clip();
+          const oX=dx+dw*cX/100,oY=dy+dh*cY/100;
+          ctx.translate(oX,oY);ctx.scale(cZ/100,cZ/100);if(rot)ctx.rotate(rot*Math.PI/180);
+          ctx.drawImage(img,dx-oX,dy-oY,dw,dh);
+          ctx.restore();
+        }
+        // 3. Right stripe
+        await drawStripe(ctx,W,H);
+        // 4. Accessories strip
+        if(hasAcc){
+          const aL=isRing?W*.14:W*.04,aB=H*.94-compatH,sz=80*sc,gap=6*sc;
+          const[lr,lg,lb]=hexRgb(shade(p.c2,-5));
+          ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.font=`700 ${7*sc}px Arial,sans-serif`;ctx.textAlign='left';ctx.textBaseline='alphabetic';
+          ctx.fillText('ACCESSOIRES DISPONIBLES',aL,aB-sz-6*sc);
+          let tx=aL;
+          for(const acc of accItems){
+            if(tx+sz>W*.87)break;
+            const ty=aB-sz;
+            ctx.fillStyle='#fff';ctx.fillRect(tx,ty,sz,sz);
+            if(acc.url){
+              const aI=await li(acc.url);
+              if(aI){
+                const iW=sz-6*sc,iH=sz-6*sc,a=aI.width/aI.height;
+                let dw,dh,ddx,ddy;
+                if(a>iW/iH){dw=iW;dh=iW/a;ddx=tx+3*sc;ddy=ty+3*sc+(iH-dh)/2;}else{dh=iH;dw=iH*a;ddy=ty+3*sc;ddx=tx+3*sc+(iW-dw)/2;}
+                ctx.save();ctx.beginPath();ctx.rect(tx+3*sc,ty+3*sc,iW,iH);ctx.clip();ctx.drawImage(aI,ddx,ddy,dw,dh);ctx.restore();
+              }
+            }
+            const[lr2,lg2,lb2]=hexRgb(shade(p.c2,-5));
+            ctx.strokeStyle=`rgb(${lr2},${lg2},${lb2})`;ctx.lineWidth=1.5*sc;ctx.strokeRect(tx,ty,sz,sz);
+            const[tr,tg,tb]=hexRgb(shade(p.c3,50));
+            ctx.fillStyle=`rgb(${tr},${tg},${tb})`;ctx.font=`400 ${7*sc}px Arial,sans-serif`;ctx.textAlign='center';ctx.textBaseline='top';
+            const nm=acc.name.length>14?acc.name.slice(0,13)+'…':acc.name;ctx.fillText(nm,tx+sz/2,aB+2*sc);
+            tx+=sz+gap;
+          }
+        }
+        // 5. Compat products (accessory pages)
+        if(hasCompat){
+          const cL=isRing?W*.14:W*.04,cB=H*.94;
+          const[lr,lg,lb]=hexRgb(shade(p.c2,-6));
+          ctx.fillStyle=`rgb(${lr},${lg},${lb})`;ctx.fillRect(cL,cB-compatH,.75*sc,compatH);
+          const[tr,tg,tb]=hexRgb(shade(p.c3,35));
+          ctx.fillStyle=`rgb(${tr},${tg},${tb})`;ctx.font=`400 ${6.5*sc}px Arial,sans-serif`;ctx.textAlign='left';ctx.textBaseline='top';
+          ctx.fillText('Accessoire compatible: '+compatList.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · '),cL,cB-compatH+3*sc,W*.83-cL);
+          const[tr2,tg2,tb2]=hexRgb(shade(p.c3,50));
+          ctx.fillStyle=`rgb(${tr2},${tg2},${tb2})`;ctx.font=`400 ${6.5*sc}px Arial,sans-serif`;
+          ctx.fillText('Compatible accessory: '+compatList.map(({name,pageNum})=>`${name} (p. ${String(pageNum).padStart(2,'0')})`).join(' · '),cL,cB-compatH+3*sc+8*sc,W*.83-cL);
+        }
+        // 6. Overlays (watermark + stamp/signature — symbol/badge/disclaimer fall back to slow path)
+        if(withOverlays){await drawWM(ctx,W,H);await drawSig(ctx,W,H,pi,tot,pg);}
+        return cv;
+      };
+
+      // Main loop
       for(let i=0;i<pages.length;i++){
         if(abortRef.current) break;
-        el=document.createElement('div');
-        el.style.cssText=`position:absolute;left:-${BW*4}px;top:0;width:${BW}px;height:${BH}px;overflow:hidden;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;`;
-        document.body.appendChild(el);
-        root=createRoot(el);
-        const navCtxVal=navData?{...navData,currentCatKey:navData.ordCatMap?.[pages[i].ordId]||null}:null;
-        root.render(
-          <PrintCtx.Provider value={true}>
-            <NavCtx.Provider value={navCtxVal}>
-              <BrandCtx.Provider value={brandCtx}>
-                <NotesEditCtx.Provider value={null}>
-                  {withOverlays
-                    ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
-                    :<PageRender page={pages[i]} state={exportState}/>
-                  }
-                </NotesEditCtx.Provider>
-              </BrandCtx.Provider>
-            </NavCtx.Provider>
-          </PrintCtx.Provider>
-        );
-        await new Promise(r=>setTimeout(r,280));
-        if(abortRef.current){root.unmount();document.body.removeChild(el);el=null;root=null;break;}
-        const canvas=await h2c(el,{scale:cfg.scale,useCORS:true,allowTaint:true,logging:false,width:BW,height:BH,windowWidth:BW,windowHeight:BH,imageTimeout:5000});
+        let canvas;
+        if(canFast(pages[i],i,pages.length)){
+          canvas=await renderFast(pages[i],i,pages.length);
+        }else{
+          el=document.createElement('div');
+          el.style.cssText=`position:absolute;left:-${BW*4}px;top:0;width:${BW}px;height:${BH}px;overflow:hidden;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;`;
+          document.body.appendChild(el);
+          root=createRoot(el);
+          const navCtxVal=navData?{...navData,currentCatKey:navData.ordCatMap?.[pages[i].ordId]||null}:null;
+          root.render(
+            <PrintCtx.Provider value={true}>
+              <NavCtx.Provider value={navCtxVal}>
+                <BrandCtx.Provider value={brandCtx}>
+                  <NotesEditCtx.Provider value={null}>
+                    {withOverlays
+                      ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
+                      :<PageRender page={pages[i]} state={exportState}/>
+                    }
+                  </NotesEditCtx.Provider>
+                </BrandCtx.Provider>
+              </NavCtx.Provider>
+            </PrintCtx.Provider>
+          );
+          await new Promise(r=>setTimeout(r,280));
+          if(abortRef.current){root.unmount();document.body.removeChild(el);el=null;root=null;break;}
+          canvas=await h2c(el,{scale:sc,useCORS:true,allowTaint:true,logging:false,width:BW,height:BH,windowWidth:BW,windowHeight:BH,imageTimeout:5000});
+          root.unmount();document.body.removeChild(el);el=null;root=null;
+        }
         if(i>0) pdf.addPage();
         pdf.addImage(canvas.toDataURL('image/jpeg',cfg.q),'JPEG',0,0,isP?210:297,isP?297:210);
         if(navData)addPdfLinks(pdf,pages[i],navData,exportState,isP);
-        root.unmount();document.body.removeChild(el);el=null;root=null;
         setDone(i+1);
       }
       if(!abortRef.current){
