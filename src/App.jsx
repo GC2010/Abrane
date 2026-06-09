@@ -1807,6 +1807,7 @@ function PdfExportModal({state,onClose}) {
   const [withAnnot,setWithAnnot]=useState(true);
   const [withOverlays,setWithOverlays]=useState(true);
   const [withInteractive,setWithInteractive]=useState(true);
+  const [vectorMode,setVectorMode]=useState(true);
   const [exporting,setExporting]=useState(false);
   const [done,setDone]=useState(0);
   const abortRef=useRef(false);
@@ -1815,6 +1816,8 @@ function PdfExportModal({state,onClose}) {
   const cfg=PDF_QUALITY.find(q=>q.id===quality);
 
   const isP=state.pageFormat.startsWith('v');
+  const isR=state.pageFormat.includes('ring');
+  const pageW=isP?210:297, pageH=isP?297:210;
   const BW=isP?794:1123, BH=isP?1123:794;
 
   const doExport=useCallback(async()=>{
@@ -1827,36 +1830,67 @@ function PdfExportModal({state,onClose}) {
       const [{jsPDF},{default:h2c}]=await Promise.all([import('jspdf'),import('html2canvas')]);
       const pdf=new jsPDF({orientation:isP?'portrait':'landscape',unit:'mm',format:'a4',compress:true});
       const navData=withInteractive?buildNavData(exportState,pages):null;
-      for(let i=0;i<pages.length;i++){
-        if(abortRef.current) break;
-        el=document.createElement('div');
-        el.style.cssText=`position:absolute;left:-${BW*4}px;top:0;width:${BW}px;height:${BH}px;overflow:hidden;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;`;
-        document.body.appendChild(el);
-        root=createRoot(el);
-        const navCtxVal=navData?{...navData,currentCatKey:navData.ordCatMap?.[pages[i].ordId]||null}:null;
-        root.render(
-          <PrintCtx.Provider value={true}>
-            <NavCtx.Provider value={navCtxVal}>
-              <BrandCtx.Provider value={brandCtx}>
-                <NotesEditCtx.Provider value={null}>
-                  {withOverlays
-                    ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
-                    :<PageRender page={pages[i]} state={exportState}/>
-                  }
-                </NotesEditCtx.Provider>
-              </BrandCtx.Provider>
-            </NavCtx.Provider>
-          </PrintCtx.Provider>
-        );
-        await new Promise(r=>setTimeout(r,280));
-        if(abortRef.current){root.unmount();document.body.removeChild(el);el=null;root=null;break;}
-        const canvas=await h2c(el,{scale:cfg.scale,useCORS:true,allowTaint:true,logging:false,width:BW,height:BH,windowWidth:BW,windowHeight:BH,imageTimeout:5000});
-        if(i>0) pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/jpeg',cfg.q),'JPEG',0,0,isP?210:297,isP?297:210);
-        if(navData)addPdfLinks(pdf,pages[i],navData,exportState,isP);
-        root.unmount();document.body.removeChild(el);el=null;root=null;
-        setDone(i+1);
+
+      if(vectorMode){
+        // ── Vector path: draw each page directly via jsPDF primitives ──
+        const {
+          drawCoverVector,drawIndexVector,drawCategoryVector,
+          drawContentVector,drawMaterialsVector,drawBackVector,
+          drawNotesVector,drawOverlaysVector
+        }=await import('./lib/pdfVector.js');
+        const allIdxRows=buildIndexRows(exportState);
+        for(let i=0;i<pages.length;i++){
+          if(abortRef.current) break;
+          if(i>0) pdf.addPage();
+          const pg=pages[i];
+          switch(pg.type){
+            case 'cover':     await drawCoverVector(pdf,pageW,pageH,exportState,isP,isR,brandCtx); break;
+            case 'index':     drawIndexVector(pdf,pageW,pageH,exportState,isP,isR,pg.pageIndex||0,allIdxRows); break;
+            case 'category':  drawCategoryVector(pdf,pageW,pageH,exportState,pg.catName,isP,isR); break;
+            case 'content':   await drawContentVector(pdf,pageW,pageH,exportState,pg,isP,isR,brandCtx); break;
+            case 'materials': await drawMaterialsVector(pdf,pageW,pageH,exportState,isP,isR,pg.pageIndex||0); break;
+            case 'back':      await drawBackVector(pdf,pageW,pageH,exportState,isP,isR,brandCtx); break;
+            case 'notes':     drawNotesVector(pdf,pageW,pageH,exportState,isP,isR); break;
+            default: break;
+          }
+          if(withOverlays) await drawOverlaysVector(pdf,pageW,pageH,exportState,pg,i,pages.length,brandCtx);
+          if(navData) addPdfLinks(pdf,pg,navData,exportState,isP);
+          setDone(i+1);
+        }
+      } else {
+        // ── Raster path: html2canvas (original) ──
+        for(let i=0;i<pages.length;i++){
+          if(abortRef.current) break;
+          el=document.createElement('div');
+          el.style.cssText=`position:absolute;left:-${BW*4}px;top:0;width:${BW}px;height:${BH}px;overflow:hidden;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;`;
+          document.body.appendChild(el);
+          root=createRoot(el);
+          const navCtxVal=navData?{...navData,currentCatKey:navData.ordCatMap?.[pages[i].ordId]||null}:null;
+          root.render(
+            <PrintCtx.Provider value={true}>
+              <NavCtx.Provider value={navCtxVal}>
+                <BrandCtx.Provider value={brandCtx}>
+                  <NotesEditCtx.Provider value={null}>
+                    {withOverlays
+                      ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
+                      :<PageRender page={pages[i]} state={exportState}/>
+                    }
+                  </NotesEditCtx.Provider>
+                </BrandCtx.Provider>
+              </NavCtx.Provider>
+            </PrintCtx.Provider>
+          );
+          await new Promise(r=>setTimeout(r,280));
+          if(abortRef.current){root.unmount();document.body.removeChild(el);el=null;root=null;break;}
+          const canvas=await h2c(el,{scale:cfg.scale,useCORS:true,allowTaint:true,logging:false,width:BW,height:BH,windowWidth:BW,windowHeight:BH,imageTimeout:5000});
+          if(i>0) pdf.addPage();
+          pdf.addImage(canvas.toDataURL('image/jpeg',cfg.q),'JPEG',0,0,pageW,pageH);
+          if(navData)addPdfLinks(pdf,pages[i],navData,exportState,isP);
+          root.unmount();document.body.removeChild(el);el=null;root=null;
+          setDone(i+1);
+        }
       }
+
       if(!abortRef.current){
         pdf.save((state.name||'catalogue').replace(/[^a-z0-9]/gi,'_')+'.pdf');
         setTimeout(onClose,400);
@@ -1866,7 +1900,7 @@ function PdfExportModal({state,onClose}) {
       if(el){try{root?.unmount();document.body.removeChild(el);}catch(_){}}
       setExporting(false);
     }
-  },[state,isP,BW,BH,quality,withAnnot,withOverlays,withInteractive,pages,brandCtx,cfg,onClose]);
+  },[state,isP,isR,pageW,pageH,BW,BH,quality,withAnnot,withOverlays,withInteractive,vectorMode,pages,brandCtx,cfg,onClose]);
 
   return(
     <Scrim onClose={exporting?()=>{}:onClose}>
@@ -1906,6 +1940,17 @@ function PdfExportModal({state,onClose}) {
           <div>
             <div style={{fontSize:12.5,fontWeight:500,color:T.ink,fontFamily:'inherit'}}>Inclure les signatures & tampons</div>
             <div style={{fontSize:11,color:T.ink4,fontFamily:'inherit'}}>Filigrane, signature et tampon d'entreprise</div>
+          </div>
+        </div>
+
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:vectorMode?T.navyTint:T.panel,borderRadius:8,border:`1px solid ${vectorMode?T.navy:T.lineSoft}`,marginBottom:8,cursor:exporting?'default':'pointer'}}
+          onClick={()=>!exporting&&setVectorMode(v=>!v)}>
+          <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${vectorMode?T.navy:T.line}`,background:vectorMode?T.navy:'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'.15s'}}>
+            {vectorMode&&<Icon name="check" size={11} color="#fff" stroke={3}/>}
+          </div>
+          <div>
+            <div style={{fontSize:12.5,fontWeight:500,color:T.ink,fontFamily:'inherit'}}>Export vectoriel</div>
+            <div style={{fontSize:11,color:T.ink4,fontFamily:'inherit'}}>Textes et formes en vecteurs — plus net, texte sélectionnable</div>
           </div>
         </div>
 
