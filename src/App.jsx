@@ -16,7 +16,7 @@ import { loadProjects, loadProject, upsertProject, deleteProject, projectToDispl
 const PDF_QUALITY = [
   {id:'web',      label:'Web',      sub:'72 dpi · partage en ligne',     scale:1.5, q:0.72},
   {id:'standard', label:'Standard', sub:'150 dpi · impression courante',  scale:2,   q:0.82},
-  {id:'hd',       label:'HD',       sub:'300 dpi · haute qualité',        scale:3,   q:0.92},
+  {id:'hd',       label:'HD',       sub:'400 dpi · très haute qualité',   scale:4,   q:0.95},
 ];
 
 const T = {
@@ -102,6 +102,7 @@ const ADMIN_PASS = 'ABRANE2026';
 const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},stampLogo:'',setBrand:()=>{}});
 
 const NavCtx = React.createContext(null);
+const PrintCtx = React.createContext(false);
 // Layout constants (fractions of page size) — used by addPdfLinks for drawing + hotspots
 const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catYEndPct:.76,maxCats:8,idxYPct:.80,idxHPct:.042,matYPct:.852,matHPct:.042};
 
@@ -1221,7 +1222,8 @@ function TemplateUpdateModal({project,onClose,onDecision}) {
 
 // ── PAGE COMPONENTS ───────────────────────────────────────
 function BindingMarks({isRing}) {
-  if(!isRing) return null;
+  const forPrint=React.useContext(PrintCtx);
+  if(!isRing||forPrint) return null;
   return <div style={{position:'absolute',top:'4%',bottom:'4%',left:'1.8%',width:'4.5%',display:'flex',flexDirection:'column',justifyContent:'space-between',alignItems:'center',zIndex:6,pointerEvents:'none'}}>
     {Array.from({length:20}).map((_,i)=><div key={i} style={{width:'100%',height:'0.9%',background:'#fff',border:'1px solid rgba(0,0,0,.18)',borderRadius:1.5}}/>)}
   </div>;
@@ -1824,16 +1826,18 @@ function PdfExportModal({state,onClose}) {
         root=createRoot(el);
         const navCtxVal=navData?{...navData,currentCatKey:navData.ordCatMap?.[pages[i].ordId]||null}:null;
         root.render(
-          <NavCtx.Provider value={navCtxVal}>
-            <BrandCtx.Provider value={brandCtx}>
-              <NotesEditCtx.Provider value={null}>
-                {withOverlays
-                  ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
-                  :<PageRender page={pages[i]} state={exportState}/>
-                }
-              </NotesEditCtx.Provider>
-            </BrandCtx.Provider>
-          </NavCtx.Provider>
+          <PrintCtx.Provider value={true}>
+            <NavCtx.Provider value={navCtxVal}>
+              <BrandCtx.Provider value={brandCtx}>
+                <NotesEditCtx.Provider value={null}>
+                  {withOverlays
+                    ?<ExportPageWrapper page={pages[i]} pageIndex={i} totalPages={pages.length} state={exportState}/>
+                    :<PageRender page={pages[i]} state={exportState}/>
+                  }
+                </NotesEditCtx.Provider>
+              </BrandCtx.Provider>
+            </NavCtx.Provider>
+          </PrintCtx.Provider>
         );
         await new Promise(r=>setTimeout(r,280));
         if(abortRef.current){root.unmount();document.body.removeChild(el);el=null;root=null;break;}
@@ -2403,9 +2407,73 @@ function NotesPanel({state,update}) {
     </Sect>}
   </>;
 }
+function FolderImportModal({groups,parentName,onConfirm,onClose,importing}){
+  const [sel,setSel]=useState(()=>Object.fromEntries(groups.map(g=>[g.name,true])));
+  const toggle=name=>setSel(s=>({...s,[name]:!s[name]}));
+  const selGroups=groups.filter(g=>sel[g.name]);
+  const totalFiles=selGroups.reduce((sum,g)=>sum+g.files.length,0);
+  return(
+    <Scrim onClose={importing?()=>{}:onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:14,width:440,maxWidth:'94vw',maxHeight:'85vh',boxShadow:'0 24px 60px rgba(0,0,0,.22)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{padding:'20px 24px 14px',borderBottom:`1px solid ${T.lineSoft}`,flexShrink:0}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:28,height:28,borderRadius:6,background:T.navy,display:'grid',placeItems:'center',flexShrink:0}}>
+                <Icon name="folder" size={14} color="#fff"/>
+              </div>
+              <div style={{fontSize:15,fontWeight:700,color:T.ink}}>Importer dossier</div>
+            </div>
+            {!importing&&<button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',padding:4,display:'grid',placeItems:'center'}}><Icon name="close" size={16} color={T.ink3}/></button>}
+          </div>
+          <div style={{fontSize:11.5,color:T.ink3,marginLeft:36}}>
+            <span style={{fontWeight:600,color:T.ink2}}>{parentName}</span>
+            {' — '}sélectionnez les sous-dossiers à importer
+          </div>
+        </div>
+        <div style={{overflowY:'auto',flex:1,padding:'10px 16px'}}>
+          {groups.map(g=>{
+            const isAcc=g.isAccessory;
+            const isOn=sel[g.name];
+            const exts=[...new Set(g.files.map(f=>f.name.split('.').pop()?.toLowerCase()).filter(Boolean))];
+            const extLabel=exts.slice(0,3).map(e=>e.toUpperCase()).join(' · ');
+            return(
+              <div key={g.name} onClick={()=>!importing&&toggle(g.name)} style={{
+                display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,marginBottom:4,
+                border:`1.5px solid ${isOn?(isAcc?T.gold:T.navy):T.line}`,
+                background:isOn?(isAcc?T.goldTint:T.navyTint):T.panel,
+                cursor:importing?'default':'pointer',transition:'all .12s',
+              }}>
+                <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${isOn?(isAcc?T.gold:T.navy):T.lineStrong}`,background:isOn?(isAcc?T.gold:T.navy):'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'all .12s'}}>
+                  {isOn&&<Icon name="check" size={10} color="#fff" stroke={3}/>}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    <span style={{fontSize:13,fontWeight:600,color:isOn?T.ink:T.ink3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{g.name}</span>
+                    {isAcc&&<span style={{fontSize:9,fontWeight:700,background:T.gold,color:'#fff',borderRadius:3,padding:'1px 5px',flexShrink:0,letterSpacing:'.04em'}}>ACCESSOIRES</span>}
+                  </div>
+                  <div style={{fontSize:10.5,color:T.ink4,marginTop:1}}>{g.files.length} fichier{g.files.length>1?'s':''}{extLabel?` · ${extLabel}`:''}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{padding:'14px 20px',borderTop:`1px solid ${T.lineSoft}`,display:'flex',gap:8,justifyContent:'flex-end',flexShrink:0,background:T.panel}}>
+          {!importing&&<button onClick={onClose} style={btnSt()}>Annuler</button>}
+          <button onClick={()=>onConfirm(selGroups)} disabled={importing||selGroups.length===0}
+            style={{...btnSt('primary'),opacity:(importing||selGroups.length===0)?.6:1}}>
+            <Icon name={importing?'history':'folder'} size={13} color="#fff"/>
+            {importing?'Import en cours…':`Importer ${selGroups.length} catégorie${selGroups.length>1?'s':''}${totalFiles?` (${totalFiles} fichiers)`:''}`}
+          </button>
+        </div>
+      </div>
+    </Scrim>
+  );
+}
+
 function ContentPanel({state,update,onNavigate,prominent=false}) {
   const fileInputRef=useRef(null);
   const accFileInputRef=useRef(null);
+  const folderInputRef=useRef(null);
   const [dragIdx,setDragIdx]=useState(null);
   const [overIdx,setOverIdx]=useState(null);
   const [mergeIdx,setMergeIdx]=useState(null);
@@ -2414,6 +2482,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
   const [expandedZoom,setExpandedZoom]=useState({});
   const [dropHighlight,setDropHighlight]=useState(false);
   const [pendingImport,setPendingImport]=useState(null);
+  const [folderPreview,setFolderPreview]=useState(null);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
   const InsertSlot=({label,onClick,isEnd=false})=>(
@@ -2437,9 +2506,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     </button>
   );
 
-  const processFiles=async(list,isAccessory=false)=>{
-    if(!list.length)return;
-    setImporting(true);
+  const processFilesRaw=async(list,isAccessory=false)=>{
     const newFiles=[],newOrders=[];
     for(const file of list){
       const ext=file.name.split('.').pop().toLowerCase();
@@ -2465,6 +2532,13 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
       const ordId='fi'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
       newOrders.push({type:'file',id:ordId,fileId:id,rotation:0,label:'',...(isAccessory?{isAccessory:true}:{})});
     }
+    return{files:newFiles,orders:newOrders};
+  };
+
+  const processFiles=async(list,isAccessory=false)=>{
+    if(!list.length)return;
+    setImporting(true);
+    const{files:newFiles,orders:newOrders}=await processFilesRaw(list,isAccessory);
     if(state.contentOrder.length>0&&!isAccessory){
       setPendingImport({files:newFiles,orders:newOrders});
     }else{
@@ -2481,6 +2555,48 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
   const handleImportAccessory=async e=>{
     await processFiles(Array.from(e.target.files||[]),true);
     e.target.value='';
+  };
+
+  const handleFolderSelect=e=>{
+    const files=Array.from(e.target.files||[]);
+    e.target.value='';
+    if(!files.length)return;
+    // Group by first subfolder; ignore files at root of selected folder (parts.length < 3)
+    const groupMap={};
+    let parentName='';
+    for(const file of files){
+      const parts=file.webkitRelativePath.split('/');
+      if(!parentName&&parts[0]) parentName=parts[0];
+      if(parts.length<3) continue;
+      const folderName=parts[1];
+      if(!groupMap[folderName]) groupMap[folderName]=[];
+      groupMap[folderName].push(file);
+    }
+    const groups=Object.entries(groupMap).map(([name,groupFiles])=>({
+      name,files:groupFiles,isAccessory:name.toLowerCase()==='accessoires',
+    }));
+    if(!groups.length){
+      alert('Aucun sous-dossier détecté. Organisez vos fichiers dans des sous-dossiers.');
+      return;
+    }
+    setFolderPreview({groups,parentName});
+  };
+
+  const confirmFolderImport=async(selectedGroups)=>{
+    if(!selectedGroups.length)return;
+    setImporting(true);
+    let newFiles=[...state.files];
+    let newOrder=[...state.contentOrder];
+    for(const group of selectedGroups){
+      const catId='c'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+      newOrder=[...newOrder,{type:'cat',id:catId,name:group.name}];
+      const{files:gFiles,orders:gOrders}=await processFilesRaw(group.files,group.isAccessory);
+      newFiles=[...newFiles,...gFiles];
+      newOrder=[...newOrder,...gOrders];
+    }
+    update({files:newFiles,contentOrder:newOrder,_dirty:true});
+    setFolderPreview(null);
+    setImporting(false);
   };
 
   const handleDrop=async e=>{
@@ -2715,8 +2831,10 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
   const sectTitle=`${fileCount} fichier${fileCount!==1?'s':''}${catCount?` · ${catCount} cat.`:''}`;
 
   return <>
+    {folderPreview&&<FolderImportModal groups={folderPreview.groups} parentName={folderPreview.parentName} importing={importing} onClose={()=>!importing&&setFolderPreview(null)} onConfirm={confirmFolderImport}/>}
     <Sect title="Importer">
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImport}/>
+      <input ref={folderInputRef} type="file" webkitdirectory="" style={{display:'none'}} onChange={handleFolderSelect}/>
       {prominent ? (
         <div
           onClick={()=>!importing&&fileInputRef.current?.click()}
@@ -2768,6 +2886,10 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
           <span style={{fontSize:12,color:T.ink3}}>JPG · PNG · SVG · PDF · Word · Excel</span>
         </div>
       )}
+      <button onClick={()=>!importing&&folderInputRef.current?.click()} disabled={importing}
+        style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:6,opacity:importing?.6:1,border:`1.5px solid ${T.navy}`,color:T.navy,fontWeight:700}}>
+        <Icon name="folder" size={14} color={T.navy}/>Importer dossier
+      </button>
       <div style={{fontSize:10,color:T.ink4,textAlign:'center',marginTop:4}}>Glissez un fichier <em>sur</em> un autre pour les afficher côte à côte</div>
     </Sect>
     <Sect title="Accessoires">
@@ -4619,12 +4741,12 @@ function Configurator({user,project,onProjectSaved,onSaveStateChange,saveFnRef})
   const save=useCallback(()=>{
     if(projectId&&USE_CLOUD){
       // Existing project — ask: overwrite or save as new
-      setSaveAsName(state.name||'');
+      setSaveAsName(state.client||state.name||'');
       setSaveModal(true);
       return;
     }
-    doSave(null,state.name);
-  },[projectId,state.name,doSave]);
+    doSave(null,state.client||state.name);
+  },[projectId,state.client,state.name,doSave]);
 
   const [savingTpl,setSavingTpl]=useState(false);
   const [tplModal,setTplModal]=useState(false);
