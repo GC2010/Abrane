@@ -1658,6 +1658,23 @@ function ExportPageWrapper({page,pageIndex,totalPages,state}) {
 // Parse hex '#rrggbb' → [r,g,b] for jsPDF drawing
 const hexRgb=hex=>{try{const v=hex.replace('#','');return[parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)];}catch{return[0,0,0];}};
 
+// Adds a PDF Named-Action "GoBack" link annotation to the current page.
+// Uses jsPDF internals (newAdditionalObject + reference annotation) so the
+// viewer's navigation history stack is used — identical to a browser Back button.
+// Works in Adobe Acrobat / Foxit; silently does nothing in browser-based viewers.
+const addGoBackAnnot=(pdf,x,y,w,h)=>{
+  try{
+    const hc=pdf.internal.getHorizontalCoordinate;
+    const vc=pdf.internal.getVerticalCoordinate;
+    const f=pdf.hpf;
+    // Rect: [llx lly urx ury] in PDF points (Y-axis bottom-up)
+    const rect=`${f(hc(x))} ${f(vc(y+h))} ${f(hc(x+w))} ${f(vc(y))}`;
+    const obj=pdf.internal.newAdditionalObject();
+    obj.content=`<</Type /Annot /Subtype /Link /Rect [${rect}] /Border [0 0 0] /A <</Type /Action /S /Named /N /GoBack>>>>`;
+    pdf.internal.getCurrentPageInfo().pageContext.annotations.push({type:'reference',object:obj});
+  }catch(_){}
+};
+
 function buildIndexRows(state){
   const tot=state.contentOrder.filter(it=>it.type==='cat'||(state.idxMode!=='cats'&&state.files.find(x=>x.id===it.fileId))).length;
   const nI=Math.max(1,Math.ceil(tot/40));
@@ -1768,7 +1785,7 @@ function addPdfLinks(pdf,page,navData,state,isP){
       pdf.setTextColor(...hexRgb(shade(p.c3,30)));
       pdf.setFont('helvetica','normal');pdf.setFontSize(8);
       pdf.text('< BACK',bX+bW/2,mid(bY,bH),{align:'center'});
-      go(bX,bY,bW,bH,curN-1);
+      addGoBackAnnot(pdf,bX,bY,bW,bH);
     }
   }
 
