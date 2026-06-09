@@ -104,7 +104,7 @@ const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},sta
 const NavCtx = React.createContext(null);
 const PrintCtx = React.createContext(false);
 // Layout constants (fractions of page size) — used by addPdfLinks for drawing + hotspots
-const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catYEndPct:.76,maxCats:8,idxYPct:.80,idxHPct:.042,matYPct:.852,matHPct:.042};
+const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catYEndPct:.76,maxCats:12,idxYPct:.80,idxHPct:.042,matYPct:.852,matHPct:.042,backYPct:.906,backHPct:.040};
 
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
@@ -1500,12 +1500,12 @@ function MatPage({state,isPortrait,isRing,pageIndex=0}) {
     <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},1fr)`,gridTemplateRows:`repeat(${fixedRows},1fr)`,gap:5,height:'90%'}}>
       {cells.map((m,i)=>(
         <div key={i} style={{border:`1px solid ${p.c1}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          <div style={{flex:'1 1 0',minHeight:0,position:'relative',overflow:'hidden'}}>
-            {m.imgUrl
-              ?<img src={m.imgUrl} alt={m.mat} style={{display:'block',position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',objectPosition:'center'}}/>
-              :<div style={{position:'absolute',inset:0,background:`linear-gradient(135deg,${shade(p.c1,4)} 0 50%,${p.c1} 50% 100%)`}}/>
-            }
-          </div>
+          <div style={{flex:'1 1 0',minHeight:0,overflow:'hidden',
+            ...(m.imgUrl
+              ?{backgroundImage:`url(${m.imgUrl})`,backgroundSize:'cover',backgroundPosition:'center',backgroundRepeat:'no-repeat'}
+              :{background:`linear-gradient(135deg,${shade(p.c1,4)} 0 50%,${p.c1} 50% 100%)`}
+            )
+          }}/>
           <div style={{flexShrink:0,padding:'3px 5px',background:'#fff',borderTop:`1px solid ${p.c1}`,overflow:'hidden'}}>
             <div style={{fontSize:9,fontWeight:700,color:p.c3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{m.mat}</div>
             <div style={{fontSize:8,color:shade(p.c3,40),overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{m.fin}</div>
@@ -1724,7 +1724,7 @@ function addPdfLinks(pdf,page,navData,state,isP){
       const bH=tH*.50;
       const tY=slotY+(tH-bH)/2;
       const words=cat.name.toUpperCase().trim().split(/\s+/).slice(0,2);
-      const label=words.map(w=>w.length>5?w.slice(0,4)+'.':w).join(' ');
+      const label=words.map(w=>w.length>8?w.slice(0,7)+'.':w).join(' ');
       if(isCurr){
         drawBtn(tY,bH,hexRgb(p.c2),hexRgb(shade(p.c2,-18)),.3);
         pdf.setTextColor(255,255,255);
@@ -1760,6 +1760,15 @@ function addPdfLinks(pdf,page,navData,state,isP){
       pdf.setFont('helvetica','bold');pdf.setFontSize(9);
       pdf.text('MAT.',bX+bW/2,mid(bY,bH),{align:'center'});
       go(bX,bY,bW,bH,matPageNum);
+    }
+
+    if(curN>1){
+      const bY=NAV.backYPct*pageH,bH=NAV.backHPct*pageH;
+      drawBtn(bY,bH,[255,255,255],hexRgb(shade(p.c3,40)),.25);
+      pdf.setTextColor(...hexRgb(shade(p.c3,30)));
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8);
+      pdf.text('< BACK',bX+bW/2,mid(bY,bH),{align:'center'});
+      go(bX,bY,bW,bH,curN-1);
     }
   }
 
