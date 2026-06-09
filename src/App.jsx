@@ -3803,12 +3803,26 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
       })
     :accessories;
 
+  // Detect multi-page product
+  const ordId=pageKey.startsWith('f-')?pageKey.replace(/^f-/,'').replace(/-\d+$/,''):null;
+  const ordItem=ordId?state.contentOrder.find(x=>x.id===ordId):null;
+  const file=ordItem?state.files.find(x=>x.id===ordItem.fileId):null;
+  const pageCount=file?.pages||1;
+
   const toggle=id=>{
     const curr=state.pageAccessories?.[pageKey]||[];
     const next=curr.includes(id)
       ?curr.filter(x=>x!==id)
       :(curr.length>=10?curr:[...curr,id]);
     update({pageAccessories:{...(state.pageAccessories||{}),[pageKey]:next}});
+  };
+
+  const applyToAll=()=>{
+    const curr=state.pageAccessories?.[pageKey]||[];
+    const updates={};
+    for(let i=0;i<pageCount;i++) updates['f-'+ordId+'-'+i]=curr;
+    update({pageAccessories:{...(state.pageAccessories||{}),...updates}});
+    onClose();
   };
 
   return(
@@ -3876,7 +3890,15 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
         {/* Footer */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 18px',borderTop:`1px solid ${T.lineSoft}`,flexShrink:0,background:T.panel}}>
           <div style={{fontSize:11,color:T.ink3}}>{selected.length} accessoire{selected.length!==1?'s':''} sélectionné{selected.length!==1?'s':''}</div>
-          <button style={btnSt('primary')} onClick={onClose}><Icon name="check" size={13} color="#fff"/>Confirmer</button>
+          <div style={{display:'flex',gap:8}}>
+            {pageCount>1&&(
+              <button style={btnSt()} onClick={onClose}><Icon name="file" size={13} color={T.ink3}/>Cette page</button>
+            )}
+            {pageCount>1
+              ?<button style={btnSt('primary')} onClick={applyToAll}><Icon name="check" size={13} color="#fff"/>Toutes les {pageCount} pages</button>
+              :<button style={btnSt('primary')} onClick={onClose}><Icon name="check" size={13} color="#fff"/>Confirmer</button>
+            }
+          </div>
         </div>
       </div>
     </Scrim>
