@@ -3794,6 +3794,14 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
   const isP=state.pageFormat.startsWith('v');
   const thumbH=90;
   const thumbW=Math.round(thumbH*(isP?3/4:4/3));
+  const [search,setSearch]=React.useState('');
+  const filtered=search.trim()
+    ?accessories.filter(item=>{
+        const f=state.files.find(x=>x.id===item.fileId);
+        const name=item.label||f?.name.replace(/\.[^.]+$/,'')||'';
+        return name.toLowerCase().includes(search.toLowerCase());
+      })
+    :accessories;
 
   const toggle=id=>{
     const curr=state.pageAccessories?.[pageKey]||[];
@@ -3813,6 +3821,18 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
           <span style={{fontSize:15,fontWeight:600,color:T.ink}}>Accessoires de la page</span>
           <span style={{...pillSt(),fontSize:10}}>{selected.length}/10 sélectionnés</span>
           <div style={{flex:1}}/>
+          <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+            <Icon name="search" size={13} color={T.ink4} style={{position:'absolute',left:8,pointerEvents:'none'}}/>
+            <input
+              value={search}
+              onChange={e=>setSearch(e.target.value)}
+              placeholder="Rechercher…"
+              style={{paddingLeft:26,paddingRight:8,height:30,border:`1px solid ${T.line}`,borderRadius:6,fontSize:12,color:T.ink,background:T.surface,outline:'none',width:160}}
+            />
+            {search&&<button onClick={()=>setSearch('')} style={{position:'absolute',right:6,background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',padding:0}}>
+              <Icon name="close" size={11} color={T.ink4}/>
+            </button>}
+          </div>
           <button onClick={onClose} style={{background:'transparent',border:`1px solid ${T.line}`,borderRadius:6,padding:'5px 8px',cursor:'pointer',display:'flex',alignItems:'center'}}>
             <Icon name="close" size={15} color={T.ink3}/>
           </button>
@@ -3824,7 +3844,11 @@ function AccessoriesPickerModal({state,update,pageKey,onClose}) {
             <div style={{width:'100%',textAlign:'center',padding:'32px 16px',color:T.ink4,fontSize:12,fontStyle:'italic'}}>
               Aucun accessoire importé.<br/>Utilisez "Importer des accessoires" dans le panneau Contenu.
             </div>
-          ):accessories.map(item=>{
+          ):filtered.length===0?(
+            <div style={{width:'100%',textAlign:'center',padding:'32px 16px',color:T.ink4,fontSize:12,fontStyle:'italic'}}>
+              Aucun accessoire correspond à « {search} »
+            </div>
+          ):filtered.map(item=>{
             const f=state.files.find(x=>x.id===item.fileId);
             if(!f)return null;
             const name=item.label||f.name.replace(/\.[^.]+$/,'');
