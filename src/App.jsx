@@ -2640,6 +2640,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     }
     const mid='f'+Date.now()+'_m';
     const mFile={id:mid,name:(a.label||fa.name.replace(/\.[^.]+$/,''))+' + '+(b.label||fb.name.replace(/\.[^.]+$/,'')),type:'merged',pages:mergedUrls.length,size:'',pageUrls:mergedUrls,
+      sourceFiles:[fa,fb],
       sourcePages:[fa.pageUrls||[],fb.pageUrls||[]],sourceNames:[fa.name,fb.name],sourceTypes:[fa.type,fb.type]};
     const insertAt=Math.min(fromIdx,toIdx);
     const newOrder=state.contentOrder.filter((_,i)=>i!==fromIdx&&i!==toIdx);
@@ -2734,15 +2735,25 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     const item=state.contentOrder.find(x=>x.id===ordId);
     if(!item||item.type!=='file')return;
     const f=state.files.find(x=>x.id===item.fileId);
-    if(!f||f.type!=='merged'||!f.sourcePages)return;
+    if(!f||f.type!=='merged')return;
     const idx=state.contentOrder.findIndex(x=>x.id===ordId);
-    const newFiles=f.sourcePages.map((urls,i)=>({
-      id:'f'+Date.now()+'_u'+i,
-      name:f.sourceNames?.[i]||`Partie ${i+1}`,
-      type:f.sourceTypes?.[i]||'image',
-      pages:urls.length,size:'',pageUrls:urls,
-    }));
-    const newOrders=newFiles.map(nf=>({type:'file',id:'fi'+Date.now()+'_'+nf.id,fileId:nf.id,rotation:0,label:''}));
+    let newFiles;
+    if(f.sourceFiles&&f.sourceFiles.length){
+      // Restore original file objects with fresh IDs to avoid collisions
+      const ts=Date.now();
+      newFiles=f.sourceFiles.map((sf,i)=>({...sf,id:'f'+ts+'_u'+i}));
+    }else if(f.sourcePages){
+      // Legacy fallback: reconstruct from URL arrays only
+      const ts=Date.now();
+      newFiles=f.sourcePages.map((urls,i)=>({
+        id:'f'+ts+'_u'+i,
+        name:f.sourceNames?.[i]||`Partie ${i+1}`,
+        type:f.sourceTypes?.[i]||'image',
+        pages:urls.length,size:'',pageUrls:urls,
+      }));
+    }else return;
+    const ts2=Date.now();
+    const newOrders=newFiles.map((nf,i)=>({type:'file',id:'fi'+ts2+'_'+i,fileId:nf.id,rotation:0,label:''}));
     const newOrder=[...state.contentOrder];
     newOrder.splice(idx,1,...newOrders);
     update({files:[...state.files.filter(x=>x.id!==f.id),...newFiles],contentOrder:newOrder});
