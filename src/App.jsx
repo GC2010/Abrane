@@ -1779,10 +1779,10 @@ function addPdfLinks(pdf,page,navData,state,isP){
 
     {
       // BACK button: deterministic link using pdf.link() — works in all viewers.
-      // Priority: accessory→product page, content→category page, category→index page.
+      // Priority: accessory→product page, content→category or index, category→index, fallback→cover(1).
       const fromPage=navData.accessoryBackMap?.[page.key]
-        ||(page.type==='content'&&ordCatMap[page.ordId]?pageMap[ordCatMap[page.ordId]]:null)
-        ||(page.type==='category'&&navData.idxPageNum?navData.idxPageNum:null);
+        ||(page.type==='content'?(pageMap[ordCatMap[page.ordId]]||navData.idxPageNum||1):null)
+        ||(page.type==='category'?(navData.idxPageNum||1):null);
       if(fromPage&&curN>1){
         const bY=NAV.backYPct*pageH,bH=NAV.backHPct*pageH;
         drawBtn(bY,bH,[255,255,255],hexRgb(shade(p.c3,40)),.25);
