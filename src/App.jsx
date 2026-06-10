@@ -1806,7 +1806,7 @@ function addPdfLinks(pdf,page,navData,state,isP){
     const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=24,gap=16;
     const cW=(BW-lPx-BW*.09-gap)/2;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
-    const resolveN=r=>r.pageKey?pageMap[r.pageKey]:r.page;
+    const resolveN=r=>(r.pageKey&&pageMap[r.pageKey])||r.page;
     console.log('[PDF DEBUG] index rows:',pRows.map(r=>({name:r.name,isCat:r.isCat,pageKey:r.pageKey,resolvedPage:resolveN(r)})));
     pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),resolveN(r));});
     if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),resolveN(r));});}
