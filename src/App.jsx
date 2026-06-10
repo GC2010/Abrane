@@ -1663,12 +1663,12 @@ function buildIndexRows(state){
   const tot=state.contentOrder.filter(it=>it.type==='cat'||(state.idxMode!=='cats'&&state.files.find(x=>x.id===it.fileId))).length;
   const nI=Math.max(1,Math.ceil(tot/40));
   let pgN=2+nI;
-  if(state.enMat)pgN+=Math.max(1,Math.ceil(state.thumbCount/12));
+  if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
   if(state.enNotes)pgN+=1;
   const rows=[];
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){rows.push({name:it.name,page:pgN,isCat:true});pgN++;}
-    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){rows.push({name:it.label||f.name.replace(/\.[^.]+$/,''),page:pgN,isCat:false,pageKey:'f-'+it.id+'-0'});pgN+=f.pages||1;}else pgN++;}
+    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){rows.push({name:it.label||f.name.replace(/\.[^.]+$/,''),page:pgN,isCat:false});pgN+=f.pages||1;}else pgN++;}
   });
   return rows;
 }
@@ -1765,29 +1765,17 @@ function addPdfLinks(pdf,page,navData,state,isP){
 
   }
 
+  // Index: each row → its content page
   if(page.type==='index'){
-    const pI=page.pageIndex||0;
-    const allPages=buildPageList(state);
-    const idxRows=[];
-    state.contentOrder.forEach(it=>{
-      if(it.type==='cat'){idxRows.push({isCat:true,n:null});}
-      else if(state.idxMode!=='cats'){
-        const f=state.files.find(x=>x.id===it.fileId);
-        if(!f)return;
-        const pg=allPages.find(p=>p.type==='content'&&p.ordId===it.id&&(p.pageIdx===0||!p.pageIdx));
-        if(!pg)console.warn('[IDX MISS] ordId:',it.id,'isAcc:',!!it.isAccessory);
-        idxRows.push({isCat:false,n:pg?pg.pageNum:null});
-      }
-    });
-    const pRows=idxRows.slice(pI*40,(pI+1)*40);
-    const twoCol=pRows.length>20;
+    const pI=page.pageIndex||0,rows=buildIndexRows(state);
+    const pRows=rows.slice(pI*40,(pI+1)*40);
+    // tPx: top padding (5%) + h3 height (22px×1.2=26) + h3 margin-bottom (12) = 38px
+    // rH: row padding 5+5=10, font 11×1.2≈13, border 1 → ~24px
     const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=24,gap=16;
     const cW=(BW-lPx-BW*.09-gap)/2;
-    // col1W: full content width for single-column layout, half-width for two-column
-    const col1W=twoCol?cW:BW-lPx-BW*.09;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
-    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat&&r.n)go(tx(lPx),ty(tPx+i*rH),tx(col1W),ty(rH),r.n);});
-    if(twoCol){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat&&r.n)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.n);});}
+    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});
+    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
   }
 
   // Content: accessory thumbnails → accessory pages
