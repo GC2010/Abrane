@@ -1281,7 +1281,7 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   ).length;
   const nIdxPages=Math.max(1,Math.ceil(totalRowCount/40));
   let pgN=2+nIdxPages;
-  if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
+  if(state.enMat)pgN+=Math.max(1,Math.ceil((state.thumbCount||0)/12));
   if(state.enNotes)pgN+=1;
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){allRows.push({name:it.name,page:pgN,isCat:true});pgN+=1;}
@@ -1663,7 +1663,7 @@ function buildIndexRows(state){
   const tot=state.contentOrder.filter(it=>it.type==='cat'||(state.idxMode!=='cats'&&state.files.find(x=>x.id===it.fileId))).length;
   const nI=Math.max(1,Math.ceil(tot/40));
   let pgN=2+nI;
-  if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
+  if(state.enMat)pgN+=Math.max(1,Math.ceil((state.thumbCount||0)/12));
   if(state.enNotes)pgN+=1;
   const rows=[];
   state.contentOrder.forEach(it=>{
@@ -1784,8 +1784,8 @@ function addPdfLinks(pdf,page,navData,state,isP){
     const fullW=BW-lPx-BW*.09;
     const cW=pRows.length>20?(fullW-gap)/2:fullW;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
-    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});
-    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
+    pRows.slice(0,20).forEach((r,i)=>{go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});
+    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
   }
 
   // Content: accessory thumbnails → accessory pages
