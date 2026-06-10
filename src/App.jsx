@@ -1778,9 +1778,9 @@ function addPdfLinks(pdf,page,navData,state,isP){
   if(page.type==='index'){
     const pI=page.pageIndex||0,rows=buildIndexRows(state);
     const pRows=rows.slice(pI*40,(pI+1)*40);
-    // tPx: top padding (5%) + h3 height (22px×1.2=26) + h3 margin-bottom (12) = 38px
+    // tPx: padding-top uses CSS % which references WIDTH (not height), + h3 (22×1.2=26) + margin-bottom 12
     // rH: matches Row explicit height:26 (boxSizing:border-box) in IndexPage
-    const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=26,gap=16;
+    const lPx=BW*(isR?.12:.05),tPx=BW*.05+38,rH=26,gap=16;
     const fullW=BW-lPx-BW*.09;
     const cW=pRows.length>20?(fullW-gap)/2:fullW;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
