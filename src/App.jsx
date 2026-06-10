@@ -104,7 +104,7 @@ const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},sta
 const NavCtx = React.createContext(null);
 const PrintCtx = React.createContext(false);
 // Layout constants (fractions of page size) — used by addPdfLinks for drawing + hotspots
-const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catYEndPct:.76,maxCats:12,idxYPct:.80,idxHPct:.042,matYPct:.852,matHPct:.042,backYPct:.906,backHPct:.040};
+const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catGapPct:.005,maxCats:10,idxYPct:.80,idxHPct:.042,matYPct:.852,matHPct:.042,backYPct:.906,backHPct:.040};
 
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
@@ -1705,7 +1705,6 @@ function addPdfLinks(pdf,page,navData,state,isP){
     const pad=sW*.06,bX=sX+pad,bW=sW-pad*2;
     const cats=categories.slice(0,NAV.maxCats);
     const n=cats.length;
-    const tH=n>0?(NAV.catYEndPct-NAV.catYStartPct)*pageH/n:0;
     const currentCatKey=ordCatMap[page.ordId]||null;
     // 9pt cap-height ≈ 2.1mm → half = 1.05mm offset below visual centre for alphabetic baseline
     const mid=(bY,bH)=>bY+bH/2+1.05;
@@ -1718,30 +1717,40 @@ function addPdfLinks(pdf,page,navData,state,isP){
       pdf.setFillColor(...fillRgb);rr(bY,bH,'F');
       pdf.setDrawColor(...borderRgb);rr(bY,bH,'S',lw);
     };
+    // Cat buttons: fixed height = same as IDX/MAT, centred in available zone above IDX
+    const btnH=NAV.idxHPct*pageH;
+    const gap=NAV.catGapPct*pageH;
+    const available=(NAV.idxYPct-0.01-NAV.catYStartPct)*pageH;
+    const blockH=n*btnH+(n>1?(n-1)*gap:0);
+    const startOff=Math.max(0,(available-blockH)/2);
 
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);
     cats.forEach((cat,i)=>{
       const isCurr=cat.key===currentCatKey;
-      const slotY=NAV.catYStartPct*pageH+i*tH;
-      const bH=tH*.50;
-      const tY=slotY+(tH-bH)/2;
-      const words=cat.name.toUpperCase().trim().split(/\s+/).slice(0,2);
-      const label=words.map(w=>w.length>8?w.slice(0,7)+'.':w).join(' ');
+      const tY=NAV.catYStartPct*pageH+startOff+i*(btnH+gap);
+      const up=cat.name.toUpperCase().trim();
+      let label=up;
+      if(pdf.getTextWidth(up)>bW*.88){
+        const words=up.split(/\s+/);
+        label=words.slice(0,2).map(w=>w.length>7?w.slice(0,6)+'.':w).join(' ');
+        if(pdf.getTextWidth(label)>bW*.88)label=up.slice(0,7)+'.';
+      }
       if(isCurr){
-        drawBtn(tY,bH,hexRgb(p.c2),hexRgb(shade(p.c2,-18)),.3);
+        drawBtn(tY,btnH,hexRgb(p.c2),hexRgb(shade(p.c2,-18)),.3);
         pdf.setTextColor(255,255,255);
       }else{
-        drawBtn(tY,bH,[252,252,252],hexRgb(shade(p.c1,-22)),.2);
+        drawBtn(tY,btnH,[252,252,252],hexRgb(shade(p.c1,-22)),.2);
         pdf.setTextColor(...hexRgb(shade(p.c3,25)));
       }
-      pdf.setFont('helvetica','bold');pdf.setFontSize(9);
-      pdf.text(label,bX+bW/2,mid(tY,bH),{align:'center'});
-      go(bX,slotY,bW,tH,cat.pageNum);
+      pdf.text(label,bX+bW/2,mid(tY,btnH),{align:'center'});
+      go(bX,tY,bW,btnH,cat.pageNum);
     });
 
     if(categories.length>NAV.maxCats){
-      pdf.setFont('helvetica','normal');pdf.setFontSize(7);
+      const overflowY=NAV.catYStartPct*pageH+startOff+n*(btnH+gap)-gap+btnH*.5;
+      pdf.setFont('helvetica','normal');pdf.setFontSize(6);
       pdf.setTextColor(...hexRgb(shade(p.c3,50)));
-      pdf.text('+'+String(categories.length-NAV.maxCats),bX+bW/2,(NAV.catYEndPct-.018)*pageH,{align:'center'});
+      pdf.text('+'+String(categories.length-NAV.maxCats),bX+bW/2,overflowY,{align:'center'});
     }
 
     if(idxPageNum){
