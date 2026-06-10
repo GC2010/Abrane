@@ -1700,6 +1700,8 @@ function buildNavData(state,pages){
       });
     });
   });
+  console.log('[PDF DEBUG] pageAccessories:',JSON.stringify(state.pageAccessories));
+  console.log('[PDF DEBUG] accessoryBackMap:',JSON.stringify(accessoryBackMap));
   return{pageMap,idxPageNum:idxPage?pageMap[idxPage.key]:null,matPageNum:matPage?pageMap[matPage.key]:null,categories,ordCatMap,accessoryBackMap};
 }
 
@@ -1805,6 +1807,7 @@ function addPdfLinks(pdf,page,navData,state,isP){
     const cW=(BW-lPx-BW*.09-gap)/2;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
     const resolveN=r=>r.pageKey?pageMap[r.pageKey]:r.page;
+    console.log('[PDF DEBUG] index rows:',pRows.map(r=>({name:r.name,isCat:r.isCat,pageKey:r.pageKey,resolvedPage:resolveN(r)})));
     pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),resolveN(r));});
     if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),resolveN(r));});}
   }
