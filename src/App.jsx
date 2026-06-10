@@ -104,7 +104,7 @@ const BrandCtx = React.createContext({officialLogo:'',wmLogo:'',shopLogos:{},sta
 const NavCtx = React.createContext(null);
 const PrintCtx = React.createContext(false);
 // Layout constants (fractions of page size) — used by addPdfLinks for drawing + hotspots
-const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catGapPct:.005,maxCats:10,idxYPct:.80,idxHPct:.042,matYPct:.852,matHPct:.042,backYPct:.906,backHPct:.040};
+const NAV={stripeXPct:.90,stripeWPct:.10,catYStartPct:.32,catGapPct:.005,maxCats:12,idxYPct:.80,idxHPct:.042,matYPct:.852,matHPct:.042,backYPct:.906,backHPct:.040};
 
 const USERS = [
   {id:'u-admin',name:'Administrateur ABRANE',initials:'AD',role:'superadmin',hasSig:false,team:'ABRANE',requiresPassword:true},
