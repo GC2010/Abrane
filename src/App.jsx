@@ -1658,33 +1658,17 @@ function ExportPageWrapper({page,pageIndex,totalPages,state}) {
 // Parse hex '#rrggbb' → [r,g,b] for jsPDF drawing
 const hexRgb=hex=>{try{const v=hex.replace('#','');return[parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)];}catch{return[0,0,0];}};
 
-// Adds a PDF Named-Action "GoBack" link annotation to the current page.
-// Uses jsPDF internals (newAdditionalObject + reference annotation) so the
-// viewer's navigation history stack is used — identical to a browser Back button.
-// Works in Adobe Acrobat / Foxit; silently does nothing in browser-based viewers.
-const addGoBackAnnot=(pdf,x,y,w,h)=>{
-  try{
-    const hc=pdf.internal.getHorizontalCoordinate;
-    const vc=pdf.internal.getVerticalCoordinate;
-    const f=pdf.hpf;
-    // Rect: [llx lly urx ury] in PDF points (Y-axis bottom-up)
-    const rect=`${f(hc(x))} ${f(vc(y+h))} ${f(hc(x+w))} ${f(vc(y))}`;
-    const obj=pdf.internal.newAdditionalObject();
-    obj.content=`<</Type /Annot /Subtype /Link /Rect [${rect}] /Border [0 0 0] /A <</Type /Action /S /Named /N /GoBack>>>>`;
-    pdf.internal.getCurrentPageInfo().pageContext.annotations.push({type:'reference',object:obj});
-  }catch(_){}
-};
 
 function buildIndexRows(state){
   const tot=state.contentOrder.filter(it=>it.type==='cat'||(state.idxMode!=='cats'&&state.files.find(x=>x.id===it.fileId))).length;
   const nI=Math.max(1,Math.ceil(tot/40));
   let pgN=2+nI;
-  if(state.enMat)pgN+=Math.ceil(state.thumbCount/12);
+  if(state.enMat)pgN+=Math.max(1,Math.ceil(state.thumbCount/12));
   if(state.enNotes)pgN+=1;
   const rows=[];
   state.contentOrder.forEach(it=>{
     if(it.type==='cat'){rows.push({name:it.name,page:pgN,isCat:true});pgN++;}
-    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){rows.push({name:it.label||f.name.replace(/\.[^.]+$/,''),page:pgN,isCat:false});pgN+=f.pages||1;}else pgN++;}
+    else if(state.idxMode!=='cats'){const f=state.files.find(x=>x.id===it.fileId);if(f){rows.push({name:it.label||f.name.replace(/\.[^.]+$/,''),page:pgN,isCat:false,pageKey:'f-'+it.id+'-0'});pgN+=f.pages||1;}else pgN++;}
   });
   return rows;
 }
@@ -1702,7 +1686,21 @@ function buildNavData(state,pages){
     if(it.type==='cat')lastCatKey='cat-'+it.id;
     else ordCatMap[it.id]=lastCatKey;
   });
-  return{pageMap,idxPageNum:idxPage?pageMap[idxPage.key]:null,matPageNum:matPage?pageMap[matPage.key]:null,categories,ordCatMap};
+  // accessoryBackMap: maps each accessory page key → page number of the product page that references it.
+  // This enables a deterministic BACK link that doesn't rely on viewer navigation history.
+  const accessoryBackMap={};
+  Object.entries(state.pageAccessories||{}).forEach(([contentPageKey,accOrdIds])=>{
+    const fromPageNum=pageMap[contentPageKey];
+    if(!fromPageNum)return;
+    (accOrdIds||[]).forEach(accOrdId=>{
+      pages.forEach(ap=>{
+        if(ap.type==='content'&&ap.ordId===accOrdId&&!(ap.key in accessoryBackMap)){
+          accessoryBackMap[ap.key]=fromPageNum;
+        }
+      });
+    });
+  });
+  return{pageMap,idxPageNum:idxPage?pageMap[idxPage.key]:null,matPageNum:matPage?pageMap[matPage.key]:null,categories,ordCatMap,accessoryBackMap};
 }
 
 function addPdfLinks(pdf,page,navData,state,isP){
@@ -1779,17 +1777,25 @@ function addPdfLinks(pdf,page,navData,state,isP){
       go(bX,bY,bW,bH,matPageNum);
     }
 
-    if(curN>1){
-      const bY=NAV.backYPct*pageH,bH=NAV.backHPct*pageH;
-      drawBtn(bY,bH,[255,255,255],hexRgb(shade(p.c3,40)),.25);
-      pdf.setTextColor(...hexRgb(shade(p.c3,30)));
-      pdf.setFont('helvetica','normal');pdf.setFontSize(8);
-      pdf.text('< BACK',bX+bW/2,mid(bY,bH),{align:'center'});
-      addGoBackAnnot(pdf,bX,bY,bW,bH);
+    {
+      // BACK button: deterministic link using pdf.link() — works in all viewers.
+      // Priority: accessory→product page, content→category page, category→index page.
+      const fromPage=navData.accessoryBackMap?.[page.key]
+        ||(page.type==='content'&&ordCatMap[page.ordId]?pageMap[ordCatMap[page.ordId]]:null)
+        ||(page.type==='category'&&navData.idxPageNum?navData.idxPageNum:null);
+      if(fromPage&&curN>1){
+        const bY=NAV.backYPct*pageH,bH=NAV.backHPct*pageH;
+        drawBtn(bY,bH,[255,255,255],hexRgb(shade(p.c3,40)),.25);
+        pdf.setTextColor(...hexRgb(shade(p.c3,30)));
+        pdf.setFont('helvetica','normal');pdf.setFontSize(8);
+        pdf.text('< BACK',bX+bW/2,mid(bY,bH),{align:'center'});
+        go(bX,bY,bW,bH,fromPage);
+      }
     }
   }
 
   // Index: each row → its content page
+  // Use pageMap (same source as category tabs) to resolve page numbers reliably.
   if(page.type==='index'){
     const pI=page.pageIndex||0,rows=buildIndexRows(state);
     const pRows=rows.slice(pI*40,(pI+1)*40);
@@ -1798,8 +1804,9 @@ function addPdfLinks(pdf,page,navData,state,isP){
     const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=24,gap=16;
     const cW=(BW-lPx-BW*.09-gap)/2;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
-    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});
-    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
+    const resolveN=r=>r.pageKey?pageMap[r.pageKey]:r.page;
+    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),resolveN(r));});
+    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),resolveN(r));});}
   }
 
   // Content: accessory thumbnails → accessory pages
