@@ -1767,7 +1767,6 @@ function addPdfLinks(pdf,page,navData,state,isP){
 
   if(page.type==='index'){
     const pI=page.pageIndex||0;
-    // Build a fresh page list and look up each item by ordId — avoids any pageMap key mismatch.
     const allPages=buildPageList(state);
     const idxRows=[];
     state.contentOrder.forEach(it=>{
@@ -1776,15 +1775,19 @@ function addPdfLinks(pdf,page,navData,state,isP){
         const f=state.files.find(x=>x.id===it.fileId);
         if(!f)return;
         const pg=allPages.find(p=>p.type==='content'&&p.ordId===it.id&&(p.pageIdx===0||!p.pageIdx));
+        if(!pg)console.warn('[IDX MISS] ordId:',it.id,'isAcc:',!!it.isAccessory);
         idxRows.push({isCat:false,n:pg?pg.pageNum:null});
       }
     });
     const pRows=idxRows.slice(pI*40,(pI+1)*40);
+    const twoCol=pRows.length>20;
     const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=24,gap=16;
     const cW=(BW-lPx-BW*.09-gap)/2;
+    // col1W: full content width for single-column layout, half-width for two-column
+    const col1W=twoCol?cW:BW-lPx-BW*.09;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
-    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat&&r.n)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.n);});
-    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat&&r.n)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.n);});}
+    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat&&r.n)go(tx(lPx),ty(tPx+i*rH),tx(col1W),ty(rH),r.n);});
+    if(twoCol){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat&&r.n)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.n);});}
   }
 
   // Content: accessory thumbnails → accessory pages
