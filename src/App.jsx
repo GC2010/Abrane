@@ -1290,7 +1290,7 @@ function IndexPage({state,isPortrait,isRing,pageIndex=0}) {
   const pageRows=allRows.slice(pageIndex*40,(pageIndex+1)*40);
   const col1=pageRows.slice(0,20),col2=pageRows.slice(20,40);
   const nav=React.useContext(NavCtx);
-  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'center',gap:4,padding:'5px 0',borderBottom:nav&&!r.isCat?`1px solid ${shade(p.c2,-5)}`:`1px dotted ${T.line}`,fontSize:11}}>
+  const Row=({r,i})=><div key={i} style={{display:'flex',alignItems:'center',gap:4,padding:'5px 0',height:26,boxSizing:'border-box',borderBottom:nav&&!r.isCat?`1px solid ${shade(p.c2,-5)}`:`1px dotted ${T.line}`,fontSize:11}}>
     <span style={{flex:1,color:r.isCat?p.c2:r.isAccessory?'#5B6CA8':T.ink2,fontWeight:r.isCat?700:400,display:'flex',alignItems:'center',gap:3}}>
       {r.isAccessory&&<Icon name="link" size={8} color="#5B6CA8" stroke={2}/>}
       {r.name}
@@ -1770,9 +1770,10 @@ function addPdfLinks(pdf,page,navData,state,isP){
     const pI=page.pageIndex||0,rows=buildIndexRows(state);
     const pRows=rows.slice(pI*40,(pI+1)*40);
     // tPx: top padding (5%) + h3 height (22px×1.2=26) + h3 margin-bottom (12) = 38px
-    // rH: row padding 5+5=10, font 11×1.2≈13, border 1 → ~24px
-    const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=24,gap=16;
-    const cW=(BW-lPx-BW*.09-gap)/2;
+    // rH: matches Row explicit height:26 (boxSizing:border-box) in IndexPage
+    const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=26,gap=16;
+    const fullW=BW-lPx-BW*.09;
+    const cW=pRows.length>20?(fullW-gap)/2:fullW;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
     pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});
     if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.page);});}
