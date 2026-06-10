@@ -1686,21 +1686,7 @@ function buildNavData(state,pages){
     if(it.type==='cat')lastCatKey='cat-'+it.id;
     else ordCatMap[it.id]=lastCatKey;
   });
-  // accessoryBackMap: maps each accessory page key → page number of the product page that references it.
-  // This enables a deterministic BACK link that doesn't rely on viewer navigation history.
-  const accessoryBackMap={};
-  Object.entries(state.pageAccessories||{}).forEach(([contentPageKey,accOrdIds])=>{
-    const fromPageNum=pageMap[contentPageKey];
-    if(!fromPageNum)return;
-    (accOrdIds||[]).forEach(accOrdId=>{
-      pages.forEach(ap=>{
-        if(ap.type==='content'&&ap.ordId===accOrdId&&!(ap.key in accessoryBackMap)){
-          accessoryBackMap[ap.key]=fromPageNum;
-        }
-      });
-    });
-  });
-  return{pageMap,idxPageNum:idxPage?pageMap[idxPage.key]:null,matPageNum:matPage?pageMap[matPage.key]:null,categories,ordCatMap,accessoryBackMap};
+  return{pageMap,idxPageNum:idxPage?pageMap[idxPage.key]:null,matPageNum:matPage?pageMap[matPage.key]:null,categories,ordCatMap};
 }
 
 function addPdfLinks(pdf,page,navData,state,isP){
@@ -1777,36 +1763,20 @@ function addPdfLinks(pdf,page,navData,state,isP){
       go(bX,bY,bW,bH,matPageNum);
     }
 
-    {
-      // BACK button: deterministic link using pdf.link() — works in all viewers.
-      // Priority: accessory→product page, content→category or index, category→index, fallback→cover(1).
-      const fromPage=navData.accessoryBackMap?.[page.key]
-        ||(page.type==='content'?(pageMap[ordCatMap[page.ordId]]||navData.idxPageNum||1):null)
-        ||(page.type==='category'?(navData.idxPageNum||1):null);
-      if(fromPage&&curN>1){
-        const bY=NAV.backYPct*pageH,bH=NAV.backHPct*pageH;
-        drawBtn(bY,bH,[255,255,255],hexRgb(shade(p.c3,40)),.25);
-        pdf.setTextColor(...hexRgb(shade(p.c3,30)));
-        pdf.setFont('helvetica','normal');pdf.setFontSize(8);
-        pdf.text('< BACK',bX+bW/2,mid(bY,bH),{align:'center'});
-        go(bX,bY,bW,bH,fromPage);
-      }
-    }
   }
 
-  // Index: each row → its content page
-  // Use pageMap (same source as category tabs) to resolve page numbers reliably.
   if(page.type==='index'){
     const pI=page.pageIndex||0;
-    // Build rows mirroring IndexPage exactly: skip items with missing files, skip non-cats when idxMode==='cats'.
-    // Resolve page numbers directly via pageMap (same source as buildPageList) — avoids any pgN drift.
+    // Build a fresh page list and look up each item by ordId — avoids any pageMap key mismatch.
+    const allPages=buildPageList(state);
     const idxRows=[];
     state.contentOrder.forEach(it=>{
       if(it.type==='cat'){idxRows.push({isCat:true,n:null});}
       else if(state.idxMode!=='cats'){
         const f=state.files.find(x=>x.id===it.fileId);
         if(!f)return;
-        idxRows.push({isCat:false,n:pageMap['f-'+it.id+'-0']||null});
+        const pg=allPages.find(p=>p.type==='content'&&p.ordId===it.id&&(p.pageIdx===0||!p.pageIdx));
+        idxRows.push({isCat:false,n:pg?pg.pageNum:null});
       }
     });
     const pRows=idxRows.slice(pI*40,(pI+1)*40);
