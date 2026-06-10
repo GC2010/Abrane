@@ -1700,8 +1700,6 @@ function buildNavData(state,pages){
       });
     });
   });
-  console.log('[PDF DEBUG] pageAccessories:',JSON.stringify(state.pageAccessories));
-  console.log('[PDF DEBUG] accessoryBackMap:',JSON.stringify(accessoryBackMap));
   return{pageMap,idxPageNum:idxPage?pageMap[idxPage.key]:null,matPageNum:matPage?pageMap[matPage.key]:null,categories,ordCatMap,accessoryBackMap};
 }
 
@@ -1799,17 +1797,24 @@ function addPdfLinks(pdf,page,navData,state,isP){
   // Index: each row → its content page
   // Use pageMap (same source as category tabs) to resolve page numbers reliably.
   if(page.type==='index'){
-    const pI=page.pageIndex||0,rows=buildIndexRows(state);
-    const pRows=rows.slice(pI*40,(pI+1)*40);
-    // tPx: top padding (5%) + h3 height (22px×1.2=26) + h3 margin-bottom (12) = 38px
-    // rH: row padding 5+5=10, font 11×1.2≈13, border 1 → ~24px
+    const pI=page.pageIndex||0;
+    // Build rows mirroring IndexPage exactly: skip items with missing files, skip non-cats when idxMode==='cats'.
+    // Resolve page numbers directly via pageMap (same source as buildPageList) — avoids any pgN drift.
+    const idxRows=[];
+    state.contentOrder.forEach(it=>{
+      if(it.type==='cat'){idxRows.push({isCat:true,n:null});}
+      else if(state.idxMode!=='cats'){
+        const f=state.files.find(x=>x.id===it.fileId);
+        if(!f)return;
+        idxRows.push({isCat:false,n:pageMap['f-'+it.id+'-0']||null});
+      }
+    });
+    const pRows=idxRows.slice(pI*40,(pI+1)*40);
     const lPx=BW*(isR?.12:.05),tPx=BH*.05+38,rH=24,gap=16;
     const cW=(BW-lPx-BW*.09-gap)/2;
     const tx=v=>v/BW*pageW,ty=v=>v/BH*pageH;
-    const resolveN=r=>(r.pageKey&&pageMap[r.pageKey])||r.page;
-    console.log('[PDF DEBUG] index rows:',pRows.map(r=>({name:r.name,isCat:r.isCat,pageKey:r.pageKey,resolvedPage:resolveN(r)})));
-    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),resolveN(r));});
-    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),resolveN(r));});}
+    pRows.slice(0,20).forEach((r,i)=>{if(!r.isCat&&r.n)go(tx(lPx),ty(tPx+i*rH),tx(cW),ty(rH),r.n);});
+    if(pRows.length>20){const c2X=lPx+cW+gap;pRows.slice(20,40).forEach((r,i)=>{if(!r.isCat&&r.n)go(tx(c2X),ty(tPx+i*rH),tx(cW),ty(rH),r.n);});}
   }
 
   // Content: accessory thumbnails → accessory pages
