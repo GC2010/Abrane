@@ -2421,9 +2421,29 @@ function NotesPanel({state,update}) {
 }
 function FolderImportModal({groups,parentName,onConfirm,onClose,importing}){
   const [sel,setSel]=useState(()=>Object.fromEntries(groups.map(g=>[g.name,true])));
+  const [ordered,setOrdered]=useState(groups);
+  const dragIdx=useRef(null);
   const toggle=name=>setSel(s=>({...s,[name]:!s[name]}));
-  const selGroups=groups.filter(g=>sel[g.name]);
+  const selGroups=ordered.filter(g=>sel[g.name]);
   const totalFiles=selGroups.reduce((sum,g)=>sum+g.files.length,0);
+
+  const handleDragStart=(i,e)=>{
+    dragIdx.current=i;
+    e.dataTransfer.effectAllowed='move';
+  };
+  const handleDragOver=(i,e)=>{
+    e.preventDefault();
+    if(dragIdx.current===null||dragIdx.current===i) return;
+    setOrdered(og=>{
+      const next=[...og];
+      const [moved]=next.splice(dragIdx.current,1);
+      next.splice(i,0,moved);
+      dragIdx.current=i;
+      return next;
+    });
+  };
+  const handleDragEnd=()=>{ dragIdx.current=null; };
+
   return(
     <Scrim onClose={importing?()=>{}:onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:14,width:440,maxWidth:'94vw',maxHeight:'85vh',boxShadow:'0 24px 60px rgba(0,0,0,.22)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -2439,22 +2459,36 @@ function FolderImportModal({groups,parentName,onConfirm,onClose,importing}){
           </div>
           <div style={{fontSize:11.5,color:T.ink3,marginLeft:36}}>
             <span style={{fontWeight:600,color:T.ink2}}>{parentName}</span>
-            {' — '}sélectionnez les sous-dossiers à importer
+            {' — '}sélectionnez et ordonnez les sous-dossiers à importer
           </div>
         </div>
         <div style={{overflowY:'auto',flex:1,padding:'10px 16px'}}>
-          {groups.map(g=>{
+          {ordered.map((g,i)=>{
             const isAcc=g.isAccessory;
             const isOn=sel[g.name];
             const exts=[...new Set(g.files.map(f=>f.name.split('.').pop()?.toLowerCase()).filter(Boolean))];
             const extLabel=exts.slice(0,3).map(e=>e.toUpperCase()).join(' · ');
             return(
-              <div key={g.name} onClick={()=>!importing&&toggle(g.name)} style={{
-                display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,marginBottom:4,
-                border:`1.5px solid ${isOn?(isAcc?T.gold:T.navy):T.line}`,
-                background:isOn?(isAcc?T.goldTint:T.navyTint):T.panel,
-                cursor:importing?'default':'pointer',transition:'all .12s',
-              }}>
+              <div key={g.name}
+                draggable={!importing}
+                onDragStart={e=>handleDragStart(i,e)}
+                onDragOver={e=>handleDragOver(i,e)}
+                onDragEnd={handleDragEnd}
+                onClick={()=>!importing&&toggle(g.name)}
+                style={{
+                  display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,marginBottom:4,
+                  border:`1.5px solid ${isOn?(isAcc?T.gold:T.navy):T.line}`,
+                  background:isOn?(isAcc?T.goldTint:T.navyTint):T.panel,
+                  cursor:importing?'default':'pointer',transition:'border .12s, background .12s',
+                  userSelect:'none',
+                }}>
+                {!importing&&(
+                  <svg width="10" height="14" viewBox="0 0 10 14" fill={T.ink4} style={{flexShrink:0,cursor:'grab'}}>
+                    <circle cx="3" cy="2.5" r="1.2"/><circle cx="7" cy="2.5" r="1.2"/>
+                    <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
+                    <circle cx="3" cy="11.5" r="1.2"/><circle cx="7" cy="11.5" r="1.2"/>
+                  </svg>
+                )}
                 <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${isOn?(isAcc?T.gold:T.navy):T.lineStrong}`,background:isOn?(isAcc?T.gold:T.navy):'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'all .12s'}}>
                   {isOn&&<Icon name="check" size={10} color="#fff" stroke={3}/>}
                 </div>
@@ -2581,6 +2615,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
       if(!parentName&&parts[0]) parentName=parts[0];
       if(parts.length<3) continue;
       const folderName=parts[1];
+      if(/^\[?archive\]?$/i.test(folderName)) continue;
       if(!groupMap[folderName]) groupMap[folderName]=[];
       groupMap[folderName].push(file);
     }
