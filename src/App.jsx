@@ -2420,7 +2420,7 @@ function NotesPanel({state,update}) {
   </>;
 }
 function FolderImportModal({groups,parentName,onConfirm,onClose,importing}){
-  const [sel,setSel]=useState(()=>Object.fromEntries(groups.map(g=>[g.name,true])));
+  const [sel,setSel]=useState(()=>Object.fromEntries(groups.map(g=>[g.name,!g.isArchive])));
   const [ordered,setOrdered]=useState(groups);
   const dragIdx=useRef(null);
   const toggle=name=>setSel(s=>({...s,[name]:!s[name]}));
@@ -2465,9 +2465,12 @@ function FolderImportModal({groups,parentName,onConfirm,onClose,importing}){
         <div style={{overflowY:'auto',flex:1,padding:'10px 16px'}}>
           {ordered.map((g,i)=>{
             const isAcc=g.isAccessory;
+            const isArch=g.isArchive;
             const isOn=sel[g.name];
             const exts=[...new Set(g.files.map(f=>f.name.split('.').pop()?.toLowerCase()).filter(Boolean))];
             const extLabel=exts.slice(0,3).map(e=>e.toUpperCase()).join(' · ');
+            const activeColor=isAcc?T.gold:isArch?T.ink3:T.navy;
+            const activeBg=isAcc?T.goldTint:isArch?T.panel:T.navyTint;
             return(
               <div key={g.name}
                 draggable={!importing}
@@ -2477,10 +2480,10 @@ function FolderImportModal({groups,parentName,onConfirm,onClose,importing}){
                 onClick={()=>!importing&&toggle(g.name)}
                 style={{
                   display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,marginBottom:4,
-                  border:`1.5px solid ${isOn?(isAcc?T.gold:T.navy):T.line}`,
-                  background:isOn?(isAcc?T.goldTint:T.navyTint):T.panel,
+                  border:`1.5px solid ${isOn?activeColor:T.line}`,
+                  background:isOn?activeBg:T.panel,
                   cursor:importing?'default':'pointer',transition:'border .12s, background .12s',
-                  userSelect:'none',
+                  userSelect:'none',opacity:isArch&&!isOn?.6:1,
                 }}>
                 {!importing&&(
                   <svg width="10" height="14" viewBox="0 0 10 14" fill={T.ink4} style={{flexShrink:0,cursor:'grab'}}>
@@ -2489,13 +2492,14 @@ function FolderImportModal({groups,parentName,onConfirm,onClose,importing}){
                     <circle cx="3" cy="11.5" r="1.2"/><circle cx="7" cy="11.5" r="1.2"/>
                   </svg>
                 )}
-                <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${isOn?(isAcc?T.gold:T.navy):T.lineStrong}`,background:isOn?(isAcc?T.gold:T.navy):'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'all .12s'}}>
+                <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${isOn?activeColor:T.lineStrong}`,background:isOn?activeColor:'transparent',display:'grid',placeItems:'center',flexShrink:0,transition:'all .12s'}}>
                   {isOn&&<Icon name="check" size={10} color="#fff" stroke={3}/>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <span style={{fontSize:13,fontWeight:600,color:isOn?T.ink:T.ink3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{g.name}</span>
                     {isAcc&&<span style={{fontSize:9,fontWeight:700,background:T.gold,color:'#fff',borderRadius:3,padding:'1px 5px',flexShrink:0,letterSpacing:'.04em'}}>ACCESSOIRES</span>}
+                    {isArch&&<span style={{fontSize:9,fontWeight:700,background:T.ink3,color:'#fff',borderRadius:3,padding:'1px 5px',flexShrink:0,letterSpacing:'.04em'}}>ARCHIVE</span>}
                   </div>
                   <div style={{fontSize:10.5,color:T.ink4,marginTop:1}}>{g.files.length} fichier{g.files.length>1?'s':''}{extLabel?` · ${extLabel}`:''}</div>
                 </div>
@@ -2610,17 +2614,19 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     // Group by first subfolder; ignore files at root of selected folder (parts.length < 3)
     const groupMap={};
     let parentName='';
+    const isArchiveName=n=>/^\[?archive\]?$/i.test(n);
     for(const file of files){
       const parts=file.webkitRelativePath.split('/');
       if(!parentName&&parts[0]) parentName=parts[0];
       if(parts.length<3) continue;
       const folderName=parts[1];
-      if(/^\[?archive\]?$/i.test(folderName)) continue;
+      // for non-archive groups, skip files that live inside a deeper archive subfolder
+      if(!isArchiveName(folderName)&&parts.slice(2,-1).some(isArchiveName)) continue;
       if(!groupMap[folderName]) groupMap[folderName]=[];
       groupMap[folderName].push(file);
     }
     const groups=Object.entries(groupMap).map(([name,groupFiles])=>({
-      name,files:groupFiles,isAccessory:name.toLowerCase()==='accessoires',
+      name,files:groupFiles,isAccessory:name.toLowerCase()==='accessoires',isArchive:isArchiveName(name),
     }));
     if(!groups.length){
       alert('Aucun sous-dossier détecté. Organisez vos fichiers dans des sous-dossiers.');
