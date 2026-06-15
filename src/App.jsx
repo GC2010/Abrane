@@ -3142,7 +3142,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
         style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:6,opacity:importing?.6:1,border:`1.5px solid ${T.navy}`,color:T.navy,fontWeight:700}}>
         <Icon name="folder" size={14} color={T.navy}/>Importer dossier
       </button>
-      {state.contentOrder.some(o=>o.type==='cat'&&!o.linked)&&(
+      {state.contentOrder.length>0&&state.contentOrder.some(o=>o.type!=='cat'||!o.linked)&&(
         <button onClick={()=>!importing&&linkExistingFolder()} disabled={importing}
           title="Collega le categorie esistenti a una cartella locale senza re-importare"
           style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:4,opacity:importing?.6:1,border:`1.5px solid ${T.ink3}`,color:T.ink2,fontWeight:700}}>
