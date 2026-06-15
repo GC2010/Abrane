@@ -4,6 +4,7 @@ import defaultLogoUrl from './assets/Logo.png';
 import defaultWmUrl from './assets/Filigrane.png';
 import defaultStampUrl from './assets/Tampon.jpg';
 import { USE_CLOUD } from './lib/supabase.js';
+import { saveFolderLink, getFolderLink, getAllFolderLinks } from './lib/folderLinks.js';
 import { signIn, signInByName, signUpWithName, signOut, getSession, getProfile, updateProfile, toAppUser, listUsers, deleteUser } from './lib/auth.js';
 import { loadProjects, loadProject, upsertProject, deleteProject, projectToDisplay,
          loadTemplates, upsertTemplate, deleteTemplate, templateToDisplay,
@@ -2520,6 +2521,50 @@ function FolderImportModal({groups,parentName,onConfirm,onClose,importing}){
   );
 }
 
+function FolderUpdateModal({results,onApply,onClose,applying}){
+  const total=results.reduce((s,c)=>s+c.changed.length,0);
+  return(
+    <Scrim onClose={applying?()=>{}:onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:14,width:440,maxWidth:'94vw',maxHeight:'85vh',boxShadow:'0 24px 60px rgba(0,0,0,.22)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{padding:'20px 24px 14px',borderBottom:`1px solid ${T.lineSoft}`,flexShrink:0}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:28,height:28,borderRadius:6,background:T.gold,display:'grid',placeItems:'center',flexShrink:0}}>
+                <Icon name="history" size={14} color="#fff"/>
+              </div>
+              <div style={{fontSize:15,fontWeight:700,color:T.ink}}>File aggiornati</div>
+            </div>
+            {!applying&&<button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',padding:4,display:'grid',placeItems:'center'}}><Icon name="close" size={16} color={T.ink3}/></button>}
+          </div>
+          <div style={{fontSize:11.5,color:T.ink3,marginLeft:36}}>
+            {total} file modificat{total===1?'o':'i'} in locale · le annotazioni verranno conservate
+          </div>
+        </div>
+        <div style={{overflowY:'auto',flex:1,padding:'12px 16px'}}>
+          {results.map(cat=>(
+            <div key={cat.catId} style={{marginBottom:10}}>
+              <div style={{fontSize:10.5,fontWeight:700,color:T.navy,background:T.navyTint,borderRadius:4,padding:'3px 8px',marginBottom:5,letterSpacing:'.04em'}}>{cat.catName}</div>
+              {cat.changed.map(f=>(
+                <div key={f.fileName} style={{display:'flex',alignItems:'center',gap:6,padding:'3px 8px',fontSize:11.5,color:T.ink2}}>
+                  <span style={{width:6,height:6,borderRadius:'50%',background:T.gold,flexShrink:0}}/>
+                  {f.fileName}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div style={{padding:'14px 20px',borderTop:`1px solid ${T.lineSoft}`,display:'flex',gap:8,justifyContent:'flex-end',flexShrink:0,background:T.panel}}>
+          {!applying&&<button onClick={onClose} style={btnSt()}>Annuler</button>}
+          <button onClick={()=>onApply(results)} disabled={applying} style={{...btnSt('primary'),opacity:applying?.6:1}}>
+            <Icon name={applying?'history':'upload'} size={13} color="#fff"/>
+            {applying?'Aggiornamento…':`Aggiorna ${total} file`}
+          </button>
+        </div>
+      </div>
+    </Scrim>
+  );
+}
+
 function ContentPanel({state,update,onNavigate,prominent=false}) {
   const fileInputRef=useRef(null);
   const accFileInputRef=useRef(null);
@@ -2533,6 +2578,8 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
   const [dropHighlight,setDropHighlight]=useState(false);
   const [pendingImport,setPendingImport]=useState(null);
   const [folderPreview,setFolderPreview]=useState(null);
+  const [folderUpdateResults,setFolderUpdateResults]=useState(null);
+  const [applyingUpdates,setApplyingUpdates]=useState(false);
   const toggleZoom=id=>setExpandedZoom(z=>({...z,[id]:!z[id]}));
 
   const InsertSlot=({label,onClick,isEnd=false})=>(
@@ -2635,6 +2682,31 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     setFolderPreview({groups,parentName});
   };
 
+  const handleDirectoryPicker=async()=>{
+    if(!window.showDirectoryPicker){folderInputRef.current?.click();return;}
+    let dirHandle;
+    try{dirHandle=await window.showDirectoryPicker({mode:'read'});}
+    catch(e){if(e.name!=='AbortError')console.error('showDirectoryPicker:',e);return;}
+    const isArchiveName=n=>/^\[?archive\]?$/i.test(n);
+    const groups=[];
+    for await(const[name,handle]of dirHandle.entries()){
+      if(handle.kind!=='directory')continue;
+      const lower=name.toLowerCase();
+      const isAccessory=lower==='accessoires'||lower==='accessories';
+      const isArchive=isArchiveName(name);
+      const files=[],fileSnapshots={};
+      for await(const[fname,fhandle]of handle.entries()){
+        if(fhandle.kind!=='file')continue;
+        const f=await fhandle.getFile();
+        files.push(f);
+        fileSnapshots[fname]={lastModified:f.lastModified,size:f.size};
+      }
+      if(files.length>0) groups.push({name,files,isAccessory,isArchive,_dirHandle:dirHandle,_subfolderName:name,_fileSnapshots:fileSnapshots});
+    }
+    if(!groups.length){alert('Aucun sous-dossier détecté. Organisez vos fichiers dans des sous-dossiers.');return;}
+    setFolderPreview({groups,parentName:dirHandle.name});
+  };
+
   const confirmFolderImport=async(selectedGroups)=>{
     if(!selectedGroups.length)return;
     setImporting(true);
@@ -2642,14 +2714,133 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     let newOrder=[...state.contentOrder];
     for(const group of selectedGroups){
       const catId='c'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-      newOrder=[...newOrder,{type:'cat',id:catId,name:group.name}];
+      const linked=!!(group._dirHandle&&group._fileSnapshots);
+      newOrder=[...newOrder,{type:'cat',id:catId,name:group.name,...(linked?{linked:true}:{})}];
       const{files:gFiles,orders:gOrders}=await processFilesRaw(group.files,group.isAccessory);
       newFiles=[...newFiles,...gFiles];
       newOrder=[...newOrder,...gOrders];
+      if(linked) await saveFolderLink(catId,group._dirHandle,group._subfolderName||group.name,group._fileSnapshots);
     }
     update({files:newFiles,contentOrder:newOrder,_dirty:true});
     setFolderPreview(null);
     setImporting(false);
+  };
+
+  const linkExistingFolder=async()=>{
+    if(!window.showDirectoryPicker){alert('Funzionalità disponibile solo su Chrome o Edge.');return;}
+    let dirHandle;
+    try{dirHandle=await window.showDirectoryPicker({mode:'read'});}
+    catch(e){if(e.name!=='AbortError')console.error(e);return;}
+    setImporting(true);
+    const unlinkedCats=state.contentOrder.filter(o=>o.type==='cat'&&!o.linked);
+    const catByName=Object.fromEntries(unlinkedCats.map(o=>[o.name.toLowerCase(),o]));
+    let linked=0;
+    const newOrder=[...state.contentOrder];
+    for await(const[name,handle]of dirHandle.entries()){
+      if(handle.kind!=='directory')continue;
+      const cat=catByName[name.toLowerCase()];
+      if(!cat)continue;
+      const fileSnapshots={};
+      for await(const[fname,fhandle]of handle.entries()){
+        if(fhandle.kind!=='file')continue;
+        const f=await fhandle.getFile();
+        fileSnapshots[fname]={lastModified:f.lastModified,size:f.size};
+      }
+      const catIdx=newOrder.findIndex(o=>o.id===cat.id);
+      if(catIdx!==-1) newOrder[catIdx]={...newOrder[catIdx],linked:true};
+      await saveFolderLink(cat.id,dirHandle,name,fileSnapshots);
+      linked++;
+    }
+    setImporting(false);
+    if(linked===0){alert('Nessuna sottocartella corrisponde ai nomi delle categorie del progetto.');return;}
+    update({contentOrder:newOrder,_dirty:true});
+  };
+
+  const checkFolderUpdates=async()=>{
+    const linkedCatIds=state.contentOrder.filter(o=>o.type==='cat'&&o.linked).map(o=>o.id);
+    if(!linkedCatIds.length)return;
+    const links=await getAllFolderLinks(linkedCatIds);
+    if(!links.length)return;
+    setImporting(true);
+    const results=[];
+    for(const link of links){
+      try{
+        const perm=await link.dirHandle.requestPermission({mode:'read'});
+        if(perm!=='granted')continue;
+        const subHandle=await link.dirHandle.getDirectoryHandle(link.subfolderName);
+        // Build set of file names already imported in this category
+        const catIdx=state.contentOrder.findIndex(o=>o.id===link.catId);
+        const importedNames=new Set();
+        if(catIdx!==-1){
+          let i=catIdx+1;
+          while(i<state.contentOrder.length&&state.contentOrder[i].type!=='cat'){
+            const ord=state.contentOrder[i];
+            if(ord.type==='file'){const sf=state.files.find(f=>f.id===ord.fileId);if(sf)importedNames.add(sf.name);}
+            i++;
+          }
+        }
+        const changed=[];
+        for await(const[fname,fhandle]of subHandle.entries()){
+          if(fhandle.kind!=='file')continue;
+          if(!importedNames.has(fname))continue; // ignora file non ancora importati
+          const snap=link.fileSnapshots?.[fname];
+          if(!snap)continue; // nessuna baseline → skip
+          const f=await fhandle.getFile();
+          if(f.lastModified!==snap.lastModified||f.size!==snap.size) changed.push({fileName:fname,fhandle,lastModified:f.lastModified,size:f.size});
+        }
+        if(changed.length>0){
+          const cat=state.contentOrder.find(o=>o.id===link.catId);
+          results.push({catId:link.catId,catName:cat?.name||link.subfolderName,changed});
+        }
+      }catch(e){console.warn('checkFolderUpdates:',link.subfolderName,e);}
+    }
+    setImporting(false);
+    if(results.length===0) alert('Tutti i file sono già aggiornati.');
+    else setFolderUpdateResults(results);
+  };
+
+  const applyFolderUpdates=async(results)=>{
+    setApplyingUpdates(true);
+    let newFiles=[...state.files];
+    for(const cat of results){
+      const catIdx=state.contentOrder.findIndex(o=>o.id===cat.catId);
+      if(catIdx===-1)continue;
+      // Build lookup: filename → fhandle
+      const handleByName=Object.fromEntries(cat.changed.map(c=>[c.fileName,c.fhandle]));
+      let i=catIdx+1;
+      while(i<state.contentOrder.length&&state.contentOrder[i].type!=='cat'){
+        const orderItem=state.contentOrder[i];
+        if(orderItem.type==='file'){
+          const stateFile=newFiles.find(f=>f.id===orderItem.fileId);
+          if(stateFile&&handleByName[stateFile.name]){
+            const fhandle=handleByName[stateFile.name];
+            const ext=stateFile.name.split('.').pop().toLowerCase();
+            let pageUrls=[],pageCount=1;
+            try{
+              const freshFile=await fhandle.getFile();
+              if(ext==='pdf'){const r=await renderPdfToDataUrls(freshFile);pageUrls=r.pageUrls;pageCount=r.pageCount;}
+              else if(ext==='docx'||ext==='doc'){const r=await renderDocxToDataUrls(freshFile);pageUrls=r.pageUrls;pageCount=r.pageCount;}
+              else{pageUrls=[await readFileAsDataUrl(freshFile)];}
+            }catch(e){console.warn('applyFolderUpdates render:',e);}
+            if(pageUrls.length>0){
+              const fIdx=newFiles.findIndex(f=>f.id===stateFile.id);
+              if(fIdx!==-1) newFiles[fIdx]={...newFiles[fIdx],pageUrls,pages:pageCount};
+            }
+          }
+        }
+        i++;
+      }
+      // Aggiorna snapshot IDB
+      const link=await getFolderLink(cat.catId);
+      if(link){
+        const newSnaps={...link.fileSnapshots};
+        for(const c of cat.changed) newSnaps[c.fileName]={lastModified:c.lastModified,size:c.size};
+        await saveFolderLink(cat.catId,link.dirHandle,link.subfolderName,newSnaps);
+      }
+    }
+    update({files:newFiles,_dirty:true});
+    setFolderUpdateResults(null);
+    setApplyingUpdates(false);
   };
 
   const handleDrop=async e=>{
@@ -2896,6 +3087,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
 
   return <>
     {folderPreview&&<FolderImportModal groups={folderPreview.groups} parentName={folderPreview.parentName} importing={importing} onClose={()=>!importing&&setFolderPreview(null)} onConfirm={confirmFolderImport}/>}
+    {folderUpdateResults&&<FolderUpdateModal results={folderUpdateResults} applying={applyingUpdates} onClose={()=>setFolderUpdateResults(null)} onApply={applyFolderUpdates}/>}
     <Sect title="Importer">
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.svg,.docx,.doc,.xlsx,.xls" style={{display:'none'}} onChange={handleImport}/>
       <input ref={folderInputRef} type="file" webkitdirectory="" style={{display:'none'}} onChange={handleFolderSelect}/>
@@ -2950,10 +3142,23 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
           <span style={{fontSize:12,color:T.ink3}}>JPG · PNG · SVG · PDF · Word · Excel</span>
         </div>
       )}
-      <button onClick={()=>!importing&&folderInputRef.current?.click()} disabled={importing}
+      <button onClick={()=>!importing&&handleDirectoryPicker()} disabled={importing}
         style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:6,opacity:importing?.6:1,border:`1.5px solid ${T.navy}`,color:T.navy,fontWeight:700}}>
         <Icon name="folder" size={14} color={T.navy}/>Importer dossier
       </button>
+      {state.contentOrder.length>0&&state.contentOrder.some(o=>o.type!=='cat'||!o.linked)&&(
+        <button onClick={()=>!importing&&linkExistingFolder()} disabled={importing}
+          title="Collega le categorie esistenti a una cartella locale senza re-importare"
+          style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:4,opacity:importing?.6:1,border:`1.5px solid ${T.ink3}`,color:T.ink2,fontWeight:700}}>
+          <Icon name="link" size={14} color={T.ink3}/>Collega dossier esistente
+        </button>
+      )}
+      {state.contentOrder.some(o=>o.type==='cat'&&o.linked)&&(
+        <button onClick={()=>!importing&&checkFolderUpdates()} disabled={importing}
+          style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:4,opacity:importing?.6:1,border:`1.5px solid ${T.gold}`,color:T.gold,fontWeight:700}}>
+          <Icon name="history" size={14} color={T.gold}/>Controlla aggiornamenti
+        </button>
+      )}
       <div style={{fontSize:10,color:T.ink4,textAlign:'center',marginTop:4}}>Glissez un fichier <em>sur</em> un autre pour les afficher côte à côte</div>
     </Sect>
     <Sect title="Accessoires">
@@ -3038,7 +3243,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
                   )}
                   <div style={{fontSize:10,color:T.ink4,display:'flex',alignItems:'center',gap:4,marginTop:2}}>
                     {isCat
-                      ?<span style={{background:T.goldSoft,color:T.navy,fontSize:8.5,fontWeight:700,padding:'1px 5px',borderRadius:3,letterSpacing:'.06em'}}>CATÉGORIE</span>
+                      ?<><span style={{background:T.goldSoft,color:T.navy,fontSize:8.5,fontWeight:700,padding:'1px 5px',borderRadius:3,letterSpacing:'.06em'}}>CATÉGORIE</span>{item.linked&&<span title="Dossier collegato" style={{background:T.navy,color:'#fff',fontSize:8,fontWeight:700,padding:'1px 5px',borderRadius:3,letterSpacing:'.04em',display:'flex',alignItems:'center',gap:2}}><Icon name="link" size={8} color="#fff" stroke={2}/>LINK</span>}</>
                       :<><span>{f.pages}p</span>{f.size&&<span>· {f.size}</span>}{f.type==='merged'&&<span style={{fontSize:8,fontWeight:700,background:T.navy,color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em'}}>combiné</span>}{item.isAccessory&&<span style={{fontSize:8,fontWeight:700,background:'#5B6CA8',color:'#fff',borderRadius:2,padding:'1px 4px',letterSpacing:'.05em',display:'flex',alignItems:'center',gap:2}}><Icon name="link" size={8} color="#fff" stroke={2}/>accessoire</span>}</>
                     }
                   </div>
