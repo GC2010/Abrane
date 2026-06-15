@@ -2786,7 +2786,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
           const snap=link.fileSnapshots?.[fname];
           if(!snap)continue; // nessuna baseline → skip
           const f=await fhandle.getFile();
-          if(f.lastModified!==snap.lastModified||f.size!==snap.size) changed.push({fileName:fname,file:f});
+          if(f.lastModified!==snap.lastModified||f.size!==snap.size) changed.push({fileName:fname,fhandle,lastModified:f.lastModified,size:f.size});
         }
         if(changed.length>0){
           const cat=state.contentOrder.find(o=>o.id===link.catId);
@@ -2805,21 +2805,24 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     for(const cat of results){
       const catIdx=state.contentOrder.findIndex(o=>o.id===cat.catId);
       if(catIdx===-1)continue;
+      // Build lookup: filename → fhandle
+      const handleByName=Object.fromEntries(cat.changed.map(c=>[c.fileName,c.fhandle]));
       let i=catIdx+1;
       while(i<state.contentOrder.length&&state.contentOrder[i].type!=='cat'){
         const orderItem=state.contentOrder[i];
         if(orderItem.type==='file'){
           const stateFile=newFiles.find(f=>f.id===orderItem.fileId);
-          if(stateFile){
-            const changedFile=cat.changed.find(c=>c.fileName===stateFile.name);
-            if(changedFile){
-              const ext=stateFile.name.split('.').pop().toLowerCase();
-              let pageUrls=[],pageCount=1;
-              try{
-                if(ext==='pdf'){const r=await renderPdfToDataUrls(changedFile.file);pageUrls=r.pageUrls;pageCount=r.pageCount;}
-                else if(ext==='docx'||ext==='doc'){const r=await renderDocxToDataUrls(changedFile.file);pageUrls=r.pageUrls;pageCount=r.pageCount;}
-                else{pageUrls=[await readFileAsDataUrl(changedFile.file)];}
-              }catch(e){console.warn('applyFolderUpdates render:',e);}
+          if(stateFile&&handleByName[stateFile.name]){
+            const fhandle=handleByName[stateFile.name];
+            const ext=stateFile.name.split('.').pop().toLowerCase();
+            let pageUrls=[],pageCount=1;
+            try{
+              const freshFile=await fhandle.getFile();
+              if(ext==='pdf'){const r=await renderPdfToDataUrls(freshFile);pageUrls=r.pageUrls;pageCount=r.pageCount;}
+              else if(ext==='docx'||ext==='doc'){const r=await renderDocxToDataUrls(freshFile);pageUrls=r.pageUrls;pageCount=r.pageCount;}
+              else{pageUrls=[await readFileAsDataUrl(freshFile)];}
+            }catch(e){console.warn('applyFolderUpdates render:',e);}
+            if(pageUrls.length>0){
               const fIdx=newFiles.findIndex(f=>f.id===stateFile.id);
               if(fIdx!==-1) newFiles[fIdx]={...newFiles[fIdx],pageUrls,pages:pageCount};
             }
@@ -2827,10 +2830,11 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
         }
         i++;
       }
+      // Aggiorna snapshot IDB
       const link=await getFolderLink(cat.catId);
       if(link){
         const newSnaps={...link.fileSnapshots};
-        for(const c of cat.changed) newSnaps[c.fileName]={lastModified:c.file.lastModified,size:c.file.size};
+        for(const c of cat.changed) newSnaps[c.fileName]={lastModified:c.lastModified,size:c.size};
         await saveFolderLink(cat.catId,link.dirHandle,link.subfolderName,newSnaps);
       }
     }
