@@ -2726,6 +2726,36 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
     setImporting(false);
   };
 
+  const linkExistingFolder=async()=>{
+    if(!window.showDirectoryPicker){alert('Funzionalità disponibile solo su Chrome o Edge.');return;}
+    let dirHandle;
+    try{dirHandle=await window.showDirectoryPicker({mode:'read'});}
+    catch(e){if(e.name!=='AbortError')console.error(e);return;}
+    setImporting(true);
+    const unlinkedCats=state.contentOrder.filter(o=>o.type==='cat'&&!o.linked);
+    const catByName=Object.fromEntries(unlinkedCats.map(o=>[o.name.toLowerCase(),o]));
+    let linked=0;
+    const newOrder=[...state.contentOrder];
+    for await(const[name,handle]of dirHandle.entries()){
+      if(handle.kind!=='directory')continue;
+      const cat=catByName[name.toLowerCase()];
+      if(!cat)continue;
+      const fileSnapshots={};
+      for await(const[fname,fhandle]of handle.entries()){
+        if(fhandle.kind!=='file')continue;
+        const f=await fhandle.getFile();
+        fileSnapshots[fname]={lastModified:f.lastModified,size:f.size};
+      }
+      const catIdx=newOrder.findIndex(o=>o.id===cat.id);
+      if(catIdx!==-1) newOrder[catIdx]={...newOrder[catIdx],linked:true};
+      await saveFolderLink(cat.id,dirHandle,name,fileSnapshots);
+      linked++;
+    }
+    setImporting(false);
+    if(linked===0){alert('Nessuna sottocartella corrisponde ai nomi delle categorie del progetto.');return;}
+    update({contentOrder:newOrder,_dirty:true});
+  };
+
   const checkFolderUpdates=async()=>{
     const linkedCatIds=state.contentOrder.filter(o=>o.type==='cat'&&o.linked).map(o=>o.id);
     if(!linkedCatIds.length)return;
@@ -3112,6 +3142,13 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
         style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:6,opacity:importing?.6:1,border:`1.5px solid ${T.navy}`,color:T.navy,fontWeight:700}}>
         <Icon name="folder" size={14} color={T.navy}/>Importer dossier
       </button>
+      {state.contentOrder.some(o=>o.type==='cat'&&!o.linked)&&(
+        <button onClick={()=>!importing&&linkExistingFolder()} disabled={importing}
+          title="Collega le categorie esistenti a una cartella locale senza re-importare"
+          style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:4,opacity:importing?.6:1,border:`1.5px solid ${T.ink3}`,color:T.ink2,fontWeight:700}}>
+          <Icon name="link" size={14} color={T.ink3}/>Collega dossier esistente
+        </button>
+      )}
       {state.contentOrder.some(o=>o.type==='cat'&&o.linked)&&(
         <button onClick={()=>!importing&&checkFolderUpdates()} disabled={importing}
           style={{...btnSt('ghost',true),width:'100%',justifyContent:'center',gap:7,marginTop:4,opacity:importing?.6:1,border:`1.5px solid ${T.gold}`,color:T.gold,fontWeight:700}}>
