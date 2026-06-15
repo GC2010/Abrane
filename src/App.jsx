@@ -176,11 +176,11 @@ const renderPdfToDataUrls = async file => {
   const pageUrls = [];
   for(let i=1;i<=pageCount;i++){
     const page = await pdf.getPage(i);
-    const vp = page.getViewport({scale:1.5});
+    const vp = page.getViewport({scale:2});
     const canvas = document.createElement('canvas');
     canvas.width = vp.width; canvas.height = vp.height;
     await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
-    pageUrls.push(canvas.toDataURL('image/jpeg',0.85));
+    pageUrls.push(canvas.toDataURL('image/jpeg',0.90));
   }
   return {pageCount,pageUrls};
 };
@@ -192,7 +192,7 @@ const htmlToPageDataUrl = (htmlContent, w=794, h=1123) => new Promise((res,rej)=
   ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,w,h);
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="padding:36px;font-family:Arial,sans-serif;font-size:11px;box-sizing:border-box;width:${w}px;height:${h}px;overflow:hidden;line-height:1.5;color:#1a1a1a;">${htmlContent}</div></foreignObject></svg>`;
   const img=new Image();
-  img.onload=()=>{ctx.drawImage(img,0,0);res(canvas.toDataURL('image/jpeg',0.85));};
+  img.onload=()=>{ctx.drawImage(img,0,0);res(canvas.toDataURL('image/jpeg',0.90));};
   img.onerror=rej;
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 });
@@ -2686,7 +2686,7 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
           ctx.drawImage(img1,Math.round((cv.width-w1)/2),0,w1,h1);
           ctx.drawImage(img2,Math.round((cv.width-w2)/2),h1,w2,h2);
         }
-        mergedUrls.push(cv.toDataURL('image/jpeg',0.85));
+        mergedUrls.push(cv.toDataURL('image/jpeg',0.90));
       }else{
         mergedUrls.push(u1||u2||null);
       }
