@@ -2738,12 +2738,25 @@ function ContentPanel({state,update,onNavigate,prominent=false}) {
         const perm=await link.dirHandle.requestPermission({mode:'read'});
         if(perm!=='granted')continue;
         const subHandle=await link.dirHandle.getDirectoryHandle(link.subfolderName);
+        // Build set of file names already imported in this category
+        const catIdx=state.contentOrder.findIndex(o=>o.id===link.catId);
+        const importedNames=new Set();
+        if(catIdx!==-1){
+          let i=catIdx+1;
+          while(i<state.contentOrder.length&&state.contentOrder[i].type!=='cat'){
+            const ord=state.contentOrder[i];
+            if(ord.type==='file'){const sf=state.files.find(f=>f.id===ord.fileId);if(sf)importedNames.add(sf.name);}
+            i++;
+          }
+        }
         const changed=[];
         for await(const[fname,fhandle]of subHandle.entries()){
           if(fhandle.kind!=='file')continue;
-          const f=await fhandle.getFile();
+          if(!importedNames.has(fname))continue; // ignora file non ancora importati
           const snap=link.fileSnapshots?.[fname];
-          if(!snap||f.lastModified>snap.lastModified||f.size!==snap.size) changed.push({fileName:fname,file:f});
+          if(!snap)continue; // nessuna baseline → skip
+          const f=await fhandle.getFile();
+          if(f.lastModified!==snap.lastModified||f.size!==snap.size) changed.push({fileName:fname,file:f});
         }
         if(changed.length>0){
           const cat=state.contentOrder.find(o=>o.id===link.catId);
